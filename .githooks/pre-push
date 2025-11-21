@@ -1,0 +1,35 @@
+#!/bin/sh
+# Pre-push hook for Ultimo
+#
+# Skip this hook with: git push --no-verify
+
+echo "🚀 Running pre-push checks..."
+echo "   💡 Skip with: git push --no-verify"
+echo ""
+
+# Run tests
+echo "  🧪 Running tests..."
+if ! cargo test --lib --features database --quiet; then
+    echo ""
+    echo "❌ Tests failed!"
+    echo "   Fix the failing tests or skip with: git push --no-verify"
+    exit 1
+fi
+
+# Run clippy
+echo "  📎 Running clippy..."
+if ! cargo clippy --all-targets --all-features -- -D warnings 2>&1 | grep -q "Finished"; then
+    echo "⚠️  Clippy warnings found, but continuing..."
+fi
+
+# Check coverage threshold
+echo "  📊 Checking coverage..."
+if ! cargo coverage 2>&1 | grep -q "Coverage meets minimum threshold"; then
+    echo ""
+    echo "❌ Coverage below minimum threshold (60%)!"
+    echo "   Add more tests or skip with: git push --no-verify"
+    exit 1
+fi
+
+echo "✅ All pre-push checks passed!"
+exit 0

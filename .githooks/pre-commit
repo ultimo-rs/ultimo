@@ -1,0 +1,21 @@
+#!/bin/sh
+# Pre-commit hook for Ultimo
+#
+# Skip this hook with: git commit --no-verify
+
+echo "🔍 Running pre-commit checks..."
+echo "   💡 Skip with: git commit --no-verify"
+echo ""
+
+# Run cargo fmt check
+echo "  ✨ Checking code formatting..."
+if ! cargo fmt --check; then
+    echo ""
+    echo "❌ Code formatting check failed!"
+    echo "   Run 'cargo fmt' to fix formatting issues."
+    echo "   Or skip with: git commit --no-verify"
+    exit 1
+fi
+
+echo "✅ Pre-commit checks passed!"
+exit 0

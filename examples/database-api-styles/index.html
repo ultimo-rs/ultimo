@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Database API Styles - Ultimo Framework</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial,
+          sans-serif;
+        max-width: 1200px;
+        margin: 50px auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      h1 {
+        color: #333;
+        border-bottom: 3px solid #4caf50;
+        padding-bottom: 10px;
+      }
+      h2 {
+        color: #555;
+        margin-top: 40px;
+        border-left: 4px solid #4caf50;
+        padding-left: 15px;
+      }
+      h3 {
+        color: #666;
+      }
+      .highlight {
+        background: #f4f4f4;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+      }
+      .style-section {
+        background: #fff;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+      }
+      pre {
+        background: #2d2d2d;
+        color: #f8f8f2;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+      }
+      code {
+        background: #f4f4f4;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: "Courier New", monospace;
+      }
+      .endpoint {
+        font-family: "Courier New", monospace;
+        background: #e3f2fd;
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin: 5px 0;
+        display: inline-block;
+      }
+      .method {
+        font-weight: bold;
+        color: #1976d2;
+        margin-right: 10px;
+      }
+      .key-point {
+        background: #e8f5e9;
+        border-left: 4px solid #4caf50;
+        padding: 15px;
+        margin: 20px 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+      }
+      th,
+      td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+      }
+      th {
+        background-color: #4caf50;
+        color: white;
+      }
+      tr:hover {
+        background-color: #f5f5f5;
+      }
+      .emoji {
+        font-size: 1.2em;
+        margin-right: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1><span class="emoji">🔄</span>Database API Styles Example</h1>
+
+    <div class="key-point">
+      <strong>Key Concept:</strong> Ultimo's database integration is
+      <strong>completely agnostic</strong> to your API routing style. The same
+      database operations (<code>ctx.sqlx()</code> and
+      <code>ctx.diesel()</code>) work seamlessly with REST, JSON-RPC, or any
+      custom routing pattern!
+    </div>
+
+    <p>
+      This example demonstrates
+      <strong>the same CRUD operations</strong> implemented in three different
+      API styles, all using the identical database logic.
+    </p>
+
+    <!-- Style 1: Traditional REST -->
+    <div class="style-section">
+      <h2><span class="emoji">🌐</span>Style 1: Traditional REST</h2>
+      <p>RESTful endpoints with resource-based URLs and HTTP verbs.</p>
+
+      <h3>Endpoints:</h3>
+      <div class="endpoint"><span class="method">GET</span> /rest/users</div>
+      <br />
+      <div class="endpoint">
+        <span class="method">GET</span> /rest/users/:id
+      </div>
+      <br />
+      <div class="endpoint"><span class="method">POST</span> /rest/users</div>
+      <br />
+      <div class="endpoint">
+        <span class="method">PUT</span> /rest/users/:id
+      </div>
+      <br />
+      <div class="endpoint">
+        <span class="method">DELETE</span> /rest/users/:id
+      </div>
+
+      <h3>Example Usage:</h3>
+      <pre>
+# List all users
+curl http://localhost:3003/rest/users
+
+# Get user by ID
+curl http://localhost:3003/rest/users/1
+
+# Create new user
+curl -X POST http://localhost:3003/rest/users \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Alice","email":"alice@example.com"}'
+
+# Update user
+curl -X PUT http://localhost:3003/rest/users/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Alice Smith"}'
+
+# Delete user
+curl -X DELETE http://localhost:3003/rest/users/1</pre
+      >
+
+      <h3>Best For:</h3>
+      <ul>
+        <li>✅ Public-facing APIs</li>
+        <li>✅ Standard CRUD operations</li>
+        <li>✅ HTTP caching with GET requests</li>
+        <li>✅ Clear, predictable URLs</li>
+      </ul>
+    </div>
+
+    <!-- Style 2: JSON-RPC -->
+    <div class="style-section">
+      <h2><span class="emoji">🔌</span>Style 2: JSON-RPC (Single Endpoint)</h2>
+      <p>
+        All operations go through a single endpoint with method-based dispatch.
+      </p>
+
+      <h3>Endpoint:</h3>
+      <div class="endpoint"><span class="method">POST</span> /rpc</div>
+
+      <h3>Example Usage:</h3>
+      <pre>
+# List all users
+curl -X POST http://localhost:3003/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"listUsers","params":{}}'
+
+# Get user by ID
+curl -X POST http://localhost:3003/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"getUser","params":{"id":1}}'
+
+# Create new user
+curl -X POST http://localhost:3003/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"createUser","params":{"name":"Alice","email":"alice@example.com"}}'
+
+# Update user
+curl -X POST http://localhost:3003/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"updateUser","params":{"id":1,"name":"Alice Smith"}}'
+
+# Delete user
+curl -X POST http://localhost:3003/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"deleteUser","params":{"id":1}}'</pre
+      >
+
+      <h3>Best For:</h3>
+      <ul>
+        <li>✅ Internal APIs and microservices</li>
+        <li>✅ Request batching (multiple operations in one call)</li>
+        <li>✅ Simple routing (one endpoint handles everything)</li>
+        <li>✅ Method-oriented rather than resource-oriented</li>
+      </ul>
+    </div>
+
+    <!-- Style 3: RPC-Style REST -->
+    <div class="style-section">
+      <h2>
+        <span class="emoji">🎯</span>Style 3: RPC-Style REST (Multiple
+        Endpoints)
+      </h2>
+      <p>Action-based endpoints (like tRPC or similar RPC frameworks).</p>
+
+      <h3>Endpoints:</h3>
+      <div class="endpoint">
+        <span class="method">GET</span> /rpc-rest/listUsers
+      </div>
+      <br />
+      <div class="endpoint">
+        <span class="method">GET</span> /rpc-rest/getUser?id=1
+      </div>
+      <br />
+      <div class="endpoint">
+        <span class="method">POST</span> /rpc-rest/createUser
+      </div>
+      <br />
+      <div class="endpoint">
+        <span class="method">POST</span> /rpc-rest/updateUser
+      </div>
+      <br />
+      <div class="endpoint">
+        <span class="method">POST</span> /rpc-rest/deleteUser
+      </div>
+
+      <h3>Example Usage:</h3>
+      <pre>
+# List all users
+curl http://localhost:3003/rpc-rest/listUsers
+
+# Get user by ID
+curl http://localhost:3003/rpc-rest/getUser?id=1
+
+# Create new user
+curl -X POST http://localhost:3003/rpc-rest/createUser \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Alice","email":"alice@example.com"}'
+
+# Update user
+curl -X POST http://localhost:3003/rpc-rest/updateUser \
+  -H 'Content-Type: application/json' \
+  -d '{"id":1,"name":"Alice Smith"}'
+
+# Delete user
+curl -X POST http://localhost:3003/rpc-rest/deleteUser \
+  -H 'Content-Type: application/json' \
+  -d '{"id":1}'</pre
+      >
+
+      <h3>Best For:</h3>
+      <ul>
+        <li>✅ Method/action-oriented APIs</li>
+        <li>✅ Clear method names in URLs (great for debugging)</li>
+        <li>✅ GET requests for queries (HTTP caching)</li>
+        <li>✅ TypeScript/JavaScript frameworks (tRPC-like)</li>
+      </ul>
+    </div>
+
+    <!-- Comparison Table -->
+    <h2><span class="emoji">📊</span>Comparison</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>REST</th>
+          <th>JSON-RPC</th>
+          <th>RPC-REST</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Endpoints</strong></td>
+          <td>Multiple (resource-based)</td>
+          <td>Single endpoint</td>
+          <td>Multiple (action-based)</td>
+        </tr>
+        <tr>
+          <td><strong>HTTP Methods</strong></td>
+          <td>GET, POST, PUT, DELETE</td>
+          <td>POST only</td>
+          <td>GET (queries), POST (mutations)</td>
+        </tr>
+        <tr>
+          <td><strong>URL Pattern</strong></td>
+          <td>/users, /users/:id</td>
+          <td>/rpc</td>
+          <td>/listUsers, /getUser</td>
+        </tr>
+        <tr>
+          <td><strong>HTTP Caching</strong></td>
+          <td>✅ GET requests</td>
+          <td>❌ POST only</td>
+          <td>✅ GET queries</td>
+        </tr>
+        <tr>
+          <td><strong>Debugging</strong></td>
+          <td>✅ Clear in logs</td>
+          <td>⚠️ Need to inspect body</td>
+          <td>✅ Clear in logs</td>
+        </tr>
+        <tr>
+          <td><strong>Batching</strong></td>
+          <td>❌ No</td>
+          <td>✅ Yes</td>
+          <td>❌ No</td>
+        </tr>
+        <tr>
+          <td><strong>Database Access</strong></td>
+          <td colspan="3" style="text-align: center; background: #e8f5e9">
+            <strong
+              >✅ Same <code>ctx.sqlx()</code> and <code>ctx.diesel()</code> in
+              all styles!</strong
+            >
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- The Key Point -->
+    <div class="highlight">
+      <h2><span class="emoji">💡</span>The Key Insight</h2>
+      <p>
+        <strong>All three styles use the exact same database logic!</strong> The
+        <code>db_operations</code> module contains shared functions that work
+        with any routing style:
+      </p>
+      <pre>
+// Shared database operations - works everywhere!
+pub async fn create_user(pool: &PgPool, input: CreateUserInput) -> Result&lt;User&gt; {
+    sqlx::query_as("INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *")
+        .bind(&input.name)
+        .bind(&input.email)
+        .fetch_one(pool)
+        .await?
+}
+
+// Used in REST:
+app.post("/rest/users", |ctx| async move {
+    let db = ctx.sqlx()?;
+    let user = db_operations::create_user(db, input).await?;
+    ctx.json(user).await
+});
+
+// Same function used in JSON-RPC:
+app.post("/rpc", |ctx| async move {
+    let db = ctx.sqlx()?;
+    match method {
+        "createUser" => db_operations::create_user(db, params).await?,
+        // ...
+    }
+});
+
+// Same function used in RPC-REST:
+app.post("/rpc-rest/createUser", |ctx| async move {
+    let db = ctx.sqlx()?;
+    let user = db_operations::create_user(db, input).await?;
+    ctx.json(user).await
+});</pre
+      >
+    </div>
+
+    <!-- Choose Your Style -->
+    <h2><span class="emoji">🎨</span>Choose Your Style</h2>
+    <p>
+      With Ultimo, you're not locked into any particular API style. The database
+      layer is completely orthogonal to your routing layer. Pick the style that
+      best fits your use case:
+    </p>
+
+    <ul>
+      <li>
+        <strong>Traditional REST</strong> - Best for standard CRUD APIs,
+        public-facing services
+      </li>
+      <li>
+        <strong>JSON-RPC</strong> - Best for internal microservices, when you
+        need batching
+      </li>
+      <li>
+        <strong>RPC-REST</strong> - Best for action-oriented APIs,
+        TypeScript-first applications
+      </li>
+      <li>
+        <strong>Hybrid</strong> - Mix and match! Use REST for some endpoints,
+        RPC for others
+      </li>
+    </ul>
+
+    <p>
+      The choice is yours, and you can change it anytime without touching your
+      database code! 🚀
+    </p>
+
+    <div class="key-point">
+      <strong>Next Steps:</strong>
+      <ul>
+        <li>Try all three API styles with the curl commands above</li>
+        <li>Notice how they all work with the same database</li>
+        <li>Choose the style that fits your project best</li>
+        <li>
+          Add OpenAPI generation and TypeScript types with <code>ts-rs</code>
+        </li>
+      </ul>
+    </div>
+  </body>
+</html>

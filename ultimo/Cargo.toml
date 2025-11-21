@@ -1,0 +1,41 @@
+[package]
+name = "ultimo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+http-body-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+validator = { workspace = true }
+multer = { workspace = true }
+ts-rs = { workspace = true }
+tracing = { workspace = true }
+bytes = { workspace = true }
+
+# Database support (optional)
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls"], optional = true }
+diesel = { version = "2.1", optional = true }
+r2d2 = { version = "0.8", optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tracing-subscriber = { workspace = true }
+
+[features]
+default = []
+
+# Database features
+database = []
+sqlx-postgres = ["database", "sqlx", "sqlx/postgres"]
+sqlx-mysql = ["database", "sqlx", "sqlx/mysql"]
+sqlx-sqlite = ["database", "sqlx", "sqlx/sqlite"]
+diesel-postgres = ["database", "diesel", "diesel/postgres", "diesel/r2d2", "r2d2"]
+diesel-mysql = ["database", "diesel", "diesel/mysql", "diesel/r2d2", "r2d2"]
+diesel-sqlite = ["database", "diesel", "diesel/sqlite", "diesel/r2d2", "r2d2"]

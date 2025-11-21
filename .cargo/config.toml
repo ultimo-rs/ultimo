@@ -1,0 +1,11 @@
+# Cargo configuration for Ultimo framework
+
+[alias]
+# Run tests with coverage using our own tool
+coverage = "run --release -p ultimo-coverage"
+coverage-open = "run --release -p ultimo-coverage"
+
+# Quick test commands
+test-lib = "test --lib --no-fail-fast"
+test-all = "test --workspace --no-fail-fast"
+test-watch = "watch -x 'test --lib'"

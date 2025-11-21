@@ -1,0 +1,524 @@
+# OpenAPI Support
+
+Ultimo automatically generates OpenAPI 3.0 specifications from your RPC procedures, enabling integration with Swagger UI, Postman, and code generation tools.
+
+## Overview
+
+The OpenAPI generator creates complete API specifications including:
+
+- All RPC endpoints with paths and methods
+- Request/response schemas from TypeScript type definitions
+- Parameter definitions (path, query, body)
+- HTTP status codes and error responses
+- Server information and metadata
+
+## Basic Usage
+
+Generate an OpenAPI spec from your RPC registry:
+
+```rust
+use ultimo::prelude::*;
+use ultimo::rpc::RpcMode;
+
+let rpc = RpcRegistry::new_with_mode(RpcMode::Rest);
+
+// Register procedures
+rpc.query("getUser", handler, "{ id: number }", "User");
+rpc.mutation("createUser", handler, "{ name: string; email: string }", "User");
+
+// Generate OpenAPI spec
+let openapi = rpc.generate_openapi(
+    "My API",        // API title
+    "1.0.0",         // Version
+    "/api"           // Base path
+);
+
+// Write to file
+openapi.write_to_file("openapi.json")?;
+```
+
+## Complete Example
+
+```rust
+use ultimo::prelude::*;
+use ultimo::rpc::RpcMode;
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct GetUserInput {
+    id: u32,
+}
+
+#[derive(Serialize)]
+struct User {
+    id: u32,
+    name: String,
+    email: String,
+    created_at: String,
+}
+
+#[derive(Deserialize)]
+struct CreateUserInput {
+    name: String,
+    email: String,
+}
+
+#[derive(Deserialize)]
+struct ListUsersInput {
+    page: Option<u32>,
+    limit: Option<u32>,
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let mut app = Ultimo::new();
+    let rpc = RpcRegistry::new_with_mode(RpcMode::Rest);
+
+    // Register queries (GET)
+    rpc.query(
+        "listUsers",
+        |input: ListUsersInput| async move {
+            Ok(json!({
+                "users": [],
+                "total": 0,
+                "page": input.page.unwrap_or(1)
+            }))
+        },
+        r#"{
+          page?: number;
+          limit?: number;
+        }"#.to_string(),
+        r#"{
+          users: User[];
+          total: number;
+          page: number;
+        }"#.to_string(),
+    );
+
+    rpc.query(
+        "getUser",
+        |input: GetUserInput| async move {
+            Ok(User {
+                id: input.id,
+                name: "Alice".to_string(),
+                email: "alice@example.com".to_string(),
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        },
+        "{ id: number }".to_string(),
+        r#"{
+          id: number;
+          name: string;
+          email: string;
+          created_at: string;
+        }"#.to_string(),
+    );
+
+    // Register mutations (POST)
+    rpc.mutation(
+        "createUser",
+        |input: CreateUserInput| async move {
+            Ok(User {
+                id: 1,
+                name: input.name,
+                email: input.email,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+        },
+        r#"{
+          name: string;
+          email: string;
+        }"#.to_string(),
+        "User".to_string(),
+    );
+
+    rpc.mutation(
+        "deleteUser",
+        |input: GetUserInput| async move {
+            Ok(json!({ "success": true }))
+        },
+        "{ id: number }".to_string(),
+        "{ success: boolean }".to_string(),
+    );
+
+    // Generate OpenAPI specification
+    let openapi = rpc.generate_openapi(
+        "User Management API",
+        "1.0.0",
+        "/api"
+    );
+
+    openapi.write_to_file("openapi.json")?;
+    println!("✅ OpenAPI spec generated: openapi.json");
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+## Generated OpenAPI Structure
+
+The generated `openapi.json` looks like:
+
+```json
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "User Management API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api"
+    }
+  ],
+  "paths": {
+    "/listUsers": {
+      "get": {
+        "operationId": "listUsers",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "users": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/User" }
+                    },
+                    "total": { "type": "number" },
+                    "page": { "type": "number" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/createUser": {
+      "post": {
+        "operationId": "createUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string" }
+                },
+                "required": ["name", "email"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "number" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "created_at": { "type": "string" }
+        }
+      }
+    }
+  }
+}
+```
+
+## View with Swagger UI
+
+Use Docker to quickly view your API docs:
+
+```bash
+docker run -p 8080:8080 \
+  -e SWAGGER_JSON=/openapi.json \
+  -v $(pwd)/openapi.json:/openapi.json \
+  swaggerapi/swagger-ui
+```
+
+Then open http://localhost:8080
+
+## Mock Server with Prism
+
+Create a mock server for testing:
+
+```bash
+# Install Prism
+npm install -g @stoplight/prism-cli
+
+# Run mock server
+prism mock openapi.json
+
+# Test it
+curl http://localhost:4010/api/getUser?id=1
+```
+
+## Generate Clients
+
+Use OpenAPI Generator to create clients in any language:
+
+```bash
+# Install generator
+npm install -g @openapitools/openapi-generator-cli
+
+# Generate TypeScript client
+openapi-generator-cli generate \
+  -i openapi.json \
+  -g typescript-fetch \
+  -o ./typescript-client
+
+# Generate Python client
+openapi-generator-cli generate \
+  -i openapi.json \
+  -g python \
+  -o ./python-client
+
+# Generate Go client
+openapi-generator-cli generate \
+  -i openapi.json \
+  -g go \
+  -o ./go-client
+```
+
+## Advanced Type Definitions
+
+### Complex Types
+
+```rust
+rpc.query(
+    "searchUsers",
+    handler,
+    r#"{
+      query: string;
+      filters?: {
+        role?: 'admin' | 'user' | 'guest';
+        active?: boolean;
+        createdAfter?: string;
+      };
+      sort?: {
+        field: 'name' | 'email' | 'created_at';
+        order: 'asc' | 'desc';
+      };
+      pagination?: {
+        page: number;
+        limit: number;
+      };
+    }"#.to_string(),
+    r#"{
+      results: User[];
+      total: number;
+      page: number;
+      hasMore: boolean;
+    }"#.to_string(),
+);
+```
+
+### Arrays and Objects
+
+```rust
+rpc.mutation(
+    "bulkCreateUsers",
+    handler,
+    r#"{
+      users: Array<{
+        name: string;
+        email: string;
+      }>;
+    }"#.to_string(),
+    r#"{
+      created: User[];
+      failed: Array<{
+        email: string;
+        error: string;
+      }>;
+    }"#.to_string(),
+);
+```
+
+### Union Types
+
+```rust
+rpc.query(
+    "getResource",
+    handler,
+    "{ id: number }".to_string(),
+    r#"{
+      data: User | Post | Comment;
+      type: 'user' | 'post' | 'comment';
+    }"#.to_string(),
+);
+```
+
+## RPC Mode Differences
+
+### REST Mode
+
+Each procedure gets its own path:
+
+```json
+{
+  "paths": {
+    "/getUser": {
+      "get": { ... }
+    },
+    "/createUser": {
+      "post": { ... }
+    }
+  }
+}
+```
+
+### JSON-RPC Mode
+
+Single endpoint with method parameter:
+
+```json
+{
+  "paths": {
+    "/rpc": {
+      "post": {
+        "requestBody": {
+          "schema": {
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": ["getUser", "createUser", "deleteUser"]
+              },
+              "params": { ... }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## CI/CD Integration
+
+Generate specs automatically in CI:
+
+```yaml
+# .github/workflows/openapi.yml
+name: Generate OpenAPI Spec
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Generate OpenAPI spec
+        run: |
+          cargo run --bin generate-openapi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: openapi-spec
+          path: openapi.json
+```
+
+## Best Practices
+
+### ✅ Version Your API
+
+```rust
+let openapi = rpc.generate_openapi(
+    "My API",
+    "2.1.0",  // Semantic versioning
+    "/api/v2"  // Version in URL
+);
+```
+
+### ✅ Document Complex Types
+
+```rust
+rpc.query(
+    "getUserProfile",
+    handler,
+    "{ id: number }".to_string(),
+    r#"{
+      user: {
+        id: number;
+        name: string;
+        email: string;
+      };
+      stats: {
+        posts: number;
+        followers: number;
+        following: number;
+      };
+      preferences: {
+        theme: 'light' | 'dark';
+        notifications: boolean;
+      };
+    }"#.to_string(),
+);
+```
+
+### ✅ Keep Specs Updated
+
+Regenerate OpenAPI specs when you change your API:
+
+```bash
+# Add to your build script
+cargo run --bin generate-openapi
+git add openapi.json
+git commit -m "Update OpenAPI spec"
+```
+
+### ✅ Test with Mock Server
+
+Use Prism to test your frontend against the OpenAPI spec:
+
+```bash
+# Start mock server
+prism mock openapi.json &
+
+# Run frontend tests
+npm test
+
+# Stop mock server
+killall prism
+```

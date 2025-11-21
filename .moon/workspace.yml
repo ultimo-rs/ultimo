@@ -1,0 +1,28 @@
+# Moonrepo workspace configuration for Ultimo
+# https://moonrepo.dev/docs/config/workspace
+
+# Enforce a specific version of moon
+versionConstraint: ">=1.41.0"
+
+# Define projects in the workspace
+projects:
+  # Core Rust packages
+  - "ultimo"
+  - "ultimo-cli"
+
+  # All examples as separate projects
+  - "examples/*"
+  - "!examples/benchmark" # Benchmark suite with subdirectories
+  - "!examples/REACT_EXAMPLES.md" # Documentation file
+  - "!examples/react-app" # React frontend (Node.js)
+  - "!examples/react-app-rest" # React frontend (Node.js)
+  - "!examples/react-app-rpc" # React frontend (Node.js)
+  - "!examples/database-with-openapi" # Incomplete example
+
+  # Documentation site
+  - "docs-site"
+
+# VCS configuration
+vcs:
+  manager: git
+  defaultBranch: main

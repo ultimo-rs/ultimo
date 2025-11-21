@@ -1,0 +1,238 @@
+# Database Integration
+
+Ultimo provides first-class support for database integration with both **SQLx** and **Diesel** ORMs.
+
+## Overview
+
+Choose the ORM that fits your development style:
+
+- **[SQLx](/sqlx)** - Async-first, raw SQL with compile-time verification
+- **[Diesel](/diesel)** - Type-safe query builder with powerful DSL
+
+Both integrations include:
+
+- ✅ Connection pooling for optimal performance
+- ✅ Context integration (`ctx.sqlx()` or `ctx.diesel()`)
+- ✅ Multiple database support (PostgreSQL, MySQL, SQLite)
+- ✅ Transaction support
+- ✅ Health checks
+
+## Quick Comparison
+
+| Feature                 | [SQLx](/sqlx)              | [Diesel](/diesel)            |
+| ----------------------- | -------------------------- | ---------------------------- |
+| **Execution Model**     | Fully Async                | Sync (with async wrapper)    |
+| **Query Style**         | Raw SQL                    | Type-safe DSL                |
+| **Compile-time checks** | ✅ Yes (optional)          | ✅ Yes (always)              |
+| **Migrations**          | Built-in CLI               | diesel_cli                   |
+| **Performance**         | High (async I/O)           | High (efficient queries)     |
+| **Learning Curve**      | Lower                      | Moderate                     |
+| **Best For**            | API servers, microservices | Complex queries, type safety |
+
+## Which to Choose?
+
+### Choose SQLx if you:
+
+- ✅ Prefer async/await throughout your application
+- ✅ Are comfortable writing raw SQL
+- ✅ Want simpler setup and configuration
+- ✅ Need quick prototyping
+- ✅ Value flexibility in query construction
+
+### Choose Diesel if you:
+
+- ✅ Want strong compile-time guarantees for all queries
+- ✅ Prefer a type-safe query builder DSL
+- ✅ Need complex joins and aggregations
+- ✅ Want auto-generated schema from migrations
+- ✅ Value explicit type safety over flexibility
+
+## Quick Start
+
+### SQLx Example
+
+```rust
+use ultimo::prelude::*;
+use ultimo::database::sqlx::SqlxPool;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let mut app = Ultimo::new();
+
+    let pool = SqlxPool::connect("postgres://localhost/mydb").await?;
+    app.with_sqlx(pool);
+
+    app.get("/users", |ctx: Context| async move {
+        let db = ctx.sqlx::<sqlx::Postgres>()?;
+        let users = sqlx::query!("SELECT * FROM users")
+            .fetch_all(db)
+            .await?;
+        ctx.json(users).await
+    });
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+[Learn more about SQLx →](/sqlx)
+
+### Diesel Example
+
+```rust
+use ultimo::prelude::*;
+use ultimo::database::diesel::DieselPool;
+use diesel::prelude::*;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let mut app = Ultimo::new();
+
+    let pool = DieselPool::<PgConnection>::new("postgres://localhost/mydb")?;
+    app.with_diesel(pool);
+
+    app.get("/users", |ctx: Context| async move {
+        let mut conn = ctx.diesel::<PgConnection>()?;
+        let users = users::table.load::<User>(&mut *conn)?;
+        ctx.json(users).await
+    });
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+[Learn more about Diesel →](/diesel)
+
+## Common Patterns
+
+### Connection Pooling
+
+Both ORMs include connection pooling for optimal performance:
+
+```rust
+// SQLx - Configure pool
+let pool = SqlxPool::connect_with_options(
+    PgPoolOptions::new()
+        .max_connections(10)
+        .min_connections(2),
+    &database_url
+).await?;
+
+// Diesel - Configure pool
+let pool = r2d2::Pool::builder()
+    .max_size(10)
+    .min_idle(Some(2))
+    .build(manager)?;
+```
+
+### Transactions
+
+Execute multiple operations atomically:
+
+```rust
+// SQLx
+let mut tx = db.begin().await?;
+sqlx::query("UPDATE accounts SET balance = balance - $1 WHERE id = $2")
+    .bind(amount).bind(from).execute(&mut *tx).await?;
+sqlx::query("UPDATE accounts SET balance = balance + $1 WHERE id = $2")
+    .bind(amount).bind(to).execute(&mut *tx).await?;
+tx.commit().await?;
+
+// Diesel
+conn.transaction::<_, Error, _>(|conn| {
+    diesel::update(accounts.find(from))
+        .set(balance.eq(balance - amount)).execute(conn)?;
+    diesel::update(accounts.find(to))
+        .set(balance.eq(balance + amount)).execute(conn)?;
+    Ok(())
+})?;
+```
+
+### Error Handling
+
+Convert database errors to user-friendly responses:
+
+```rust
+// Handle unique constraint violations
+.map_err(|e| {
+    if e.to_string().contains("unique") {
+        UltimoError::BadRequest("Email already exists".to_string())
+    } else {
+        UltimoError::Internal(format!("Database error: {}", e))
+    }
+})
+```
+
+### Health Checks
+
+Add database health check endpoints:
+
+```rust
+app.get("/health", |ctx: Context| async move {
+    let db = ctx.sqlx::<sqlx::Postgres>()?;
+    sqlx::query("SELECT 1").execute(db).await?;
+    ctx.json(json!({"status": "healthy", "database": "connected"})).await
+});
+```
+
+## Migration Management
+
+### SQLx Migrations
+
+```bash
+# Create migration
+sqlx migrate add create_users
+
+# Run migrations
+sqlx migrate run
+```
+
+### Diesel Migrations
+
+```bash
+# Create migration
+diesel migration generate create_users
+
+# Run migrations
+diesel migration run
+```
+
+## Testing
+
+Both ORMs support database testing:
+
+```rust
+#[tokio::test]
+#[ignore] // Requires test database
+async fn test_create_user() {
+    let pool = setup_test_db().await;
+    // Test database operations
+}
+```
+
+Run tests with:
+
+```bash
+DATABASE_URL=postgres://localhost/test_db cargo test -- --ignored
+```
+
+## Examples
+
+Explore working examples in the repository:
+
+- `examples/database-sqlx/` - Complete SQLx integration
+- `examples/database-diesel/` - Complete Diesel integration
+- `examples/database-api-styles/` - Comparing REST vs RPC with databases
+- `examples/database-with-openapi/` - Database + OpenAPI integration
+
+## Next Steps
+
+- **[SQLx Integration →](/sqlx)** - Learn about async database queries
+- **[Diesel Integration →](/diesel)** - Learn about type-safe query building
+- **[Testing Guide →](/testing)** - Test database operations
+
+## Getting Help
+
+- Check the [SQLx documentation](https://docs.rs/sqlx)
+- Check the [Diesel documentation](https://diesel.rs)
+- Browse the examples in `examples/database-*`
+- Review the [Testing Guide](/testing) for database testing patterns

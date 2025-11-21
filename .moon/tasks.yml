@@ -1,0 +1,122 @@
+# Global tasks for all Rust projects
+# https://moonrepo.dev/docs/config/tasks
+
+# These tasks are inherited by all Rust packages (ultimo, ultimo-cli, examples)
+
+tasks:
+  # Build task - compile the project
+  build:
+    command: cargo build
+    inputs:
+      - "src/**/*.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+    options:
+      cache: false
+      persistent: false
+
+  # Build release version
+  build-release:
+    command: cargo build --release
+    inputs:
+      - "src/**/*.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+    options:
+      cache: false
+      persistent: false
+
+  # Run tests
+  test:
+    command: cargo test
+    inputs:
+      - "src/**/*.rs"
+      - "tests/**/*.rs"
+      - "Cargo.toml"
+    deps:
+      - "~:build"
+    options:
+      cache: false
+      runInCI: true
+
+  # Run tests with all features
+  test-all:
+    command: cargo test --all-features
+    inputs:
+      - "src/**/*.rs"
+      - "tests/**/*.rs"
+      - "Cargo.toml"
+    deps:
+      - "~:build"
+    options:
+      cache: false
+      runInCI: true
+
+  # Format check
+  fmt:
+    command: cargo fmt --check
+    inputs:
+      - "src/**/*.rs"
+      - "tests/**/*.rs"
+    options:
+      cache: false
+      runInCI: true
+
+  # Format code
+  fmt-fix:
+    command: cargo fmt
+    inputs:
+      - "src/**/*.rs"
+      - "tests/**/*.rs"
+    options:
+      cache: false
+      runInCI: false
+
+  # Run clippy linter
+  clippy:
+    command: cargo clippy -- -D warnings
+    inputs:
+      - "src/**/*.rs"
+      - "tests/**/*.rs"
+      - "Cargo.toml"
+    deps:
+      - "~:build"
+    options:
+      cache: false
+      runInCI: true
+
+  # Clean build artifacts
+  clean:
+    command: cargo clean
+    options:
+      cache: false
+      persistent: false
+
+  # Run the project (for binaries)
+  run:
+    command: cargo run
+    deps:
+      - "~:build"
+    options:
+      cache: false
+      persistent: true
+
+  # Generate documentation
+  doc:
+    command: cargo doc --no-deps
+    inputs:
+      - "src/**/*.rs"
+      - "Cargo.toml"
+    options:
+      cache: false
+      persistent: false
+
+  # Check for compilation errors without building
+  check:
+    command: cargo check
+    inputs:
+      - "src/**/*.rs"
+      - "Cargo.toml"
+    options:
+      cache: false
+      runInCI: true

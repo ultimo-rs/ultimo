@@ -1,0 +1,382 @@
+# Middleware
+
+Middleware in Ultimo allows you to execute code before and after your route handlers, enabling powerful cross-cutting concerns like logging, authentication, and CORS.
+
+## Basic Middleware
+
+Middleware functions receive the context and a `next` function:
+
+```rust
+use ultimo::prelude::*;
+
+app.use_middleware(|ctx, next| async move {
+    println!("Before handler");
+    next().await?;
+    println!("After handler");
+    Ok(())
+});
+```
+
+## Built-in Middleware
+
+### Logger
+
+Log requests and responses:
+
+```rust
+use ultimo::middleware::logger;
+
+app.use_middleware(logger());
+```
+
+Output:
+
+```
+[INFO] GET /users/1 - 200 OK (2.3ms)
+[INFO] POST /users - 201 Created (5.1ms)
+```
+
+### CORS
+
+Configure Cross-Origin Resource Sharing:
+
+```rust
+use ultimo::middleware::cors;
+
+app.use_middleware(
+    cors::new()
+        .allow_origin("https://example.com")
+        .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
+        .allow_headers(vec!["Content-Type", "Authorization"])
+        .allow_credentials(true)
+);
+```
+
+Allow all origins (development only):
+
+```rust
+app.use_middleware(
+    cors::new()
+        .allow_origin("*")
+        .allow_methods(vec!["GET", "POST"])
+);
+```
+
+### Rate Limiting
+
+Limit requests per time window:
+
+```rust
+use ultimo::middleware::rate_limit;
+use std::time::Duration;
+
+// Allow 100 requests per minute
+app.use_middleware(
+    rate_limit::new()
+        .limit(100)
+        .window(Duration::from_secs(60))
+);
+```
+
+When limit is exceeded:
+
+```json
+{
+  "error": "TooManyRequests",
+  "message": "Rate limit exceeded. Try again later."
+}
+```
+
+## Custom Middleware
+
+### Request Timing
+
+Measure how long requests take:
+
+```rust
+use std::time::Instant;
+
+app.use_middleware(|ctx, next| async move {
+    let start = Instant::now();
+
+    next().await?;
+
+    let duration = start.elapsed();
+    ctx.res.header("X-Response-Time", format!("{}ms", duration.as_millis()));
+
+    Ok(())
+});
+```
+
+### Request ID
+
+Add unique IDs to each request:
+
+```rust
+use uuid::Uuid;
+
+app.use_middleware(|ctx, next| async move {
+    let request_id = Uuid::new_v4().to_string();
+    ctx.set("request_id", request_id.clone());
+    ctx.res.header("X-Request-ID", request_id);
+
+    next().await
+});
+```
+
+### Authentication
+
+Check for valid tokens:
+
+```rust
+app.use_middleware(|ctx, next| async move {
+    let auth_header = ctx.req.header("Authorization")?;
+
+    if !auth_header.starts_with("Bearer ") {
+        return Err(ultimo::Error::Unauthorized(
+            "Invalid authorization header".to_string()
+        ));
+    }
+
+    let token = &auth_header[7..]; // Remove "Bearer "
+
+    if !is_valid_token(token) {
+        return Err(ultimo::Error::Unauthorized(
+            "Invalid token".to_string()
+        ));
+    }
+
+    // Store user info for handlers to use
+    let user = get_user_from_token(token)?;
+    ctx.set("user", user);
+
+    next().await
+});
+```
+
+### Content Type Validation
+
+Ensure requests have correct content type:
+
+```rust
+app.use_middleware(|ctx, next| async move {
+    if ctx.req.method() == "POST" || ctx.req.method() == "PUT" {
+        let content_type = ctx.req.header("Content-Type")?;
+
+        if content_type != "application/json" {
+            return Err(ultimo::Error::BadRequest(
+                "Content-Type must be application/json".to_string()
+            ));
+        }
+    }
+
+    next().await
+});
+```
+
+## Sharing Data Between Middleware
+
+Use `ctx.set()` and `ctx.get()` to pass data:
+
+```rust
+// Middleware 1: Authenticate and store user
+app.use_middleware(|ctx, next| async move {
+    let user = authenticate(&ctx).await?;
+    ctx.set("user", user);
+    next().await
+});
+
+// Middleware 2: Log user action
+app.use_middleware(|ctx, next| async move {
+    if let Some(user) = ctx.get::<User>("user") {
+        println!("User {} made a request", user.id);
+    }
+    next().await
+});
+
+// Handler: Access user
+app.get("/profile", |ctx| async move {
+    let user: User = ctx.get("user")?;
+    ctx.json(user).await
+});
+```
+
+## Conditional Middleware
+
+Apply middleware only to specific routes:
+
+```rust
+// Middleware for all routes
+app.use_middleware(logger());
+
+// Protected routes only
+let auth = bearer_auth(vec!["secret_token"]);
+
+app.get("/public", |ctx| async move {
+    ctx.json(json!({"public": true})).await
+});
+
+app.get("/protected", auth, |ctx| async move {
+    ctx.json(json!({"protected": true})).await
+});
+```
+
+## Middleware Order
+
+Middleware executes in the order it's added:
+
+```rust
+app.use_middleware(logger());           // 1. Log request
+app.use_middleware(auth_middleware());  // 2. Check authentication
+app.use_middleware(rate_limit());       // 3. Check rate limit
+
+// Request flow:
+// logger → auth → rate_limit → handler → rate_limit → auth → logger
+```
+
+## Short-Circuiting
+
+Return early without calling `next()`:
+
+```rust
+app.use_middleware(|ctx, next| async move {
+    if ctx.req.header("X-API-Key")? != "secret" {
+        // Don't call next(), return error immediately
+        return Err(ultimo::Error::Unauthorized(
+            "Invalid API key".to_string()
+        ));
+    }
+
+    next().await
+});
+```
+
+## Error Handling in Middleware
+
+Middleware can catch and transform errors:
+
+```rust
+app.use_middleware(|ctx, next| async move {
+    match next().await {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            // Log the error
+            eprintln!("Error: {:?}", e);
+
+            // Transform specific errors
+            if let ultimo::Error::DatabaseError(_) = e {
+                return Err(ultimo::Error::InternalServerError(
+                    "Database temporarily unavailable".to_string()
+                ));
+            }
+
+            Err(e)
+        }
+    }
+});
+```
+
+## Complete Example
+
+Combining multiple middleware:
+
+```rust
+use ultimo::prelude::*;
+use ultimo::middleware::{logger, cors, rate_limit};
+use std::time::Duration;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let mut app = Ultimo::new();
+
+    // 1. Logging
+    app.use_middleware(logger());
+
+    // 2. CORS
+    app.use_middleware(
+        cors::new()
+            .allow_origin("https://myapp.com")
+            .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
+            .allow_credentials(true)
+    );
+
+    // 3. Rate limiting
+    app.use_middleware(
+        rate_limit::new()
+            .limit(100)
+            .window(Duration::from_secs(60))
+    );
+
+    // 4. Request ID
+    app.use_middleware(|ctx, next| async move {
+        ctx.set("request_id", uuid::Uuid::new_v4());
+        next().await
+    });
+
+    // 5. Timing
+    app.use_middleware(|ctx, next| async move {
+        let start = std::time::Instant::now();
+        next().await?;
+        let duration = start.elapsed();
+        ctx.res.header("X-Response-Time", format!("{}ms", duration.as_millis()));
+        Ok(())
+    });
+
+    // Routes
+    app.get("/", |ctx| async move {
+        ctx.json(json!({"message": "Hello!"})).await
+    });
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+## Best Practices
+
+### ✅ Order Matters
+
+Put essential middleware first:
+
+```rust
+app.use_middleware(logger());        // Log everything
+app.use_middleware(auth());          // Then authenticate
+app.use_middleware(rate_limit());    // Then rate limit
+```
+
+### ✅ Keep Middleware Focused
+
+Each middleware should do one thing:
+
+```rust
+// ✅ Good - focused
+app.use_middleware(auth_middleware());
+app.use_middleware(logging_middleware());
+
+// ❌ Bad - does too much
+app.use_middleware(auth_and_logging_middleware());
+```
+
+### ✅ Use Typed Context Storage
+
+```rust
+// ✅ Good - type-safe
+ctx.set("user", user);
+let user: User = ctx.get("user")?;
+
+// ❌ Bad - stringly-typed
+ctx.set("user_id_string", user.id.to_string());
+```
+
+### ✅ Handle Errors Gracefully
+
+```rust
+app.use_middleware(|ctx, next| async move {
+    match next().await {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            log_error(&e);
+            Err(e)
+        }
+    }
+});
+```

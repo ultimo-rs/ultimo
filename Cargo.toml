@@ -1,0 +1,30 @@
+[workspace]
+members = ["ultimo", "examples/basic", "examples/rpc-modes", "examples/openapi-demo", "examples/database-sqlx", "examples/database-diesel", "examples/database-api-styles", "ultimo-cli", "coverage-tool"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75.0"
+authors = ["Ultimo Contributors"]
+license = "MIT"
+description = "Modern Rust web framework with automatic TypeScript client generation"
+homepage = "https://github.com/yourusername/ultimo-rs"
+repository = "https://github.com/yourusername/ultimo-rs"
+keywords = ["web", "framework", "async", "rpc", "typescript"]
+categories = ["web-programming", "web-programming::http-server"]
+
+[workspace.dependencies]
+tokio = { version = "1.35", features = ["full"] }
+hyper = { version = "1.0", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+http-body-util = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+validator = { version = "0.18", features = ["derive"] }
+multer = "3.0"
+ts-rs = "8.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+bytes = "1.5"
+

@@ -1,0 +1,245 @@
+# REST API Routing
+
+Ultimo provides a fast, intuitive routing system for building traditional REST APIs. This page covers the standard HTTP routing with methods like GET, POST, PUT, and DELETE. For RPC-style APIs with TypeScript client generation, see the [RPC documentation](/rpc).
+
+## Basic Routes
+
+Define routes for different HTTP methods:
+
+```rust
+use ultimo::prelude::*;
+
+let mut app = Ultimo::new();
+
+app.get("/users", |ctx| async move {
+    ctx.json(json!({"users": ["Alice", "Bob"]})).await
+});
+
+app.post("/users", |ctx| async move {
+    let body: CreateUser = ctx.req.json().await?;
+    ctx.json(body).await
+});
+
+app.put("/users/:id", |ctx| async move {
+    let id = ctx.param("id")?;
+    ctx.json(json!({"id": id, "updated": true})).await
+});
+
+app.delete("/users/:id", |ctx| async move {
+    let id = ctx.param("id")?;
+    ctx.json(json!({"deleted": id})).await
+});
+```
+
+## Path Parameters
+
+Capture dynamic segments from the URL:
+
+```rust
+// Single parameter
+app.get("/users/:id", |ctx| async move {
+    let id: u32 = ctx.param("id")?.parse()?;
+    ctx.json(json!({"id": id})).await
+});
+
+// Multiple parameters
+app.get("/users/:user_id/posts/:post_id", |ctx| async move {
+    let user_id = ctx.param("user_id")?;
+    let post_id = ctx.param("post_id")?;
+    ctx.json(json!({
+        "user_id": user_id,
+        "post_id": post_id
+    })).await
+});
+```
+
+## Query Parameters
+
+Access query string parameters:
+
+```rust
+// GET /search?q=rust&page=2
+app.get("/search", |ctx| async move {
+    let query = ctx.req.query("q")?;
+    let page: u32 = ctx.req.query("page")?.parse().unwrap_or(1);
+
+    ctx.json(json!({
+        "query": query,
+        "page": page,
+        "results": search_results(query, page)
+    })).await
+});
+```
+
+## Request Body
+
+Parse JSON request bodies:
+
+```rust
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct CreateUser {
+    name: String,
+    email: String,
+}
+
+#[derive(Serialize)]
+struct User {
+    id: u32,
+    name: String,
+    email: String,
+}
+
+app.post("/users", |ctx| async move {
+    let input: CreateUser = ctx.req.json().await?;
+
+    let user = User {
+        id: 1,
+        name: input.name,
+        email: input.email,
+    };
+
+    ctx.status(201);
+    ctx.json(user).await
+});
+```
+
+## Headers
+
+Access and set headers:
+
+```rust
+// Read headers
+app.get("/check-auth", |ctx| async move {
+    let auth = ctx.req.header("Authorization")?;
+    ctx.json(json!({"auth": auth})).await
+});
+
+// Set response headers
+app.get("/with-headers", |ctx| async move {
+    ctx.header("X-Custom-Header", "value");
+    ctx.header("Cache-Control", "max-age=3600");
+    ctx.json(json!({"message": "Check the headers!"})).await
+});
+```
+
+## Response Types
+
+Return different response types:
+
+```rust
+// JSON
+app.get("/json", |ctx| async move {
+    ctx.json(json!({"key": "value"})).await
+});
+
+// Plain text
+app.get("/text", |ctx| async move {
+    ctx.text("Hello, world!").await
+});
+
+// HTML
+app.get("/html", |ctx| async move {
+    ctx.html("<h1>Hello, Ultimo!</h1>").await
+});
+
+// Redirect
+app.get("/old-path", |ctx| async move {
+    ctx.redirect("/new-path").await
+});
+
+// Custom status code
+app.get("/not-found", |ctx| async move {
+    ctx.status(404);
+    ctx.json(json!({"error": "Not found"})).await
+});
+```
+
+## Error Handling
+
+Routes automatically handle errors with structured responses:
+
+```rust
+app.get("/users/:id", |ctx| async move {
+    let id: u32 = ctx.param("id")?.parse()?;
+
+    let user = find_user(id)
+        .ok_or_else(|| ultimo::Error::NotFound("User not found".to_string()))?;
+
+    ctx.json(user).await
+});
+```
+
+Errors return JSON like:
+
+```json
+{
+  "error": "NotFound",
+  "message": "User not found"
+}
+```
+
+## Route Organization
+
+Organize routes with route groups:
+
+```rust
+let mut app = Ultimo::new();
+
+// User routes
+app.get("/api/users", list_users);
+app.get("/api/users/:id", get_user);
+app.post("/api/users", create_user);
+app.put("/api/users/:id", update_user);
+app.delete("/api/users/:id", delete_user);
+
+// Post routes
+app.get("/api/posts", list_posts);
+app.get("/api/posts/:id", get_post);
+app.post("/api/posts", create_post);
+
+// Handler functions
+async fn list_users(ctx: Context) -> ultimo::Result<Response> {
+    ctx.json(json!({"users": []})).await
+}
+
+async fn get_user(ctx: Context) -> ultimo::Result<Response> {
+    let id = ctx.param("id")?;
+    ctx.json(json!({"id": id})).await
+}
+```
+
+## Best Practices
+
+### Use Type Conversions
+
+```rust
+// ✅ Good - parse with error handling
+let id: u32 = ctx.param("id")?.parse()?;
+
+// ❌ Bad - panics on invalid input
+let id: u32 = ctx.param("id").unwrap().parse().unwrap();
+```
+
+### Return Early on Errors
+
+```rust
+// ✅ Good - explicit error handling
+app.get("/users/:id", |ctx| async move {
+    let id: u32 = ctx.param("id")?.parse()?;
+    let user = find_user(id)?;
+    ctx.json(user).await
+});
+```
+
+### Use Structured Error Types
+
+```rust
+// ✅ Good - descriptive errors
+if user.is_none() {
+    return Err(ultimo::Error::NotFound(
+        format!("User {} not found", id)
+    ));
+}
+```

@@ -1,0 +1,59 @@
+# Rust
+/target/
+**/target/
+Cargo.lock
+*.rs.bk
+*.pdb
+
+# Node.js / Frontend
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# output
+out
+dist
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+*.profraw
+*.profdata
+/target/llvm-cov/
+coverage.json
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+.history
+
+# Moonrepo
+.moon/cache
+.moon/docker
+
+venv/
+**/venv/openapi-*.json

@@ -1,0 +1,22 @@
+[package]
+name = "openapi-demo"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "generate"
+path = "src/main.rs"
+
+[[bin]]
+name = "rest-server"
+path = "src/rest-server.rs"
+
+[[bin]]
+name = "rpc-server"
+path = "src/rpc-server.rs"
+
+[dependencies]
+ultimo = { path = "../../ultimo" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

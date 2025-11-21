@@ -1,0 +1,65 @@
+---
+layout: landing
+---
+
+import { HomePage } from "vocs/components";
+
+<HomePage.Root>
+  <HomePage.Tagline>⚡ Ultimo</HomePage.Tagline>
+  <HomePage.Description>
+    Modern Rust web framework with automatic TypeScript generation.
+    Performance-equivalent to Axum (152k+ req/sec), with type-safe full-stack
+    development.
+  </HomePage.Description>
+  <HomePage.Buttons>
+    <HomePage.Button href="/getting-started" variant="accent">
+      Get Started
+    </HomePage.Button>
+    <HomePage.Button href="https://github.com/yourusername/ultimo-rs">
+      GitHub
+    </HomePage.Button>
+  </HomePage.Buttons>
+</HomePage.Root>
+
+## ✨ Key Features
+
+:::info Features
+
+- ⚡ **Blazing Fast** - Matches Axum: 152k+ req/sec, sub-millisecond latency
+- 🚀 **Auto TypeScript Generation** - Type-safe clients generated automatically
+- 📋 **OpenAPI Support** - Generate specs for Swagger UI and tools
+- 🔄 **Hybrid RPC Modes** - Choose REST or JSON-RPC style
+- 🛡️ **Type Safety Everywhere** - From Rust backend to TypeScript frontend
+- 🔥 **Great DX** - Ergonomic APIs, helpful errors, minimal boilerplate
+  :::
+
+## 📊 Performance
+
+| Framework   | Throughput       | Avg Latency | vs Python      |
+| ----------- | ---------------- | ----------- | -------------- |
+| **Ultimo**  | **152k req/sec** | **0.6ms**   | **15x faster** |
+| Axum (Rust) | 153k req/sec     | 0.6ms       | 15x faster     |
+| Hono (Bun)  | 132k req/sec     | 0.8ms       | 13x faster     |
+| FastAPI     | 10k req/sec      | 9.5ms       | baseline       |
+
+## Quick Example
+
+```rust
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let mut app = Ultimo::new();
+
+    app.get("/users/:id", |ctx: Context| async move {
+        let id: u32 = ctx.param("id")?.parse()?;
+        ctx.json(json!({
+            "id": id,
+            "name": "Alice",
+            "email": "alice@example.com"
+        })).await
+    });
+
+    app.listen("127.0.0.1:3000").await
+}
+```

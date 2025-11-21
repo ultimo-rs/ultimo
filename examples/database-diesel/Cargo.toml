@@ -1,0 +1,12 @@
+[package]
+name = "database-diesel-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ultimo = { path = "../../ultimo", features = ["diesel-postgres"] }
+diesel = { version = "2.1", features = ["postgres", "r2d2"] }
+tokio = { version = "1.35", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing-subscriber = "0.3"

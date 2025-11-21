@@ -1,0 +1,81 @@
+# Getting Started
+
+Get up and running with Ultimo in minutes.
+
+## Installation
+
+Add Ultimo to your `Cargo.toml`:
+
+```toml
+[dependencies]
+ultimo = { git = "https://github.com/yourusername/ultimo-rs" }
+tokio = { version = "1.35", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+```
+
+## Hello Ultimo
+
+Create a simple API server:
+
+```rust
+use ultimo::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize)]
+struct Message {
+    text: String,
+}
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let mut app = Ultimo::new();
+
+    app.get("/", |ctx: Context| async move {
+        ctx.json(Message {
+            text: "Hello, Ultimo!".to_string(),
+        }).await
+    });
+
+    println!("🚀 Server running on http://127.0.0.1:3000");
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+## Run Your Server
+
+```bash
+cargo run
+```
+
+Test it:
+
+```bash
+curl http://localhost:3000/
+# {"text":"Hello, Ultimo!"}
+```
+
+## Next Steps
+
+- Learn about [Routing](/routing) and path parameters
+- Explore [RPC](/rpc) for type-safe APIs
+- Add [Middleware](/middleware) for logging and CORS
+- Generate [TypeScript Clients](/typescript) automatically
+- Create [OpenAPI Specs](/openapi) for documentation
+
+## Project Structure
+
+A typical Ultimo project looks like:
+
+```
+my-app/
+├── Cargo.toml
+├── src/
+│   ├── main.rs          # Application entry point
+│   ├── handlers/        # Request handlers
+│   ├── models/          # Data models
+│   └── rpc/             # RPC procedures
+└── frontend/
+    └── src/
+        └── lib/
+            └── client.ts # Auto-generated TypeScript client
+```

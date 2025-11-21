@@ -1,0 +1,146 @@
+# Tasks for the documentation site
+# Overrides global Rust tasks with Node.js tasks
+
+$schema: "https://moonrepo.dev/schemas/tasks.json"
+
+tasks:
+  # Install dependencies
+  install:
+    command: "pnpm install"
+    inputs:
+      - "package.json"
+      - "pnpm-lock.yaml"
+    options:
+      cache: true
+
+  # Development server
+  dev:
+    command: "pnpm run dev"
+    deps:
+      - "~:install"
+    local: true
+    options:
+      persistent: true
+      runInCI: false
+
+  # Build documentation
+  build:
+    command: "pnpm run build"
+    inputs:
+      - "docs/**/*.mdx"
+      - "docs/**/*.ts"
+      - "docs/**/*.tsx"
+      - "docs/public/**/*"
+      - "vocs.config.ts"
+      - "package.json"
+    outputs:
+      - "docs/dist"
+    deps:
+      - "~:install"
+    options:
+      cache: true
+      runInCI: true
+
+  # Preview built documentation
+  preview:
+    command: "pnpm run preview"
+    deps:
+      - "~:build"
+    local: true
+    options:
+      persistent: true
+      runInCI: false
+
+  # Type check
+  typecheck:
+    command: "pnpm tsc --noEmit"
+    inputs:
+      - "docs/**/*.ts"
+      - "docs/**/*.tsx"
+      - "vocs.config.ts"
+      - "tsconfig.json"
+    deps:
+      - "~:install"
+    options:
+      runInCI: true
+
+  # Clean build artifacts
+  clean:
+    command: "rm"
+    args:
+      - "-rf"
+      - "docs/dist"
+      - "node_modules"
+    options:
+      cache: false
+
+  # Override Rust tasks that don't apply to Node.js project
+  fmt:
+    command: "echo"
+    args:
+      - "Skipping fmt for Node.js project"
+    options:
+      cache: false
+
+  fmt-fix:
+    command: "echo"
+    args:
+      - "Skipping fmt-fix for Node.js project"
+    options:
+      cache: false
+
+  clippy:
+    command: "echo"
+    args:
+      - "Skipping clippy for Node.js project"
+    options:
+      cache: false
+
+  test:
+    command: "echo"
+    args:
+      - "Skipping test for Node.js project"
+    options:
+      cache: false
+
+  test-all:
+    command: "echo"
+    args:
+      - "Skipping test-all for Node.js project"
+    options:
+      cache: false
+
+  doc:
+    command: "echo"
+    args:
+      - "Skipping doc for Node.js project"
+    options:
+      cache: false
+
+  build-release:
+    command: "echo"
+    args:
+      - "Skipping build-release for Node.js project"
+    options:
+      cache: false
+
+  run:
+    command: "pnpm run dev"
+    deps:
+      - "~:install"
+    local: true
+    options:
+      persistent: true
+      runInCI: false
+
+  check:
+    command: "pnpm tsc --noEmit"
+    inputs:
+      - "docs/**/*.ts"
+      - "docs/**/*.tsx"
+      - "vocs.config.ts"
+      - "tsconfig.json"
+    deps:
+      - "~:install"
+    options:
+      runInCI: true

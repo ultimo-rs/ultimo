@@ -1,0 +1,10 @@
+[package]
+name = "rpc-modes"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ultimo = { path = "../../ultimo" }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ultimo API - Swagger UI</title>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://unpkg.com/swagger-ui-dist@5.10.0/swagger-ui.css"
+    />
+    <style>
+      html {
+        box-sizing: border-box;
+        overflow: -moz-scrollbars-vertical;
+        overflow-y: scroll;
+      }
+      *,
+      *:before,
+      *:after {
+        box-sizing: inherit;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      #header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        color: white;
+      }
+      #header h1 {
+        margin: 0;
+        font-family: sans-serif;
+      }
+      #spec-selector {
+        padding: 20px;
+        background: #f5f5f5;
+        border-bottom: 1px solid #ddd;
+      }
+      #spec-selector select {
+        padding: 10px 15px;
+        font-size: 16px;
+        border: 2px solid #667eea;
+        border-radius: 5px;
+        background: white;
+        cursor: pointer;
+        min-width: 300px;
+      }
+      #spec-selector label {
+        font-weight: bold;
+        margin-right: 10px;
+        font-family: sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="header">
+      <h1>🚀 Ultimo Framework - API Documentation</h1>
+    </div>
+
+    <div id="spec-selector">
+      <label for="spec-select">Select OpenAPI Spec:</label>
+      <select id="spec-select" onchange="loadSpec()">
+        <option value="openapi-live.json">🟢 Generated Spec (Latest)</option>
+        <option value="openapi-rest.json">REST Mode Example</option>
+        <option value="openapi-jsonrpc.json">JSON-RPC Mode Example</option>
+        <option value="openapi-manual.json">Manual Builder Example</option>
+      </select>
+      <div style="margin-top: 10px; font-size: 14px; color: #666">
+        <strong>Note:</strong> To test API calls, start the backend server:
+        <br /><code
+          style="background: #f0f0f0; padding: 2px 5px; border-radius: 3px"
+          >cargo run --bin server</code
+        >
+        <br />Then click "Try it out" on any endpoint below.
+      </div>
+    </div>
+
+    <div id="swagger-ui"></div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5.10.0/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.10.0/swagger-ui-standalone-preset.js"></script>
+    <script>
+      let ui;
+
+      function loadSpec() {
+        const select = document.getElementById("spec-select");
+        const specUrl = select.value;
+
+        if (ui) {
+          // SwaggerUI doesn't have a clean way to reload, so we recreate it
+          document.getElementById("swagger-ui").innerHTML = "";
+        }
+
+        ui = SwaggerUIBundle({
+          url: specUrl,
+          dom_id: "#swagger-ui",
+          deepLinking: true,
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+          plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+          layout: "StandaloneLayout",
+          defaultModelsExpandDepth: 1,
+          defaultModelExpandDepth: 1,
+          docExpansion: "list",
+          filter: true,
+          showExtensions: true,
+          showCommonExtensions: true,
+          tryItOutEnabled: true,
+        });
+      }
+
+      // Load initial spec
+      window.onload = function () {
+        loadSpec();
+      };
+    </script>
+  </body>
+</html>
