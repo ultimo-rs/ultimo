@@ -191,8 +191,7 @@ serde_json = "1.0"
     fs::write(project_dir.join("backend/Cargo.toml"), backend_cargo)?;
 
     // Backend main.rs with REST API
-    let backend_main = r#"use ultimo::{Ultimo, Context};
-use serde::{Deserialize, Serialize};
+    let backend_main = r#"use ultimo::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct User {
@@ -207,39 +206,44 @@ struct CreateUserInput {
     email: String,
 }
 
-async fn get_users(_c: Context) -> Result<String, Box<dyn std::error::Error>> {
-    let users = vec![
-        User {
-            id: 1,
-            name: "Alice".to_string(),
-            email: "alice@example.com".to_string(),
-        },
-        User {
-            id: 2,
-            name: "Bob".to_string(),
-            email: "bob@example.com".to_string(),
-        },
-    ];
-    Ok(serde_json::to_string(&users)?)
-}
-
-async fn create_user(mut c: Context) -> Result<String, Box<dyn std::error::Error>> {
-    let body = c.req.json::<CreateUserInput>().await?;
-    let user = User {
-        id: 3,
-        name: body.name,
-        email: body.email,
-    };
-    Ok(serde_json::to_string(&user)?)
-}
-
 #[tokio::main]
 async fn main() {
     let mut app = Ultimo::new();
     
-    // Routes with CORS for frontend
-    app.get("/api/users", get_users);
-    app.post("/api/users", create_user);
+    // Add CORS middleware for frontend
+    app.use_middleware(
+        middleware::builtin::Cors::new()
+            .allow_origin("http://localhost:5173")
+            .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
+            .build(),
+    );
+    
+    // Routes
+    app.get("/api/users", |ctx: Context| async move {
+        let users = vec![
+            User {
+                id: 1,
+                name: "Alice".to_string(),
+                email: "alice@example.com".to_string(),
+            },
+            User {
+                id: 2,
+                name: "Bob".to_string(),
+                email: "bob@example.com".to_string(),
+            },
+        ];
+        ctx.json(&users).await
+    });
+    
+    app.post("/api/users", |ctx: Context| async move {
+        let body = ctx.req.json::<CreateUserInput>().await?;
+        let user = User {
+            id: 3,
+            name: body.name,
+            email: body.email,
+        };
+        ctx.json(&user).await
+    });
     
     println!("🚀 Backend running on http://localhost:3001");
     app.listen("127.0.0.1:3001").await.unwrap();
