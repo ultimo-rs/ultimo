@@ -35,7 +35,7 @@ enum Commands {
         /// Project name
         name: String,
 
-        /// Template to use (basic, fullstack, api-only)
+        /// Template to use (basic, fullstack, api-only, rpc, production)
         #[arg(short, long, default_value = "basic")]
         template: String,
     },

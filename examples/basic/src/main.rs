@@ -115,7 +115,7 @@ async fn main() -> Result<()> {
 
     // HTML response
     app.get("/html", |ctx: Context| async move {
-        ctx.html("<h1>Hello from Ultimo!</h1><p>A Hono.js-inspired Rust web framework</p>")
+        ctx.html("<h1>Hello from Ultimo!</h1><p>A fast, type-safe Rust web framework</p>")
             .await
     });
 

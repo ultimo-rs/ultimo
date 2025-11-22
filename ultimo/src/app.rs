@@ -15,6 +15,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::Request as HyperRequest;
 use hyper_util::rt::TokioIo;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -156,6 +157,44 @@ impl Ultimo {
                 .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap());
             }
         };
+
+        // Handle OPTIONS requests through middleware before routing
+        // This allows CORS middleware to respond to preflight requests
+        if method_str == hyper::Method::OPTIONS {
+            // Create context for OPTIONS request
+            let ctx = match Context::new(req, HashMap::new()).await {
+                Ok(ctx) => ctx,
+                Err(err) => {
+                    error!("Failed to create context: {}", err);
+                    return response::helpers::error_response(&err)
+                        .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap());
+                }
+            };
+
+            // Build and execute middleware chain
+            let mut chain = MiddlewareChain::new();
+            for middleware in &self.middleware {
+                chain.push(middleware.clone());
+            }
+
+            // Execute with a dummy handler that returns 404
+            // CORS middleware should intercept OPTIONS and return early
+            let result = chain
+                .execute(ctx, |_ctx| async move {
+                    Ok(response::helpers::not_found()
+                        .unwrap_or_else(|_| response::helpers::text("Not Found").unwrap()))
+                })
+                .await;
+
+            return match result {
+                Ok(response) => response,
+                Err(err) => {
+                    error!("Middleware error: {}", err);
+                    response::helpers::error_response(&err)
+                        .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap())
+                }
+            };
+        }
 
         // Find matching route
         let (handler_id, params) = match self.router.find_route(method, &path) {

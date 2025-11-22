@@ -1,6 +1,6 @@
 //! # Ultimo - Modern Rust Web Framework
 //!
-//! Lightweight, type-safe Rust web framework inspired by Hono.js with automatic TypeScript type generation.
+//! Lightweight, type-safe Rust web framework with automatic TypeScript type generation.
 //!
 //! ## Quick Start
 //!

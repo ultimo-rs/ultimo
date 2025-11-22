@@ -1,4 +1,4 @@
-//! Request/Response context with Hono.js-inspired API
+//! Request/Response context for handling HTTP requests and responses
 //!
 //! Provides a unified interface for handling HTTP requests and building responses.
 
@@ -18,8 +18,8 @@ use tokio::sync::RwLock;
 #[cfg(feature = "database")]
 use crate::database::Database;
 
-/// HonoRequest wraps the incoming request and provides easy access to request data
-pub struct HonoRequest {
+/// Request wraps the incoming HTTP request and provides easy access to request data
+pub struct Request {
     method: hyper::Method,
     uri: hyper::Uri,
     headers: hyper::HeaderMap,
@@ -27,8 +27,8 @@ pub struct HonoRequest {
     body: Arc<RwLock<Option<Bytes>>>,
 }
 
-impl HonoRequest {
-    /// Create a new HonoRequest from a Hyper request and path parameters
+impl Request {
+    /// Create a new Request from a Hyper request and path parameters
     pub async fn new(req: HyperRequest<Incoming>, params: Params) -> Result<Self> {
         let (parts, body) = req.into_parts();
 
@@ -149,7 +149,7 @@ impl HonoRequest {
 
 /// Context holds request data and provides response building methods
 pub struct Context {
-    pub req: HonoRequest,
+    pub req: Request,
     state: Arc<RwLock<HashMap<String, String>>>,
     response_status: Arc<RwLock<Option<u16>>>,
     response_headers: Arc<RwLock<HashMap<String, String>>>,
@@ -161,10 +161,10 @@ pub struct Context {
 impl Context {
     /// Create a new context from a request and params
     pub async fn new(req: HyperRequest<Incoming>, params: Params) -> Result<Self> {
-        let hono_req = HonoRequest::new(req, params).await?;
+        let request = Request::new(req, params).await?;
 
         Ok(Self {
-            req: hono_req,
+            req: request,
             state: Arc::new(RwLock::new(HashMap::new())),
             response_status: Arc::new(RwLock::new(None)),
             response_headers: Arc::new(RwLock::new(HashMap::new())),
