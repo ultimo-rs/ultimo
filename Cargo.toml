@@ -9,8 +9,8 @@ rust-version = "1.75.0"
 authors = ["Ultimo Contributors"]
 license = "MIT"
 description = "Modern Rust web framework with automatic TypeScript client generation"
-homepage = "https://github.com/yourusername/ultimo-rs"
-repository = "https://github.com/yourusername/ultimo-rs"
+homepage = "https://ultimo.dev"
+repository = "https://github.com/ultimo-rs/ultimo"
 keywords = ["web", "framework", "async", "rpc", "typescript"]
 categories = ["web-programming", "web-programming::http-server"]
 

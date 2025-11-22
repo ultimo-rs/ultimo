@@ -5,8 +5,8 @@ edition = "2021"
 authors = ["Ultimo Contributors"]
 license = "MIT"
 description = "CLI tool for Ultimo web framework - Generate TypeScript clients, scaffold projects, and more"
-homepage = "https://github.com/yourusername/ultimo-rs"
-repository = "https://github.com/yourusername/ultimo-rs"
+homepage = "https://ultimo.dev"
+repository = "https://github.com/ultimo-rs/ultimo"
 keywords = ["cli", "codegen", "typescript", "web", "framework"]
 categories = ["command-line-utilities", "development-tools"]
 
