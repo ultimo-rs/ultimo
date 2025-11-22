@@ -190,8 +190,8 @@ serde_json = "1.0"
     );
     fs::write(project_dir.join("backend/Cargo.toml"), backend_cargo)?;
 
-    // Backend main.rs with RPC
-    let backend_main = r#"use ultimo::{Ultimo, Context, Rpc};
+    // Backend main.rs with REST API
+    let backend_main = r#"use ultimo::{Ultimo, Context};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -207,45 +207,39 @@ struct CreateUserInput {
     email: String,
 }
 
+async fn get_users(_c: Context) -> Result<String, Box<dyn std::error::Error>> {
+    let users = vec![
+        User {
+            id: 1,
+            name: "Alice".to_string(),
+            email: "alice@example.com".to_string(),
+        },
+        User {
+            id: 2,
+            name: "Bob".to_string(),
+            email: "bob@example.com".to_string(),
+        },
+    ];
+    Ok(serde_json::to_string(&users)?)
+}
+
+async fn create_user(mut c: Context) -> Result<String, Box<dyn std::error::Error>> {
+    let body = c.req.json::<CreateUserInput>().await?;
+    let user = User {
+        id: 3,
+        name: body.name,
+        email: body.email,
+    };
+    Ok(serde_json::to_string(&user)?)
+}
+
 #[tokio::main]
 async fn main() {
     let mut app = Ultimo::new();
     
-    // Enable CORS for frontend
-    app.use_cors();
-    
-    // RPC procedures
-    let mut rpc = Rpc::new();
-    
-    rpc.register("getUsers", |_params: ()| async move {
-        let users = vec![
-            User {
-                id: 1,
-                name: "Alice".to_string(),
-                email: "alice@example.com".to_string(),
-            },
-            User {
-                id: 2,
-                name: "Bob".to_string(),
-                email: "bob@example.com".to_string(),
-            },
-        ];
-        Ok(users)
-    });
-    
-    rpc.register("createUser", |input: CreateUserInput| async move {
-        let user = User {
-            id: 3,
-            name: input.name,
-            email: input.email,
-        };
-        Ok(user)
-    });
-    
-    // Generate TypeScript client
-    rpc.generate_client_file("../frontend/src/client.ts").unwrap();
-    
-    app.rpc("/rpc", rpc);
+    // Routes with CORS for frontend
+    app.get("/api/users", get_users);
+    app.post("/api/users", create_user);
     
     println!("🚀 Backend running on http://localhost:3001");
     app.listen("127.0.0.1:3001").await.unwrap();
@@ -304,7 +298,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/rpc': 'http://localhost:3001'
+      '/api': 'http://localhost:3001'
     }
   }
 })
@@ -326,31 +320,76 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
     // Frontend App.tsx
     let frontend_app = r#"import { useState, useEffect } from 'react'
-// Import the auto-generated client after running the backend
-// import { client } from './client'
+
+interface User {
+  id: number
+  name: string
+  email: string
+}
 
 function App() {
-  const [users, setUsers] = useState([])
+  const [users, setUsers] = useState<User[]>([])
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
 
   useEffect(() => {
-    // After running backend once, uncomment this:
-    // client.getUsers().then(setUsers)
-    
-    // Placeholder for now
-    setUsers([
-      { id: 1, name: 'Alice', email: 'alice@example.com' },
-      { id: 2, name: 'Bob', email: 'bob@example.com' }
-    ])
+    fetchUsers()
   }, [])
 
+  const fetchUsers = async () => {
+    const response = await fetch('http://localhost:3001/api/users')
+    const data = await response.json()
+    setUsers(data)
+  }
+
+  const createUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await fetch('http://localhost:3001/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email })
+    })
+    setName('')
+    setEmail('')
+    fetchUsers()
+  }
+
   return (
-    <div style={{ padding: '2rem' }}>
+    <div style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
       <h1>🚀 Ultimo Fullstack App</h1>
+      
+      <h2>Create User:</h2>
+      <form onSubmit={createUser} style={{ marginBottom: '2rem' }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <input
+            type="text"
+            placeholder="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={{ padding: '0.5rem', width: '100%' }}
+            required
+          />
+        </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ padding: '0.5rem', width: '100%' }}
+            required
+          />
+        </div>
+        <button type="submit" style={{ padding: '0.5rem 1rem' }}>
+          Create User
+        </button>
+      </form>
+
       <h2>Users:</h2>
       <ul>
-        {users.map((user: any) => (
+        {users.map((user) => (
           <li key={user.id}>
-            {user.name} ({user.email})
+            <strong>{user.name}</strong> - {user.email}
           </li>
         ))}
       </ul>
@@ -372,7 +411,7 @@ A fullstack application built with [Ultimo](https://ultimo.dev).
 
 ```
 {}/
-├── backend/     # Rust API with Ultimo
+├── backend/     # Rust REST API with Ultimo
 └── frontend/    # React frontend with Vite
 ```
 
@@ -385,9 +424,11 @@ cd backend
 cargo run
 ```
 
-The backend will:
-- Start on http://localhost:3001
-- Auto-generate TypeScript client at `frontend/src/client.ts`
+The backend will start on http://localhost:3001
+
+**API Endpoints:**
+- `GET /api/users` - List all users
+- `POST /api/users` - Create a new user
 
 ### Frontend
 
@@ -401,10 +442,11 @@ Frontend will start on http://localhost:5173
 
 ## Features
 
-- 🚀 Type-safe RPC communication
-- ✨ Automatic TypeScript client generation
+- 🚀 Fast Rust backend with Ultimo
+- ⚡ React + TypeScript frontend
 - 🔄 Hot reload for both frontend and backend
 - 📦 Production-ready setup
+- 🎨 Modern development experience
 
 ## Learn More
 
