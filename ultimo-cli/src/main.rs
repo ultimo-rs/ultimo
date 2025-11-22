@@ -3,6 +3,7 @@ use colored::Colorize;
 use std::path::PathBuf;
 
 mod generate;
+mod new;
 
 #[derive(Parser)]
 #[command(name = "ultimo")]
@@ -70,10 +71,7 @@ async fn main() -> anyhow::Result<()> {
             generate::run(project, output, watch).await?;
         }
         Commands::New { name, template } => {
-            println!("🚀 Creating new project: {}", name.green());
-            println!("📦 Template: {}", template);
-            println!();
-            println!("{}", "Coming soon!".yellow());
+            new::run(name, template).await?;
         }
         Commands::Dev { port } => {
             println!(
