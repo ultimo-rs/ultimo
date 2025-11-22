@@ -1,4 +1,29 @@
-# Ultimo - Modern Rust Web Framework
+<div align="center">
+  <img src="docs-site/docs/public/logo.svg" alt="Ultimo Logo" width="200" />
+  <h1>Ultimo</h1>
+  <p><strong>Type-safe web framework with automatic TypeScript client generation</strong></p>
+
+  <p>
+    <a href="https://crates.io/crates/ultimo"><img src="https://img.shields.io/crates/v/ultimo.svg?style=flat-square" alt="Crates.io" /></a>
+    <a href="https://docs.rs/ultimo"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square" alt="Documentation" /></a>
+    <a href="https://github.com/ultimo-rs/ultimo/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License" /></a>
+    <a href="https://github.com/ultimo-rs/ultimo/actions"><img src="https://img.shields.io/github/actions/workflow/status/ultimo-rs/ultimo/ci.yml?branch=main&style=flat-square" alt="Build Status" /></a>
+  </p>
+
+  <p>
+    <a href="https://ultimo.dev">Website</a>
+    <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+    <a href="https://docs.ultimo.dev">Documentation</a>
+    <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+    <a href="https://docs.ultimo.dev/getting-started">Getting Started</a>
+    <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+    <a href="https://github.com/ultimo-rs/ultimo/tree/main/examples">Examples</a>
+  </p>
+
+  <br />
+</div>
+
+---
 
 ⚡ **Performance-equivalent to Axum** (152k+ req/sec, 0.6ms latency) - Lightweight, type-safe Rust web framework with **automatic TypeScript client generation** for type-safe full-stack development.
 
