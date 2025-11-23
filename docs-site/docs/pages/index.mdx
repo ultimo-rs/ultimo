@@ -53,6 +53,7 @@ Ultimo delivers exceptional performance, matching industry-leading frameworks:
 ## 🎯 Type-Safe Full Stack
 
 **Backend (Rust):**
+
 ```rust
 rpc.query("getUser", |input: GetUserInput| async move {
     Ok(User { id: input.id, name: "Alice".into() })
@@ -63,6 +64,7 @@ rpc.generate_client_file("../frontend/src/lib/client.ts")?;
 ```
 
 **Frontend (TypeScript):**
+
 ```typescript
 const user = await client.getUser({ id: 1 });
 console.log(user.name); // ✅ Fully type-safe!
