@@ -1,29 +1,14 @@
-import { ArrowRight, Terminal } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { ArrowRight, Terminal } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { siteConfig } from "@/lib/config";
 
 export function HeroSection() {
   return (
     <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden min-h-[90vh] flex flex-col items-center justify-center">
-      <div className="absolute inset-0 bg-grid-pattern -z-20 opacity-20" />
-
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
-        {/* Primary center spotlight */}
-        <div className="absolute top-[-150px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-orange-500/20 blur-[120px] rounded-full" />
-
-        {/* Left diagonal beam */}
-        <div className="absolute top-0 left-[10%] w-[500px] h-[700px] bg-gradient-to-b from-orange-500/15 via-orange-600/10 to-transparent rotate-[-15deg] blur-[100px]" />
-
-        {/* Right diagonal beam */}
-        <div className="absolute top-0 right-[10%] w-[500px] h-[700px] bg-gradient-to-b from-red-500/15 via-orange-500/10 to-transparent rotate-[15deg] blur-[100px]" />
-
-        {/* Accent spotlight left */}
-        <div className="absolute top-[20%] left-[5%] w-[400px] h-[400px] bg-orange-600/10 blur-[80px] rounded-full" />
-
-        {/* Accent spotlight right */}
-        <div className="absolute top-[30%] right-[5%] w-[350px] h-[350px] bg-red-500/10 blur-[80px] rounded-full" />
-
-        {/* Light source line at top */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[3px] bg-gradient-to-r from-transparent via-orange-500 to-transparent opacity-60 blur-sm" />
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0 bg-gradient-to-b from-orange-500/5 via-background to-background" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-orange-500/10 blur-[120px] rounded-full" />
       </div>
 
       <div className="container px-4 md:px-6 mx-auto flex flex-col items-center text-center relative z-10">
@@ -33,19 +18,22 @@ export function HeroSection() {
         </div>
 
         <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl text-balance">
-          The <span className="text-gradient">Rust Framework</span> for <br className="hidden md:block" />
+          The <span className="text-gradient">Rust Framework</span> for{" "}
+          <br className="hidden md:block" />
           Modern Web Development
         </h1>
 
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10 text-balance leading-relaxed">
-          Performance-equivalent to Axum (152k+ req/sec). Automatic TypeScript client generation. The full-stack
-          experience you've been waiting for.
+          Automatic TypeScript client generation. Built for speed, designed for
+          developers. The full-stack experience you've been waiting for.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
-          <Button size="lg" className="h-12 px-8 text-base">
-            Start Building
-            <ArrowRight className="ml-2 h-4 w-4" />
+          <Button size="lg" className="h-12 px-8 text-base" asChild>
+            <Link href={siteConfig.nav.getStarted}>
+              Start Building
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
           </Button>
           <Button
             size="lg"
@@ -65,34 +53,44 @@ export function HeroSection() {
               <div className="h-3 w-3 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
               <div className="h-3 w-3 rounded-full bg-green-500/20 border border-green-500/50" />
             </div>
-            <div className="mx-auto text-xs font-mono text-zinc-500">server.rs</div>
+            <div className="mx-auto text-xs font-mono text-zinc-500">
+              server.rs
+            </div>
           </div>
           <div className="p-6 overflow-x-auto text-left">
             <pre className="font-mono text-sm leading-relaxed">
               <code className="text-zinc-300">
-                <span className="text-purple-400">use</span> <span className="text-zinc-100">ultimo::prelude::*;</span>
+                <span className="text-purple-400">use</span>{" "}
+                <span className="text-zinc-100">ultimo::prelude::*;</span>
                 {"\n\n"}
                 <span className="text-purple-400">#[tokio::main]</span>
                 {"\n"}
-                <span className="text-blue-400">async fn</span> <span className="text-yellow-300">main</span>() {"->"}{" "}
-                <span className="text-zinc-100">ultimo::Result{"<()>"}</span> {"{"}
+                <span className="text-blue-400">async fn</span>{" "}
+                <span className="text-yellow-300">main</span>() {"->"}{" "}
+                <span className="text-zinc-100">ultimo::Result{"<()>"}</span>{" "}
+                {"{"}
                 {"\n"} <span className="text-zinc-500">// Initialize app</span>
-                {"\n"} <span className="text-blue-400">let</span> <span className="text-blue-400">mut</span> app ={" "}
-                <span className="text-green-400">Ultimo</span>::<span className="text-yellow-300">new</span>();
+                {"\n"} <span className="text-blue-400">let</span>{" "}
+                <span className="text-blue-400">mut</span> app ={" "}
+                <span className="text-green-400">Ultimo</span>::
+                <span className="text-yellow-300">new</span>();
                 {"\n\n"}
                 {"\n"} <span className="text-zinc-500">// Define a route</span>
                 {"\n"} app.<span className="text-yellow-300">get</span>(
                 <span className="text-orange-300">"/hello"</span>, |ctx|{" "}
                 <span className="text-blue-400">async move</span> {"{"}
-                {"\n"} ctx.<span className="text-yellow-300">json</span>(<span className="text-green-400">json!</span>(
-                {"{"} <span className="text-orange-300">"message"</span>:{" "}
-                <span className="text-orange-300">"Hello from Ultimo!"</span> {"}"})).
+                {"\n"} ctx.<span className="text-yellow-300">json</span>(
+                <span className="text-green-400">json!</span>({"{"}{" "}
+                <span className="text-orange-300">"message"</span>:{" "}
+                <span className="text-orange-300">"Hello from Ultimo!"</span>{" "}
+                {"}"})).
                 <span className="text-blue-400">await</span>
                 {"\n"} {"}"});
                 {"\n\n"}
                 {"\n"} <span className="text-zinc-500">// Start server</span>
                 {"\n"} app.<span className="text-yellow-300">listen</span>(
-                <span className="text-orange-300">"127.0.0.1:3000"</span>).<span className="text-blue-400">await</span>
+                <span className="text-orange-300">"127.0.0.1:3000"</span>).
+                <span className="text-blue-400">await</span>
                 {"\n"}
                 {"}"}
               </code>
@@ -101,5 +99,5 @@ export function HeroSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
