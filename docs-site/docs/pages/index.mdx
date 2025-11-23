@@ -5,6 +5,81 @@ description: Modern Rust web framework with automatic TypeScript generation
 
 # Ultimo
 
-Modern Rust web framework with automatic TypeScript generation.
+**Modern Rust web framework with automatic TypeScript client generation**
+
+Build type-safe full-stack applications with Rust backend and TypeScript frontend, automatically synced.
 
 [Get Started →](/getting-started)
+
+## ✨ Key Features
+
+- **⚡ Blazing Fast** - 152k+ req/sec, matches Axum performance
+- **🔒 Type-Safe** - End-to-end type safety from Rust to TypeScript
+- **🚀 Auto TypeScript** - Generate type-safe clients automatically
+- **📋 OpenAPI Built-in** - Generate specs for Swagger UI and API docs
+- **🎯 Hybrid API** - Support both REST and RPC-style endpoints
+- **🔧 CLI Tools** - Build, develop, and generate clients with ease
+
+## 🚀 Quick Example
+
+```rust
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let mut app = Ultimo::new();
+
+    app.get("/", |ctx: Context| async move {
+        ctx.json(json!({"message": "Hello, Ultimo!"})).await
+    });
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+## 📊 Performance
+
+Ultimo delivers exceptional performance, matching industry-leading frameworks:
+
+| Framework   | Throughput       | Avg Latency |
+| ----------- | ---------------- | ----------- |
+| **Ultimo**  | **152k req/sec** | **0.6ms**   |
+| Axum (Rust) | 153k req/sec     | 0.6ms       |
+| Hono (Bun)  | 132k req/sec     | 0.8ms       |
+| FastAPI     | 10k req/sec      | 9.5ms       |
+
+**15x faster than FastAPI** with zero performance penalty for auto-generation.
+
+## 🎯 Type-Safe Full Stack
+
+**Backend (Rust):**
+```rust
+rpc.query("getUser", |input: GetUserInput| async move {
+    Ok(User { id: input.id, name: "Alice".into() })
+});
+
+// Auto-generate TypeScript client
+rpc.generate_client_file("../frontend/src/lib/client.ts")?;
+```
+
+**Frontend (TypeScript):**
+```typescript
+const user = await client.getUser({ id: 1 });
+console.log(user.name); // ✅ Fully type-safe!
+```
+
+## 📚 Learn More
+
+- [Getting Started](/getting-started) - Install and create your first app
+- [RPC System](/rpc) - Build type-safe APIs
+- [TypeScript Clients](/typescript) - Auto-generated clients
+- [OpenAPI Support](/openapi) - Generate API specs
+- [Examples](https://github.com/ultimo-rs/ultimo/tree/main/examples) - Sample projects
+
+## 🌟 Why Ultimo?
+
+✅ **Single Source of Truth** - Types defined in Rust, auto-sync to TypeScript  
+✅ **Zero Boilerplate** - No manual API typing or client code  
+✅ **Production Ready** - Built-in validation, auth, rate limiting  
+✅ **Great DX** - Full IDE autocomplete and type checking  
+✅ **Performance** - Rust speed with modern async runtime
