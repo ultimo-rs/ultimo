@@ -76,7 +76,7 @@ export function SiteFooter() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href={siteConfig.nav.changelog}
                   className="hover:text-orange-500 transition-colors"
                 >
                   Changelog

@@ -1,0 +1,648 @@
+# API Reference
+
+Complete API reference for the Ultimo web framework.
+
+## Core Types
+
+### `Ultimo`
+
+The main application struct that manages routing, middleware, and server lifecycle.
+
+```rust
+use ultimo::prelude::*;
+
+let mut app = Ultimo::new();
+```
+
+#### Methods
+
+##### `new() -> Self`
+
+Create a new Ultimo application with default middleware (includes `X-Powered-By: Ultimo` header).
+
+```rust
+let mut app = Ultimo::new();
+```
+
+##### `new_without_defaults() -> Self`
+
+Create a new Ultimo application without any default middleware. Use this for full control over middleware configuration.
+
+```rust
+let mut app = Ultimo::new_without_defaults();
+```
+
+##### Routing Methods
+
+Register route handlers for different HTTP methods:
+
+```rust
+// GET route
+app.get("/path", handler);
+
+// POST route
+app.post("/path", handler);
+
+// PUT route
+app.put("/path", handler);
+
+// DELETE route
+app.delete("/path", handler);
+
+// PATCH route
+app.patch("/path", handler);
+```
+
+##### `use_middleware(&mut self, middleware: impl IntoMiddleware) -> &mut Self`
+
+Add middleware to the application. Middleware executes in the order it's added.
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::logger());
+app.use_middleware(ultimo::middleware::builtin::cors());
+```
+
+##### `listen(&mut self, addr: &str) -> Result<()>`
+
+Start the HTTP server on the specified address.
+
+```rust
+app.listen("127.0.0.1:3000").await?;
+```
+
+##### Database Methods (requires feature flags)
+
+**With SQLx** (requires `sqlx` feature):
+
+```rust
+app.with_sqlx(pool);
+```
+
+**With Diesel** (requires `diesel` feature):
+
+```rust
+app.with_diesel(pool);
+```
+
+---
+
+## Context & Request
+
+### `Context`
+
+The request context provides access to the incoming request and allows building responses.
+
+```rust
+async fn handler(ctx: Context) -> Result<Response> {
+    // Access request data through ctx.req
+    // Build responses with ctx methods
+    ctx.json(json!({"message": "Hello"})).await
+}
+```
+
+#### Response Methods
+
+##### `json<T: Serialize>(&self, value: T) -> Result<Response>`
+
+Return a JSON response with `Content-Type: application/json`.
+
+```rust
+ctx.json(json!({"key": "value"})).await
+```
+
+##### `text(&self, body: impl Into<String>) -> Result<Response>`
+
+Return a plain text response with `Content-Type: text/plain`.
+
+```rust
+ctx.text("Hello, World!").await
+```
+
+##### `html(&self, body: impl Into<String>) -> Result<Response>`
+
+Return an HTML response with `Content-Type: text/html`.
+
+```rust
+ctx.html("<h1>Hello</h1>").await
+```
+
+##### `redirect(&self, location: &str) -> Result<Response>`
+
+Return a 302 redirect response.
+
+```rust
+ctx.redirect("/new-path").await
+```
+
+##### `status(&self, code: u16)`
+
+Set the response status code. Can be chained with other response methods.
+
+```rust
+ctx.status(201);
+ctx.json(user).await
+```
+
+##### `header(&self, key: &str, value: &str)`
+
+Set a response header. Can be chained with other response methods.
+
+```rust
+ctx.header("X-Custom", "value");
+ctx.json(data).await
+```
+
+### `Request`
+
+Access request data through `ctx.req`.
+
+#### Path Parameters
+
+##### `param(&self, name: &str) -> Result<&str>`
+
+Get a path parameter by name.
+
+```rust
+// Route: /users/:id
+let id = ctx.req.param("id")?;
+```
+
+##### `params(&self) -> &Params`
+
+Get all path parameters as a HashMap.
+
+```rust
+let all_params = ctx.req.params();
+```
+
+#### Query Parameters
+
+##### `query(&self, name: &str) -> Option<String>`
+
+Get a single query parameter.
+
+```rust
+// GET /search?q=rust
+let query = ctx.req.query("q");
+```
+
+##### `queries(&self) -> HashMap<String, Vec<String>>`
+
+Get all query parameters. Returns a map of parameter names to their values (supports multiple values per parameter).
+
+```rust
+let all_queries = ctx.req.queries();
+```
+
+#### Headers
+
+##### `header(&self, name: &str) -> Option<String>`
+
+Get a request header value.
+
+```rust
+let auth = ctx.req.header("Authorization");
+```
+
+##### `headers(&self) -> &HeaderMap`
+
+Get all request headers.
+
+```rust
+let all_headers = ctx.req.headers();
+```
+
+#### Body
+
+##### `json<T: DeserializeOwned>(&self) -> Result<T>`
+
+Parse the request body as JSON.
+
+```rust
+let body: CreateUser = ctx.req.json().await?;
+```
+
+##### `text(&self) -> Result<String>`
+
+Get the request body as a string.
+
+```rust
+let body = ctx.req.text().await?;
+```
+
+##### `bytes(&self) -> Result<Bytes>`
+
+Get the request body as raw bytes.
+
+```rust
+let body = ctx.req.bytes().await?;
+```
+
+#### Method & URI
+
+##### `method(&self) -> &Method`
+
+Get the HTTP method (GET, POST, etc.).
+
+```rust
+let method = ctx.req.method();
+```
+
+##### `uri(&self) -> &Uri`
+
+Get the request URI.
+
+```rust
+let uri = ctx.req.uri();
+let path = uri.path();
+```
+
+---
+
+## RPC System
+
+### `RpcRegistry`
+
+Registry for RPC procedures with automatic TypeScript generation.
+
+#### Creating a Registry
+
+```rust
+use ultimo::rpc::{RpcRegistry, RpcMode};
+
+// JSON-RPC mode (default)
+let rpc = RpcRegistry::new();
+
+// REST mode
+let rpc = RpcRegistry::new_with_mode(RpcMode::Rest);
+```
+
+#### Registering Procedures
+
+##### `query<F, I, O>(&self, name: &str, handler: F)`
+
+Register a query procedure (idempotent, read-only operations).
+
+- **REST mode**: Maps to GET endpoint
+- **JSON-RPC mode**: Part of RPC protocol
+
+```rust
+rpc.query("getUser", |input: GetUserInput| async move {
+    Ok(User { /* ... */ })
+});
+```
+
+##### `mutation<F, I, O>(&self, name: &str, handler: F)`
+
+Register a mutation procedure (non-idempotent operations that modify state).
+
+- **REST mode**: Maps to POST endpoint
+- **JSON-RPC mode**: Part of RPC protocol
+
+```rust
+rpc.mutation("createUser", |input: CreateUserInput| async move {
+    Ok(User { /* ... */ })
+});
+```
+
+##### `register_with_types<F, I, O>(&self, name: &str, handler: F, input_type: String, output_type: String)`
+
+Register a procedure with explicit TypeScript type annotations.
+
+```rust
+rpc.register_with_types(
+    "getUser",
+    |input: GetUserInput| async move { Ok(User { /* ... */ }) },
+    "{ id: number }".to_string(),
+    "User".to_string(),
+);
+```
+
+#### TypeScript Generation
+
+##### `generate_client_file(&self, path: &str) -> Result<()>`
+
+Generate a TypeScript client file with type-safe methods.
+
+```rust
+rpc.generate_client_file("../frontend/src/lib/client.ts")?;
+```
+
+##### `generate_client(&self) -> String`
+
+Generate TypeScript client code as a string.
+
+```rust
+let ts_code = rpc.generate_client();
+```
+
+#### RPC Modes
+
+```rust
+pub enum RpcMode {
+    /// Each procedure becomes its own HTTP endpoint
+    /// - Queries: GET /api/{name}
+    /// - Mutations: POST /api/{name}
+    Rest,
+
+    /// All procedures use a single POST endpoint
+    /// POST /rpc with JSON-RPC protocol
+    JsonRpc,
+}
+```
+
+---
+
+## Middleware
+
+### Built-in Middleware
+
+#### `logger()`
+
+Log all incoming requests with method, path, and response time.
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::logger());
+```
+
+#### `cors()`
+
+Enable CORS with permissive defaults (allows all origins, methods, and headers).
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::cors());
+```
+
+#### `powered_by()`
+
+Add `X-Powered-By: Ultimo` header to all responses. Included by default in `Ultimo::new()`.
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::powered_by());
+```
+
+### Custom Middleware
+
+Create custom middleware by implementing the middleware function signature:
+
+```rust
+use ultimo::middleware::Next;
+
+fn my_middleware() -> impl IntoMiddleware {
+    |ctx: Context, next: Next| async move {
+        // Before handler
+        println!("Before: {}", ctx.req.uri());
+
+        // Call next middleware/handler
+        let mut response = next(ctx).await?;
+
+        // After handler
+        response.headers.insert("X-Custom", "value".parse().unwrap());
+
+        Ok(response)
+    }
+}
+
+app.use_middleware(my_middleware());
+```
+
+---
+
+## OpenAPI
+
+### `OpenApiSpec`
+
+Generate OpenAPI 3.0 specifications for your API.
+
+```rust
+use ultimo::openapi::OpenApiSpec;
+
+let mut spec = OpenApiSpec::new("My API", "1.0.0");
+
+spec.add_endpoint(
+    "/users",
+    "get",
+    "Get all users",
+    Some("UserListInput"),
+    "UserList",
+);
+
+let json = spec.to_json()?;
+```
+
+#### Methods
+
+##### `new(title: &str, version: &str) -> Self`
+
+Create a new OpenAPI specification.
+
+##### `add_endpoint(&mut self, path: &str, method: &str, summary: &str, request_schema: Option<&str>, response_schema: &str)`
+
+Add an API endpoint to the specification.
+
+##### `add_schema(&mut self, name: &str, schema: Value)`
+
+Add a JSON schema definition.
+
+##### `to_json(&self) -> Result<String>`
+
+Serialize the specification to JSON.
+
+---
+
+## Validation
+
+### `validate<T: Validate>(value: &T) -> Result<()>`
+
+Validate a value using the `validator` crate rules.
+
+```rust
+use ultimo::prelude::*;
+use validator::Validate;
+
+#[derive(Deserialize, Validate)]
+struct CreateUser {
+    #[validate(length(min = 3, max = 50))]
+    name: String,
+
+    #[validate(email)]
+    email: String,
+}
+
+async fn create_user(ctx: Context) -> Result<Response> {
+    let input: CreateUser = ctx.req.json().await?;
+
+    // Validate input
+    validate(&input)?;
+
+    // Process valid data
+    ctx.json(json!({"success": true})).await
+}
+```
+
+Validation errors return a 400 Bad Request with detailed error messages.
+
+---
+
+## Error Handling
+
+### `UltimoError`
+
+The main error type for the framework.
+
+```rust
+pub enum UltimoError {
+    BadRequest(String),
+    NotFound(String),
+    Unauthorized(String),
+    Forbidden(String),
+    Internal(String),
+    ValidationError(String),
+    DatabaseError(String),
+}
+```
+
+#### Usage
+
+```rust
+// Return errors from handlers
+if user.is_none() {
+    return Err(UltimoError::NotFound("User not found".to_string()));
+}
+
+// Or use the ? operator
+let id: u32 = ctx.req.param("id")?.parse()?;
+```
+
+Errors automatically serialize to JSON:
+
+```json
+{
+  "error": "NotFound",
+  "message": "User not found"
+}
+```
+
+---
+
+## Database Integration
+
+### SQLx Support (requires `sqlx` feature)
+
+```rust
+use sqlx::postgres::PgPoolOptions;
+
+let pool = PgPoolOptions::new()
+    .max_connections(5)
+    .connect("postgres://localhost/mydb")
+    .await?;
+
+app.with_sqlx(pool);
+```
+
+Access in handlers:
+
+```rust
+async fn get_user(ctx: Context) -> Result<Response> {
+    let db = ctx.db()?;
+    let pool = db.sqlx_pool::<sqlx::Postgres>()?;
+
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        .bind(1)
+        .fetch_one(pool)
+        .await?;
+
+    ctx.json(user).await
+}
+```
+
+### Diesel Support (requires `diesel` feature)
+
+```rust
+use diesel::r2d2::{self, ConnectionManager};
+use diesel::PgConnection;
+
+let manager = ConnectionManager::<PgConnection>::new("postgres://localhost/mydb");
+let pool = r2d2::Pool::builder().build(manager)?;
+
+app.with_diesel(pool);
+```
+
+Access in handlers:
+
+```rust
+async fn get_user(ctx: Context) -> Result<Response> {
+    let db = ctx.db()?;
+    let pool = db.diesel_pool::<PgConnection>()?;
+
+    let conn = pool.get()?;
+    let user = users::table.find(1).first::<User>(&conn)?;
+
+    ctx.json(user).await
+}
+```
+
+---
+
+## Types & Prelude
+
+### Prelude Module
+
+Import everything you need in one line:
+
+```rust
+use ultimo::prelude::*;
+
+// Includes:
+// - Ultimo (app)
+// - Context (request context)
+// - Result, UltimoError (error types)
+// - RpcRegistry, RpcRequest, RpcResponse (RPC system)
+// - middleware (middleware module)
+// - validate (validation function)
+// - serde::{Deserialize, Serialize}
+// - serde_json::json
+// - validator::Validate
+```
+
+### Response Type
+
+```rust
+pub struct Response {
+    pub status: StatusCode,
+    pub headers: HeaderMap,
+    pub body: Full<Bytes>,
+}
+```
+
+Responses are typically created through `Context` methods, but you can construct them manually if needed.
+
+---
+
+## Feature Flags
+
+Enable optional functionality through Cargo features:
+
+```toml
+[dependencies]
+ultimo = { version = "0.1", features = ["sqlx", "postgres"] }
+```
+
+### Available Features
+
+- `database` - Enable database support (required for `sqlx` or `diesel`)
+- `sqlx` - Enable SQLx integration
+- `diesel` - Enable Diesel integration
+- `postgres` - PostgreSQL support (for SQLx)
+- `mysql` - MySQL support (for SQLx)
+- `sqlite` - SQLite support (for SQLx)
+
+---
+
+## Next Steps
+
+- [Getting Started](/getting-started) - Build your first Ultimo app
+- [RPC System](/rpc) - Type-safe APIs with auto-generated clients
+- [Middleware](/middleware) - Composable request/response handling
+- [Database](/database) - SQLx and Diesel integration
+- [Examples](https://github.com/ultimo-rs/ultimo/tree/main/examples) - Sample projects

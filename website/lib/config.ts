@@ -16,5 +16,6 @@ export const siteConfig = {
     blog: "/blog",
     features: "/features",
     roadmap: "https://docs.ultimo.dev/roadmap",
+    changelog: "https://docs.ultimo.dev/changelog",
   },
 };

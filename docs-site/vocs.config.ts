@@ -22,8 +22,16 @@ export default defineConfig({
           link: "/getting-started",
         },
         {
+          text: "API Reference",
+          link: "/api-reference",
+        },
+        {
           text: "Roadmap",
           link: "/roadmap",
+        },
+        {
+          text: "Changelog",
+          link: "/changelog",
         },
       ],
     },
