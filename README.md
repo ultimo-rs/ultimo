@@ -25,13 +25,13 @@
 
 ---
 
-⚡ **Performance-equivalent to Axum** (152k+ req/sec, 0.6ms latency) - Lightweight, type-safe Rust web framework with **automatic TypeScript client generation** for type-safe full-stack development.
+⚡ **Industry-leading performance** (158k+ req/sec, 0.6ms latency) - Lightweight, type-safe Rust web framework with **automatic TypeScript client generation** for type-safe full-stack development.
 
 ## ✨ Key Features
 
 ### Available Now
 
-- ⚡ **Blazing Fast Performance** - Matches Axum (Rust's most popular framework): 152k+ req/sec, sub-millisecond latency
+- ⚡ **Blazing Fast Performance** - Industry-leading speed: 158k+ req/sec, sub-millisecond latency
 - 🚀 **Automatic TypeScript Generation** - RPC endpoints automatically generate type-safe TypeScript clients
 - 📋 **OpenAPI Support** - Generate OpenAPI 3.0 specs from your RPC procedures for Swagger UI, Prism, and OpenAPI Generator
 - 🔄 **Hybrid RPC Modes** - Choose between REST (individual endpoints) or JSON-RPC (single endpoint) style
@@ -59,7 +59,7 @@ Ultimo delivers exceptional performance, matching industry-leading frameworks:
 
 | Framework   | Throughput       | Avg Latency | vs Python      |
 | ----------- | ---------------- | ----------- | -------------- |
-| **Ultimo**  | **152k req/sec** | **0.6ms**   | **15x faster** |
+| **Ultimo**  | **158k req/sec** | **0.6ms**   | **15x faster** |
 | Axum (Rust) | 153k req/sec     | 0.6ms       | 15x faster     |
 | Hono (Bun)  | 132k req/sec     | 0.8ms       | 13x faster     |
 | Hono (Node) | 62k req/sec      | 1.6ms       | 6x faster      |

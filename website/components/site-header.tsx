@@ -40,7 +40,7 @@ export function SiteHeader() {
                 className="object-contain"
               />
             </div>
-            <span>Ultimo</span>
+            <span className="">Ultimo</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6 ml-10 text-sm font-medium text-muted-foreground">
             <Link

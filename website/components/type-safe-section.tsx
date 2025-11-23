@@ -1,4 +1,4 @@
-import { ArrowDown } from "lucide-react"
+import { ArrowDown } from "lucide-react";
 
 export function TypeSafeSection() {
   return (
@@ -11,10 +11,11 @@ export function TypeSafeSection() {
       <div className="container px-4 md:px-6 mx-auto">
         <div className="mb-16 text-center">
           <h2 className="text-3xl md:text-5xl font-bold mb-6 tracking-tight">
-            End-to-End <span className="text-orange-500">Type Safety</span>
+            End-to-End <span className="text-gradient">Type Safety</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Define your API in Rust. Get TypeScript clients automatically. Catch errors at compile time, not runtime.
+            Define your API in Rust. Get TypeScript clients automatically. Catch
+            errors at compile time, not runtime.
           </p>
         </div>
 
@@ -29,7 +30,9 @@ export function TypeSafeSection() {
           {/* Backend Card */}
           <div className="rounded-xl border border-border bg-card overflow-hidden flex flex-col shadow-lg">
             <div className="px-6 py-4 border-b border-border bg-muted/50 flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">backend/src/main.rs</span>
+              <span className="text-sm font-medium text-foreground">
+                backend/src/main.rs
+              </span>
               <div className="px-2 py-0.5 rounded text-xs bg-orange-500/10 text-orange-500 border border-orange-500/20">
                 Rust
               </div>
@@ -37,17 +40,20 @@ export function TypeSafeSection() {
             <div className="p-6 font-mono text-sm overflow-x-auto flex-1 bg-zinc-950 text-zinc-300">
               <pre>
                 <code>
-                  <span className="text-purple-400">struct</span> <span className="text-yellow-300">User</span> {"{"}{" "}
-                  {"\n"}
+                  <span className="text-purple-400">struct</span>{" "}
+                  <span className="text-yellow-300">User</span> {"{"} {"\n"}
                   {"    "}id: <span className="text-blue-400">u32</span>, {"\n"}
-                  {"    "}name: <span className="text-blue-400">String</span>, {"\n"}
-                  {"    "}email: <span className="text-blue-400">String</span> {"\n"}
+                  {"    "}name: <span className="text-blue-400">String</span>,{" "}
+                  {"\n"}
+                  {"    "}email: <span className="text-blue-400">String</span>{" "}
+                  {"\n"}
                   {"}"} {"\n\n"}
                   rpc.<span className="text-yellow-300">query</span>( {"\n"}
                   {"    "}
                   <span className="text-orange-300">"getUser"</span>, {"\n"}
                   {"    "}|id: <span className="text-blue-400">u32</span>|{" "}
-                  <span className="text-blue-400">async move</span> {"{"}...{"}"} {"\n"}
+                  <span className="text-blue-400">async move</span> {"{"}...
+                  {"}"} {"\n"}
                   );
                 </code>
               </pre>
@@ -57,7 +63,9 @@ export function TypeSafeSection() {
           {/* Frontend Card */}
           <div className="rounded-xl border border-border bg-card overflow-hidden flex flex-col shadow-lg">
             <div className="px-6 py-4 border-b border-border bg-muted/50 flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">frontend/src/client.ts</span>
+              <span className="text-sm font-medium text-foreground">
+                frontend/src/client.ts
+              </span>
               <div className="px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-500 border border-blue-500/20">
                 Generated
               </div>
@@ -67,14 +75,19 @@ export function TypeSafeSection() {
                 <code>
                   <span className="text-purple-400">export interface</span>{" "}
                   <span className="text-yellow-300">User</span> {"{"} {"\n"}
-                  {"    "}id: <span className="text-blue-400">number</span>; {"\n"}
-                  {"    "}name: <span className="text-blue-400">string</span>; {"\n"}
-                  {"    "}email: <span className="text-blue-400">string</span>; {"\n"}
+                  {"    "}id: <span className="text-blue-400">number</span>;{" "}
+                  {"\n"}
+                  {"    "}name: <span className="text-blue-400">string</span>;{" "}
+                  {"\n"}
+                  {"    "}email: <span className="text-blue-400">string</span>;{" "}
+                  {"\n"}
                   {"}"} {"\n\n"}
                   <span className="text-zinc-500">// Fully typed!</span> {"\n"}
-                  <span className="text-blue-400">const</span> user = <span className="text-purple-400">await</span>{" "}
-                  client.<span className="text-yellow-300">getUser</span>(1); {"\n"}
-                  console.<span className="text-yellow-300">log</span>(user.<span className="text-blue-400">name</span>
+                  <span className="text-blue-400">const</span> user ={" "}
+                  <span className="text-purple-400">await</span> client.
+                  <span className="text-yellow-300">getUser</span>(1); {"\n"}
+                  console.<span className="text-yellow-300">log</span>(user.
+                  <span className="text-blue-400">name</span>
                   );
                 </code>
               </pre>
@@ -83,5 +96,5 @@ export function TypeSafeSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

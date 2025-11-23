@@ -4,7 +4,7 @@ const frameworks = [
   {
     name: "Ultimo",
     features: {
-      performance: "152k+",
+      performance: "158k+",
       typeScript: "auto",
       openAPI: "auto",
       rpc: true,

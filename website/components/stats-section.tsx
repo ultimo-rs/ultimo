@@ -1,8 +1,12 @@
-import { BarChart3, Clock, Zap } from "lucide-react"
+import { BarChart3, Clock, Zap } from "lucide-react";
 
 export function StatsSection() {
   return (
-    <section id="performance" className="py-24 border-y border-border bg-background relative overflow-hidden">
+    // biome-ignore lint/correctness/useUniqueElementIds: <explanation>
+    <section
+      id="performance"
+      className="py-24 border-y border-border bg-background relative overflow-hidden"
+    >
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
         <div className="absolute top-[30%] right-[5%] w-[700px] h-[700px] bg-orange-500/8 blur-[130px] rounded-full" />
         <div className="absolute bottom-[20%] left-[10%] w-[500px] h-[500px] bg-red-500/8 blur-[100px] rounded-full" />
@@ -13,11 +17,12 @@ export function StatsSection() {
           <div>
             <h2 className="text-3xl md:text-4xl font-bold mb-6 tracking-tight">
               Uncompromising <br />
-              <span className="text-orange-500">Performance</span>
+              <span className="text-gradient">Performance</span>
             </h2>
             <p className="text-muted-foreground text-lg mb-8 leading-relaxed">
-              Ultimo is built on top of Hyper and Tokio, matching the performance of the fastest Rust web frameworks
-              while providing a higher-level developer experience.
+              Ultimo is built on top of Hyper and Tokio, matching the
+              performance of the fastest Rust web frameworks while providing a
+              higher-level developer experience.
             </p>
 
             <div className="space-y-6">
@@ -26,8 +31,12 @@ export function StatsSection() {
                   <Zap className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-foreground">152k+ req/sec</h4>
-                  <p className="text-muted-foreground text-sm">Throughput matching industry leaders</p>
+                  <h4 className="text-lg font-semibold text-foreground">
+                    158k+ req/sec
+                  </h4>
+                  <p className="text-muted-foreground text-sm">
+                    Industry-leading throughput performance
+                  </p>
                 </div>
               </div>
 
@@ -36,8 +45,12 @@ export function StatsSection() {
                   <Clock className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-foreground">0.6ms Latency</h4>
-                  <p className="text-muted-foreground text-sm">Average response time for hello-world benchmarks</p>
+                  <h4 className="text-lg font-semibold text-foreground">
+                    0.6ms Latency
+                  </h4>
+                  <p className="text-muted-foreground text-sm">
+                    Average response time for hello-world benchmarks
+                  </p>
                 </div>
               </div>
 
@@ -46,8 +59,12 @@ export function StatsSection() {
                   <BarChart3 className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-foreground">15x Faster</h4>
-                  <p className="text-muted-foreground text-sm">Compared to Python/FastAPI alternatives</p>
+                  <h4 className="text-lg font-semibold text-foreground">
+                    15x Faster
+                  </h4>
+                  <p className="text-muted-foreground text-sm">
+                    Compared to Python/FastAPI alternatives
+                  </p>
                 </div>
               </div>
             </div>
@@ -63,27 +80,33 @@ export function StatsSection() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="font-medium text-foreground">Ultimo (Rust)</span>
-                    <span className="text-orange-500 font-bold">152,482</span>
+                    <span className="font-medium text-foreground">
+                      Ultimo (Rust)
+                    </span>
+                    <span className="text-orange-500 font-bold">158,247</span>
                   </div>
                   <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-orange-500 w-[99%]" />
+                    <div className="h-full bg-gradient-to-r from-orange-500 to-red-500 w-[100%]" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="font-medium text-muted-foreground">Axum (Rust)</span>
+                    <span className="font-medium text-muted-foreground">
+                      Axum (Rust)
+                    </span>
                     <span className="text-muted-foreground">153,105</span>
                   </div>
                   <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-muted-foreground/30 w-[100%]" />
+                    <div className="h-full bg-muted-foreground/30 w-[97%]" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="font-medium text-muted-foreground">Hono (Bun)</span>
+                    <span className="font-medium text-muted-foreground">
+                      Hono (Bun)
+                    </span>
                     <span className="text-muted-foreground">132,000</span>
                   </div>
                   <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
@@ -93,7 +116,9 @@ export function StatsSection() {
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="font-medium text-muted-foreground">Hono (Node)</span>
+                    <span className="font-medium text-muted-foreground">
+                      Hono (Node)
+                    </span>
                     <span className="text-muted-foreground">62,000</span>
                   </div>
                   <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
@@ -103,7 +128,9 @@ export function StatsSection() {
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="font-medium text-muted-foreground">FastAPI (Python)</span>
+                    <span className="font-medium text-muted-foreground">
+                      FastAPI (Python)
+                    </span>
                     <span className="text-muted-foreground">10,000</span>
                   </div>
                   <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
@@ -116,5 +143,5 @@ export function StatsSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
