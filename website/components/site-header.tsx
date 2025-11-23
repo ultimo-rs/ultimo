@@ -58,6 +58,7 @@ export function SiteHeader() {
             <Link
               href={siteConfig.nav.documentation}
               className="hover:text-foreground transition-colors"
+              rel="noopener noreferrer"
             >
               Docs
             </Link>
@@ -74,6 +75,7 @@ export function SiteHeader() {
           <Link
             href={siteConfig.links.github}
             target="_blank"
+            rel="noopener noreferrer"
             className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors"
           >
             <Github className="h-5 w-5" />
@@ -81,7 +83,9 @@ export function SiteHeader() {
           </Link>
           <div className="hidden sm:flex gap-3">
             <Button size="sm" asChild>
-              <Link href={siteConfig.nav.getStarted}>Get Started</Link>
+              <Link href={siteConfig.nav.getStarted} rel="noopener noreferrer">
+                Get Started
+              </Link>
             </Button>
           </div>
           <Button

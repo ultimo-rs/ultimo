@@ -25,7 +25,9 @@ export function CTASection() {
             className="h-12 px-8 text-base bg-white text-black hover:bg-zinc-200"
             asChild
           >
-            <Link href={siteConfig.nav.getStarted}>Get Started</Link>
+            <Link href={siteConfig.nav.getStarted} rel="noopener noreferrer">
+              Get Started
+            </Link>
           </Button>
           <Button
             size="lg"
@@ -33,7 +35,9 @@ export function CTASection() {
             className="h-12 px-8 text-base border-zinc-800 hover:bg-zinc-900 text-white bg-transparent"
             asChild
           >
-            <Link href={siteConfig.nav.documentation}>Read Documentation</Link>
+            <Link href={siteConfig.nav.documentation} rel="noopener noreferrer">
+              Read Documentation
+            </Link>
           </Button>
         </div>
       </div>

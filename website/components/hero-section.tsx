@@ -30,7 +30,7 @@ export function HeroSection() {
 
         <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
           <Button size="lg" className="h-12 px-8 text-base" asChild>
-            <Link href={siteConfig.nav.getStarted}>
+            <Link href={siteConfig.nav.getStarted} rel="noopener noreferrer">
               Start Building
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
