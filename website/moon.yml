@@ -1,0 +1,49 @@
+$schema: "https://moonrepo.dev/schemas/project.json"
+
+type: "application"
+language: "javascript"
+platform: "node"
+
+project:
+  name: "website"
+  description: "Ultimo marketing website"
+
+tasks:
+  dev:
+    command: "next dev"
+    local: true
+    options:
+      runInCI: false
+
+  build:
+    command: "next build"
+    inputs:
+      - "app/**/*"
+      - "components/**/*"
+      - "lib/**/*"
+      - "public/**/*"
+      - "styles/**/*"
+      - "next.config.mjs"
+      - "package.json"
+      - "tsconfig.json"
+    outputs:
+      - ".next"
+
+  start:
+    command: "next start"
+    deps:
+      - "~:build"
+
+  lint:
+    command: "next lint"
+    inputs:
+      - "app/**/*"
+      - "components/**/*"
+      - "lib/**/*"
+
+  type-check:
+    command: "tsc --noEmit"
+    inputs:
+      - "**/*.ts"
+      - "**/*.tsx"
+      - "tsconfig.json"

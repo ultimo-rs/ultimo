@@ -9,9 +9,9 @@ export default defineConfig({
     { text: "Docs", link: "/getting-started" },
     {
       text: "Examples",
-      link: "https://github.com/yourusername/ultimo-rs/tree/main/examples",
+      link: "https://github.com/ultimo-rs/ultimo/tree/main/examples",
     },
-    { text: "GitHub", link: "https://github.com/yourusername/ultimo-rs" },
+    { text: "GitHub", link: "https://github.com/ultimo-rs/ultimo" },
   ],
   sidebar: [
     {
@@ -86,7 +86,7 @@ export default defineConfig({
   socials: [
     {
       icon: "github",
-      link: "https://github.com/yourusername/ultimo-rs",
+      link: "https://github.com/ultimo-rs/ultimo",
     },
   ],
   theme: {

@@ -21,6 +21,9 @@ projects:
 
   # Documentation site
   - "docs-site"
+  
+  # Marketing website
+  - "website"
 
 # VCS configuration
 vcs:

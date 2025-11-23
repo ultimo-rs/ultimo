@@ -9,12 +9,14 @@ Pushes to `main` branch automatically deploy to: https://ultimo.pages.dev
 ## Cloudflare Pages Settings
 
 **Build Configuration:**
+
 - Framework preset: `None` (Vite)
 - Build command: `pnpm install && pnpm build`
 - Build output directory: `docs/.vocs/dist` ⚠️ **Important:** This path is relative to the root directory
 - Root directory: `docs-site`
 
 **Environment Variables:**
+
 - `NODE_VERSION`: `22` (required for Vocs globSync support)
 - `PNPM_VERSION`: `latest`
 

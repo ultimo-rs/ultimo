@@ -57,3 +57,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 venv/
 **/venv/openapi-*.json
+
+# Next.js
+.next/
+
