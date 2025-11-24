@@ -40,6 +40,9 @@ pub mod validation;
 #[cfg(feature = "database")]
 pub mod database;
 
+#[cfg(feature = "websocket")]
+pub mod websocket;
+
 // Re-exports for convenience
 pub use app::Ultimo;
 pub use context::Context;
