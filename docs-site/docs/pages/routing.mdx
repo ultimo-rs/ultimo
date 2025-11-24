@@ -21,12 +21,12 @@ app.post("/users", |ctx| async move {
 });
 
 app.put("/users/:id", |ctx| async move {
-    let id = ctx.param("id")?;
+    let id = ctx.req.param("id")?;
     ctx.json(json!({"id": id, "updated": true})).await
 });
 
 app.delete("/users/:id", |ctx| async move {
-    let id = ctx.param("id")?;
+    let id = ctx.req.param("id")?;
     ctx.json(json!({"deleted": id})).await
 });
 ```
@@ -38,14 +38,14 @@ Capture dynamic segments from the URL:
 ```rust
 // Single parameter
 app.get("/users/:id", |ctx| async move {
-    let id: u32 = ctx.param("id")?.parse()?;
+    let id: u32 = ctx.req.param("id")?.parse()?;
     ctx.json(json!({"id": id})).await
 });
 
 // Multiple parameters
 app.get("/users/:user_id/posts/:post_id", |ctx| async move {
-    let user_id = ctx.param("user_id")?;
-    let post_id = ctx.param("post_id")?;
+    let user_id = ctx.req.param("user_id")?;
+    let post_id = ctx.req.param("post_id")?;;
     ctx.json(json!({
         "user_id": user_id,
         "post_id": post_id
@@ -162,10 +162,10 @@ Routes automatically handle errors with structured responses:
 
 ```rust
 app.get("/users/:id", |ctx| async move {
-    let id: u32 = ctx.param("id")?.parse()?;
+    let id: u32 = ctx.req.param("id")?.parse()?;
 
     let user = find_user(id)
-        .ok_or_else(|| ultimo::Error::NotFound("User not found".to_string()))?;
+        .ok_or_else(|| UltimoError::NotFound("User not found".to_string()))?;
 
     ctx.json(user).await
 });
@@ -205,7 +205,7 @@ async fn list_users(ctx: Context) -> ultimo::Result<Response> {
 }
 
 async fn get_user(ctx: Context) -> ultimo::Result<Response> {
-    let id = ctx.param("id")?;
+    let id = ctx.req.param("id")?;
     ctx.json(json!({"id": id})).await
 }
 ```
@@ -216,10 +216,10 @@ async fn get_user(ctx: Context) -> ultimo::Result<Response> {
 
 ```rust
 // ✅ Good - parse with error handling
-let id: u32 = ctx.param("id")?.parse()?;
+let id: u32 = ctx.req.param("id")?.parse()?;
 
 // ❌ Bad - panics on invalid input
-let id: u32 = ctx.param("id").unwrap().parse().unwrap();
+let id: u32 = ctx.req.param("id").unwrap().parse().unwrap();
 ```
 
 ### Return Early on Errors
@@ -227,7 +227,7 @@ let id: u32 = ctx.param("id").unwrap().parse().unwrap();
 ```rust
 // ✅ Good - explicit error handling
 app.get("/users/:id", |ctx| async move {
-    let id: u32 = ctx.param("id")?.parse()?;
+    let id: u32 = ctx.req.param("id")?.parse()?;
     let user = find_user(id)?;
     ctx.json(user).await
 });
@@ -238,7 +238,7 @@ app.get("/users/:id", |ctx| async move {
 ```rust
 // ✅ Good - descriptive errors
 if user.is_none() {
-    return Err(ultimo::Error::NotFound(
+    return Err(UltimoError::NotFound(
         format!("User {} not found", id)
     ));
 }

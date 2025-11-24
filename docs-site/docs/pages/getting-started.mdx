@@ -8,9 +8,17 @@ Add Ultimo to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ultimo = { git = "https://github.com/yourusername/ultimo-rs" }
+ultimo = "0.1.2"
 tokio = { version = "1.35", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
+```
+
+Or install directly with cargo:
+
+```bash
+cargo add ultimo tokio serde
+cargo add tokio --features full
+cargo add serde --features derive
 ```
 
 ## Hello Ultimo

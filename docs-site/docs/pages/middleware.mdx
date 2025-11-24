@@ -133,7 +133,7 @@ app.use_middleware(|ctx, next| async move {
     let auth_header = ctx.req.header("Authorization")?;
 
     if !auth_header.starts_with("Bearer ") {
-        return Err(ultimo::Error::Unauthorized(
+        return Err(UltimoError::Unauthorized(
             "Invalid authorization header".to_string()
         ));
     }
@@ -141,7 +141,7 @@ app.use_middleware(|ctx, next| async move {
     let token = &auth_header[7..]; // Remove "Bearer "
 
     if !is_valid_token(token) {
-        return Err(ultimo::Error::Unauthorized(
+        return Err(UltimoError::Unauthorized(
             "Invalid token".to_string()
         ));
     }
@@ -164,7 +164,7 @@ app.use_middleware(|ctx, next| async move {
         let content_type = ctx.req.header("Content-Type")?;
 
         if content_type != "application/json" {
-            return Err(ultimo::Error::BadRequest(
+            return Err(UltimoError::BadRequest(
                 "Content-Type must be application/json".to_string()
             ));
         }
@@ -242,7 +242,7 @@ Return early without calling `next()`:
 app.use_middleware(|ctx, next| async move {
     if ctx.req.header("X-API-Key")? != "secret" {
         // Don't call next(), return error immediately
-        return Err(ultimo::Error::Unauthorized(
+        return Err(UltimoError::Unauthorized(
             "Invalid API key".to_string()
         ));
     }
@@ -263,14 +263,10 @@ app.use_middleware(|ctx, next| async move {
             // Log the error
             eprintln!("Error: {:?}", e);
 
-            // Transform specific errors
-            if let ultimo::Error::DatabaseError(_) = e {
-                return Err(ultimo::Error::InternalServerError(
-                    "Database temporarily unavailable".to_string()
-                ));
-            }
-
-            Err(e)
+            // Transform or wrap errors
+            Err(UltimoError::Internal(
+                "An error occurred processing your request".to_string()
+            ))
         }
     }
 });

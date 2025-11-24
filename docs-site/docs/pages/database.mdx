@@ -54,6 +54,15 @@ Both integrations include:
 ```rust
 use ultimo::prelude::*;
 use ultimo::database::sqlx::SqlxPool;
+use serde::Serialize;
+use sqlx::FromRow;
+
+#[derive(Serialize, FromRow)]
+struct User {
+    id: i32,
+    name: String,
+    email: String,
+}
 
 #[tokio::main]
 async fn main() -> ultimo::Result<()> {
@@ -64,7 +73,7 @@ async fn main() -> ultimo::Result<()> {
 
     app.get("/users", |ctx: Context| async move {
         let db = ctx.sqlx::<sqlx::Postgres>()?;
-        let users = sqlx::query!("SELECT * FROM users")
+        let users = sqlx::query_as::<_, User>("SELECT id, name, email FROM users")
             .fetch_all(db)
             .await?;
         ctx.json(users).await
@@ -82,6 +91,27 @@ async fn main() -> ultimo::Result<()> {
 use ultimo::prelude::*;
 use ultimo::database::diesel::DieselPool;
 use diesel::prelude::*;
+use serde::Serialize;
+
+// Define schema
+mod schema {
+    diesel::table! {
+        users (id) {
+            id -> Int4,
+            name -> Varchar,
+            email -> Varchar,
+        }
+    }
+}
+
+// Define model
+#[derive(Serialize, Queryable, Selectable)]
+#[diesel(table_name = schema::users)]
+struct User {
+    id: i32,
+    name: String,
+    email: String,
+}
 
 #[tokio::main]
 async fn main() -> ultimo::Result<()> {
@@ -92,7 +122,9 @@ async fn main() -> ultimo::Result<()> {
 
     app.get("/users", |ctx: Context| async move {
         let mut conn = ctx.diesel::<PgConnection>()?;
-        let users = users::table.load::<User>(&mut *conn)?;
+        let users = schema::users::table
+            .select(User::as_select())
+            .load(&mut *conn)?;
         ctx.json(users).await
     });
 
