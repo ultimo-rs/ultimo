@@ -25,8 +25,11 @@ ts-rs = { workspace = true }
 tracing = { workspace = true }
 bytes = { workspace = true }
 
-# WebSocket support (optional)
-tokio-tungstenite = { version = "0.21", optional = true }
+# WebSocket support (zero additional dependencies - built on hyper)
+uuid = { version = "1.0", features = ["v4"] }
+sha1 = "0.10"
+base64 = "0.21"
+async-trait = "0.1"
 
 # Database support (optional)
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls"], optional = true }
@@ -40,8 +43,8 @@ tracing-subscriber = { workspace = true }
 [features]
 default = []
 
-# WebSocket feature
-websocket = ["tokio-tungstenite"]
+# WebSocket feature (zero additional dependencies)
+websocket = []
 
 # Database features
 database = []
