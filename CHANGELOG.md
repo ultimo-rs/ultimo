@@ -9,18 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Coming Soon
 
-- Database integration (SQLx & Diesel)
-- WebSocket support
-- Server-Sent Events (SSE)
-- Session management
-- Testing utilities
-- Multi-language client generation
-
-## [Unreleased]
-
-### Coming Soon
-
-- Database integration (SQLx & Diesel)
 - WebSocket support
 - Server-Sent Events (SSE)
 - Session management

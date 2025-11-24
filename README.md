@@ -45,7 +45,6 @@
 
 See the [full roadmap](https://docs.ultimo.dev/roadmap) for upcoming features:
 
-- 🗄️ Database Integration (SQLx & Diesel)
 - 🔌 WebSocket Support
 - 📡 Streaming & SSE
 - 🎫 Session Management
