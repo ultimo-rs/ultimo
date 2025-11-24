@@ -3,6 +3,23 @@
 #
 # Skip this hook with: git push --no-verify
 
+# Check if pushing to main branch
+current_branch=$(git symbolic-ref HEAD | sed -e 's,.*/\(.*\),\1,')
+remote_branch=$(git rev-parse --abbrev-ref --symbolic-full-name @{push} 2>/dev/null | sed 's/.*\///')
+
+if [ "$remote_branch" = "main" ] || [ "$current_branch" = "main" ]; then
+    echo "🚫 Direct pushes to main branch are not allowed!"
+    echo ""
+    echo "📋 Please follow the workflow:"
+    echo "  1. Create a branch: git checkout -b feature/issue-123-description"
+    echo "  2. Make your changes and commit"
+    echo "  3. Push your branch: git push origin feature/issue-123-description"
+    echo "  4. Create a Pull Request on GitHub"
+    echo ""
+    echo "💡 To push anyway (emergency only): git push --no-verify"
+    exit 1
+fi
+
 echo "🚀 Running pre-push checks..."
 echo "   💡 Skip with: git push --no-verify"
 echo ""
