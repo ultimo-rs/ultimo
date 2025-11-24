@@ -1,0 +1,49 @@
+# Label PRs based on changed files
+
+# Core framework
+'area: core':
+  - ultimo/src/**/*
+  - ultimo/Cargo.toml
+
+# RPC system
+'area: rpc':
+  - ultimo/src/rpc.rs
+  - ultimo/src/rpc/**/*
+
+# OpenAPI
+'area: openapi':
+  - ultimo/src/openapi.rs
+  - ultimo/src/openapi/**/*
+
+# Database
+'area: database':
+  - examples/database-**/*
+  - ultimo/src/database.rs
+
+# CLI
+'area: cli':
+  - ultimo-cli/**/*
+
+# Examples
+'area: examples':
+  - examples/**/*
+
+# Documentation
+'area: docs':
+  - docs/**/*
+  - docs-site/**/*
+  - '*.md'
+  - website/**/*
+
+# Tests
+'type: test':
+  - '**/*.test.rs'
+  - '**/tests/**/*'
+  - coverage-tool/**/*
+
+# CI/CD
+'type: chore':
+  - .github/workflows/**/*
+  - .github/**/*
+  - scripts/**/*
+  - Makefile

@@ -1,0 +1,36 @@
+name: Auto Label PR
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Label based on changed files
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+
+      - name: Add size label
+        uses: codelytv/pr-size-labeler@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          xs_label: 'size: XS'
+          xs_max_size: '10'
+          s_label: 'size: S'
+          s_max_size: '100'
+          m_label: 'size: M'
+          m_max_size: '500'
+          l_label: 'size: L'
+          l_max_size: '1000'
+          xl_label: 'size: XL'
+          message_if_xl: >
+            This PR is quite large. Consider breaking it into smaller PRs for easier review.

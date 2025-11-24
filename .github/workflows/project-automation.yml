@@ -1,0 +1,38 @@
+name: Project Automation
+on:
+  issues:
+    types: [opened, reopened, assigned, labeled]
+  pull_request:
+    types: [opened, ready_for_review, converted_to_draft, closed]
+
+jobs:
+  project-automation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move issue to Ready when labeled with priority
+        if: github.event_name == 'issues' && github.event.action == 'labeled'
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: https://github.com/orgs/ultimo-rs/projects/1
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Move issue to In Progress when assigned
+        if: github.event_name == 'issues' && github.event.action == 'assigned'
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: https://github.com/orgs/ultimo-rs/projects/1
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Move PR to Review when opened
+        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: https://github.com/orgs/ultimo-rs/projects/1
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Move PR to Done when merged
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: https://github.com/orgs/ultimo-rs/projects/1
+          github-token: ${{ secrets.GITHUB_TOKEN }}
