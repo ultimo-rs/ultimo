@@ -39,12 +39,17 @@ r2d2 = { version = "0.8", optional = true }
 [dev-dependencies]
 tokio-test = "0.4"
 tracing-subscriber = { workspace = true }
+proptest = "1.5"
+criterion = { version = "0.5", features = ["async_tokio"] }
 
 [features]
 default = []
 
 # WebSocket feature (zero additional dependencies)
 websocket = []
+
+# Test helpers (for integration tests)
+test-helpers = []
 
 # Database features
 database = []
@@ -54,3 +59,8 @@ sqlx-sqlite = ["database", "sqlx", "sqlx/sqlite"]
 diesel-postgres = ["database", "diesel", "diesel/postgres", "diesel/r2d2", "r2d2"]
 diesel-mysql = ["database", "diesel", "diesel/mysql", "diesel/r2d2", "r2d2"]
 diesel-sqlite = ["database", "diesel", "diesel/sqlite", "diesel/r2d2", "r2d2"]
+
+[[bench]]
+name = "websocket_bench"
+harness = false
+required-features = ["websocket", "test-helpers"]

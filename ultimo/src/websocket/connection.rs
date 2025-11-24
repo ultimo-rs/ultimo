@@ -37,52 +37,52 @@ impl<T> WebSocket<T> {
             remote_addr,
         }
     }
-    
+
     /// Get reference to typed context data
     pub fn data(&self) -> &T {
         &self.data
     }
-    
+
     /// Get mutable reference to typed context data
     pub fn data_mut(&mut self) -> &mut T {
         &mut self.data
     }
-    
+
     /// Send text message
     pub async fn send(&self, text: impl Into<String>) -> Result<(), std::io::Error> {
         self.sender
             .send(Message::Text(text.into()))
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed"))
     }
-    
+
     /// Send binary message
     pub async fn send_binary(&self, data: impl Into<Bytes>) -> Result<(), std::io::Error> {
         self.sender
             .send(Message::Binary(data.into()))
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed"))
     }
-    
+
     /// Send JSON message
     pub async fn send_json<S: Serialize>(&self, data: &S) -> Result<(), std::io::Error> {
         let json = serde_json::to_string(data)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         self.send(json).await
     }
-    
+
     /// Subscribe to a topic/channel
     pub async fn subscribe(&self, topic: impl AsRef<str>) -> Result<(), std::io::Error> {
         self.channel_manager
             .subscribe(self.connection_id, topic.as_ref(), self.sender.clone())
             .await
     }
-    
+
     /// Unsubscribe from a topic/channel
     pub async fn unsubscribe(&self, topic: impl AsRef<str>) -> Result<(), std::io::Error> {
         self.channel_manager
             .unsubscribe(self.connection_id, topic.as_ref())
             .await
     }
-    
+
     /// Publish message to all subscribers of a topic
     pub async fn publish<S: Serialize>(
         &self,
@@ -95,9 +95,13 @@ impl<T> WebSocket<T> {
             .publish(topic.as_ref(), Message::Text(json))
             .await
     }
-    
+
     /// Close the WebSocket connection
-    pub async fn close(&self, code: Option<u16>, reason: Option<&str>) -> Result<(), std::io::Error> {
+    pub async fn close(
+        &self,
+        code: Option<u16>,
+        reason: Option<&str>,
+    ) -> Result<(), std::io::Error> {
         let close_frame = if let Some(c) = code {
             let r = reason.unwrap_or("");
             let mut payload = BytesMut::new();
@@ -110,17 +114,17 @@ impl<T> WebSocket<T> {
         } else {
             Message::Close(None)
         };
-        
+
         self.sender
             .send(close_frame)
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed"))
     }
-    
+
     /// Get remote address
     pub fn remote_addr(&self) -> Option<SocketAddr> {
         self.remote_addr
     }
-    
+
     /// Check if connection is writable (for backpressure)
     pub fn is_writable(&self) -> bool {
         !self.sender.is_closed()
@@ -143,7 +147,7 @@ impl ConnectionHandler {
     ) -> (Self, mpsc::UnboundedSender<Message>) {
         let (tx, rx) = mpsc::unbounded_channel();
         let connection_id = uuid::Uuid::new_v4();
-        
+
         let handler = Self {
             upgraded,
             sender: tx.clone(),
@@ -151,10 +155,10 @@ impl ConnectionHandler {
             channel_manager,
             connection_id,
         };
-        
+
         (handler, tx)
     }
-    
+
     pub async fn handle(self) -> Result<(), std::io::Error> {
         let mut read_buf = BytesMut::with_capacity(8192);
         let io = TokioIo::new(self.upgraded);
@@ -162,7 +166,7 @@ impl ConnectionHandler {
         let mut receiver = self.receiver;
         let channel_manager = self.channel_manager;
         let connection_id = self.connection_id;
-        
+
         loop {
             tokio::select! {
                 // Read frames from client
@@ -184,12 +188,12 @@ impl ConnectionHandler {
                         }
                     }
                 }
-                
+
                 // Send frames to client
                 Some(message) = receiver.recv() => {
                     let frame = message.to_frame();
                     let encoded = frame.encode();
-                    
+
                     if let Err(e) = writer.write_all(&encoded).await {
                         tracing::error!("Error writing to socket: {}", e);
                         break;
@@ -197,10 +201,10 @@ impl ConnectionHandler {
                 }
             }
         }
-        
+
         // Cleanup on disconnect
         channel_manager.disconnect(connection_id).await;
-        
+
         Ok(())
     }
 }
@@ -237,4 +241,3 @@ async fn handle_frame(
         }
     }
 }
-

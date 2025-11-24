@@ -3,10 +3,12 @@
 use super::connection::{ConnectionHandler, WebSocket};
 use super::pubsub::ChannelManager;
 use super::WebSocketConfig;
-use hyper::header::{CONNECTION, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE};
-use hyper::{Request as HyperRequest, Response as HyperResponse, StatusCode};
-use http_body_util::Full;
 use bytes::Bytes;
+use http_body_util::Full;
+use hyper::header::{
+    CONNECTION, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE,
+};
+use hyper::{Request as HyperRequest, Response as HyperResponse, StatusCode};
 use sha1::{Digest, Sha1};
 use std::future::Future;
 use std::sync::Arc;
@@ -38,37 +40,37 @@ where
             channel_manager: Arc::new(ChannelManager::new()),
         }
     }
-    
+
     /// Set typed context data for the WebSocket
     pub fn with_data(mut self, data: T) -> Self {
         self.data = Some(data);
         self
     }
-    
+
     /// Add custom header to upgrade response
     pub fn with_header(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.headers.push((key.into(), value.into()));
         self
     }
-    
+
     /// Set accepted WebSocket subprotocols
     pub fn with_protocols(mut self, protocols: Vec<String>) -> Self {
         self.protocols = protocols;
         self
     }
-    
+
     /// Set WebSocket configuration
     pub fn with_config(mut self, config: WebSocketConfig) -> Self {
         self.config = config;
         self
     }
-    
+
     /// Use shared channel manager for pub/sub
     pub fn with_channel_manager(mut self, channel_manager: Arc<ChannelManager>) -> Self {
         self.channel_manager = channel_manager;
         self
     }
-    
+
     /// Set callback to be executed when WebSocket is upgraded
     pub fn on_upgrade<F, Fut>(self, callback: F) -> HyperResponse<Full<Bytes>>
     where
@@ -83,7 +85,7 @@ where
                 .body(Full::new(Bytes::from("Invalid WebSocket upgrade request")))
                 .unwrap();
         }
-        
+
         // Extract WebSocket key
         let key = match self.request.headers().get(SEC_WEBSOCKET_KEY) {
             Some(key) => key.to_str().unwrap_or(""),
@@ -94,40 +96,42 @@ where
                     .unwrap();
             }
         };
-        
+
         // Calculate accept key
         let accept_key = calculate_accept_key(key);
-        
+
         // Build upgrade response
         let mut response = HyperResponse::builder()
             .status(StatusCode::SWITCHING_PROTOCOLS)
             .header(UPGRADE, "websocket")
             .header(CONNECTION, "Upgrade")
             .header(SEC_WEBSOCKET_ACCEPT, accept_key);
-        
+
         // Add custom headers
         for (key, value) in self.headers {
             response = response.header(key, value);
         }
-        
+
         let response = response.body(Full::new(Bytes::new())).unwrap();
-        
+
         // Spawn upgrade handler
         let data = self.data.expect("WebSocket data not set");
         let channel_manager = self.channel_manager;
-        
+
         tokio::spawn(async move {
             match hyper::upgrade::on(self.request).await {
                 Ok(upgraded) => {
-                    let (handler, sender) = ConnectionHandler::new(upgraded, channel_manager.clone());
+                    let (handler, sender) =
+                        ConnectionHandler::new(upgraded, channel_manager.clone());
                     let connection_id = uuid::Uuid::new_v4();
                     let remote_addr = None; // TODO: Get from request
-                    
-                    let ws = WebSocket::new(data, sender, channel_manager, connection_id, remote_addr);
-                    
+
+                    let ws =
+                        WebSocket::new(data, sender, channel_manager, connection_id, remote_addr);
+
                     // Call user callback
                     callback(ws).await;
-                    
+
                     // Handle connection
                     if let Err(e) = handler.handle().await {
                         tracing::error!("WebSocket handler error: {}", e);
@@ -138,10 +142,10 @@ where
                 }
             }
         });
-        
+
         response
     }
-    
+
     /// Build the upgrade response without a callback (for manual handling)
     pub fn build(self) -> HyperResponse<Full<Bytes>>
     where
@@ -159,36 +163,36 @@ fn is_valid_upgrade_request(req: &HyperRequest<hyper::body::Incoming>) -> bool {
     if req.method() != hyper::Method::GET {
         return false;
     }
-    
+
     // Must have Upgrade: websocket header
     let upgrade = req.headers().get(UPGRADE);
     if upgrade.is_none() || upgrade.unwrap().to_str().unwrap_or("").to_lowercase() != "websocket" {
         return false;
     }
-    
+
     // Must have Connection: Upgrade header
     let connection = req.headers().get(CONNECTION);
     if connection.is_none() {
         return false;
     }
-    
+
     // Must have Sec-WebSocket-Version: 13
     let version = req.headers().get(SEC_WEBSOCKET_VERSION);
     if version.is_none() || version.unwrap() != "13" {
         return false;
     }
-    
+
     // Must have Sec-WebSocket-Key header
     if req.headers().get(SEC_WEBSOCKET_KEY).is_none() {
         return false;
     }
-    
+
     true
 }
 
 /// Calculate WebSocket accept key from client key
 fn calculate_accept_key(key: &str) -> String {
-    use base64::{Engine as _, engine::general_purpose};
+    use base64::{engine::general_purpose, Engine as _};
     let mut hasher = Sha1::new();
     hasher.update(key.as_bytes());
     hasher.update(WEBSOCKET_GUID.as_bytes());
@@ -199,7 +203,7 @@ fn calculate_accept_key(key: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_calculate_accept_key() {
         let key = "dGhlIHNhbXBsZSBub25jZQ==";
