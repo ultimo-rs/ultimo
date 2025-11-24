@@ -5,6 +5,7 @@ Congratulations! Your GitHub Projects Kanban board is ready to use. Here's what 
 ## 📦 What You Have Now
 
 ### 📚 Documentation (8 files)
+
 1. **[README.md](.github/README.md)** - Main overview and entry point
 2. **[GITHUB_PROJECTS_SETUP.md](GITHUB_PROJECTS_SETUP.md)** - Complete step-by-step setup guide
 3. **[PROJECT_BOARD.md](PROJECT_BOARD.md)** - Board structure and workflow details
@@ -14,11 +15,13 @@ Congratulations! Your GitHub Projects Kanban board is ready to use. Here's what 
 7. **[../CONTRIBUTING.md](../CONTRIBUTING.md)** - Updated with project board info
 
 ### 📋 Templates (3 files)
+
 1. **[ISSUE_TEMPLATE/bug_report.md](ISSUE_TEMPLATE/bug_report.md)** - Bug report template
 2. **[ISSUE_TEMPLATE/feature_request.md](ISSUE_TEMPLATE/feature_request.md)** - Feature request template
 3. **[PULL_REQUEST_TEMPLATE.md](PULL_REQUEST_TEMPLATE.md)** - PR template
 
 ### 🤖 Automation (3 files)
+
 1. **[workflows/project-automation.yml](workflows/project-automation.yml)** - Auto-moves issues/PRs
 2. **[workflows/label-pr.yml](workflows/label-pr.yml)** - Auto-labels PRs
 3. **[labeler.yml](labeler.yml)** - Label configuration
@@ -26,6 +29,7 @@ Congratulations! Your GitHub Projects Kanban board is ready to use. Here's what 
 ## 🎯 Next Steps (5-10 minutes)
 
 ### Step 1: Create the GitHub Project Board
+
 ```bash
 # Go to your repo
 https://github.com/ultimo-rs/ultimo
@@ -42,6 +46,7 @@ https://github.com/ultimo-rs/ultimo
 ```
 
 ### Step 2: Set Up Labels
+
 ```bash
 # Go to Issues → Labels
 # Create these labels (see GITHUB_PROJECTS_SETUP.md for colors):
@@ -55,6 +60,7 @@ Size: XS, S, M, L, XL (auto-applied by GitHub Actions)
 ```
 
 ### Step 3: Commit and Push Everything
+
 ```bash
 # From your project root
 git add .github/
@@ -74,6 +80,7 @@ git push origin main
 ```
 
 ### Step 4: Create Your First Issues
+
 ```bash
 # Option 1: Manual (recommended for first few)
 # Go to Issues → New Issue
@@ -93,6 +100,7 @@ gh issue create \
 ```
 
 ### Step 5: Enable GitHub Actions
+
 ```bash
 # Actions should auto-enable when you push
 # Verify at: https://github.com/ultimo-rs/ultimo/actions
@@ -119,7 +127,7 @@ gh issue create \
 Once your board is set up, these should be your first 5 issues:
 
 1. **WebSocket Support** 🔴 High - Real-time bidirectional communication
-2. **Server-Sent Events** 🔴 High - Server-to-client streaming  
+2. **Server-Sent Events** 🔴 High - Server-to-client streaming
 3. **Session Management** 🔴 High - Cookie-based sessions
 4. **Testing Utilities** 🔴 High - TestClient and helpers
 5. **Test Coverage to 80%** 🔴 High - From 63.58% to 80%
@@ -127,6 +135,7 @@ Once your board is set up, these should be your first 5 issues:
 ## 🤖 Automation Features
 
 Your GitHub Actions will automatically:
+
 - ✅ Move issues to "In Progress" when assigned
 - ✅ Move PRs to "Review" when opened
 - ✅ Move to "Done" when PR merged
@@ -137,6 +146,7 @@ Your GitHub Actions will automatically:
 ## 📈 Success Metrics
 
 Track these to measure project health:
+
 - **Velocity:** 5-10 issues per week (target)
 - **Cycle Time:** 3-7 days from Ready → Done
 - **WIP Limit:** Max 5 items in "In Progress"
@@ -146,11 +156,13 @@ Track these to measure project health:
 ## 🎓 Team Workflow
 
 ### For Maintainers
+
 1. **Morning:** Triage new issues (Backlog → Ready)
 2. **Daily:** Review PRs in "Review" column
 3. **Weekly:** Archive "Done" issues, update metrics
 
 ### For Contributors
+
 1. **Find:** Browse "Ready" column or "good first issue"
 2. **Claim:** Comment on issue to claim it
 3. **Code:** Create branch, make changes, add tests
@@ -160,14 +172,14 @@ Track these to measure project health:
 
 ## 📚 Documentation Guide
 
-| Need to... | Read this... |
-|------------|--------------|
-| Set up the board | [GITHUB_PROJECTS_SETUP.md](GITHUB_PROJECTS_SETUP.md) |
-| Understand workflow | [PROJECT_BOARD.md](PROJECT_BOARD.md) |
-| Create issues | [INITIAL_ISSUES.md](INITIAL_ISSUES.md) |
-| Daily reference | [QUICK_REFERENCE.md](QUICK_REFERENCE.md) |
-| See visual guide | [VISUAL_WORKFLOW.md](VISUAL_WORKFLOW.md) |
-| Contribute code | [../CONTRIBUTING.md](../CONTRIBUTING.md) |
+| Need to...          | Read this...                                         |
+| ------------------- | ---------------------------------------------------- |
+| Set up the board    | [GITHUB_PROJECTS_SETUP.md](GITHUB_PROJECTS_SETUP.md) |
+| Understand workflow | [PROJECT_BOARD.md](PROJECT_BOARD.md)                 |
+| Create issues       | [INITIAL_ISSUES.md](INITIAL_ISSUES.md)               |
+| Daily reference     | [QUICK_REFERENCE.md](QUICK_REFERENCE.md)             |
+| See visual guide    | [VISUAL_WORKFLOW.md](VISUAL_WORKFLOW.md)             |
+| Contribute code     | [../CONTRIBUTING.md](../CONTRIBUTING.md)             |
 
 ## ✅ Verification Checklist
 
@@ -188,6 +200,7 @@ Before you start using the board:
 Your GitHub Projects Kanban board is fully configured and ready to use!
 
 **What's next?**
+
 1. ✅ Create your first 5 high-priority issues
 2. ✅ Assign issues to team members
 3. ✅ Start working and watch automation in action
@@ -260,7 +273,7 @@ Everything is ready. Time to start building amazing features!
 
 ---
 
-*Setup completed: 2025-11-24*  
-*Total issues ready: 35+*  
-*Estimated work: 6-12 months*  
-*Let's make Ultimo awesome! 🚀*
+_Setup completed: 2025-11-24_  
+_Total issues ready: 35+_  
+_Estimated work: 6-12 months_  
+_Let's make Ultimo awesome! 🚀_

@@ -5,17 +5,20 @@ Welcome! This directory contains everything you need to set up and manage the Ul
 ## 📁 What's Included
 
 ### Documentation
+
 - **[GITHUB_PROJECTS_SETUP.md](GITHUB_PROJECTS_SETUP.md)** - Complete setup guide (START HERE!)
 - **[PROJECT_BOARD.md](PROJECT_BOARD.md)** - Board structure and workflow details
 - **[INITIAL_ISSUES.md](INITIAL_ISSUES.md)** - 35+ issues ready to create
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference for daily use
 
 ### Templates
+
 - **[ISSUE_TEMPLATE/bug_report.md](ISSUE_TEMPLATE/bug_report.md)** - Bug report template
 - **[ISSUE_TEMPLATE/feature_request.md](ISSUE_TEMPLATE/feature_request.md)** - Feature request template
 - **[PULL_REQUEST_TEMPLATE.md](PULL_REQUEST_TEMPLATE.md)** - PR template
 
 ### Automation
+
 - **[workflows/project-automation.yml](workflows/project-automation.yml)** - Auto-moves issues/PRs
 - **[workflows/label-pr.yml](workflows/label-pr.yml)** - Auto-labels PRs
 - **[labeler.yml](labeler.yml)** - Label configuration
@@ -23,29 +26,34 @@ Welcome! This directory contains everything you need to set up and manage the Ul
 ## 🚀 Getting Started (5 Minutes)
 
 ### Step 1: Create the Board
+
 1. Go to your GitHub repo → **Projects** tab
 2. Click **New project** → Choose **Board** template
 3. Name it "Ultimo Development"
 4. Create 5 columns: 📋 Backlog, 🎯 Ready, 🚧 In Progress, 👀 Review, ✅ Done
 
 ### Step 2: Set Up Labels
+
 1. Go to **Issues** → **Labels**
 2. Create priority labels: critical, high, medium, low
 3. Create type labels: feature, bug, docs, test, performance
 4. Create area labels: core, rpc, cli, database, docs
 
 ### Step 3: Create Initial Issues
+
 1. Open **[INITIAL_ISSUES.md](INITIAL_ISSUES.md)**
 2. Start with the top 5 high-priority issues
 3. Copy each issue template to GitHub
 4. Add to project board in "📋 Backlog" column
 
 ### Step 4: Enable Automation
+
 1. Commit the `.github/workflows/` files to your repo
 2. GitHub Actions will automatically run
 3. Issues/PRs will auto-move between columns
 
 ### Step 5: Start Working!
+
 1. Move high-priority issues to "🎯 Ready"
 2. Assign issues to team members
 3. Issues auto-move as work progresses
@@ -67,18 +75,22 @@ Welcome! This directory contains everything you need to set up and manage the Ul
 Based on the roadmap and project needs:
 
 1. **WebSocket Support** 🔴 High Priority
+
    - Real-time bidirectional communication
    - ~XL size (~2-3 weeks)
 
 2. **Server-Sent Events (SSE)** 🔴 High Priority
+
    - Server-to-client streaming
    - ~L size (~1-2 weeks)
 
 3. **Session Management** 🔴 High Priority
+
    - Cookie-based sessions with multiple backends
    - ~XL size (~2-3 weeks)
 
 4. **Testing Utilities** 🔴 High Priority
+
    - TestClient and assertion helpers
    - ~L size (~1-2 weeks)
 
@@ -88,26 +100,28 @@ Based on the roadmap and project needs:
 
 ## 📋 Issue Statistics
 
-| Category | Count | Priority |
-|----------|-------|----------|
-| High Priority Features | 5 | 🔴 Critical path |
-| Documentation | 4 | 🟡 Important |
-| Performance & Quality | 4 | 🟠 High |
-| CLI Improvements | 5 | 🟠 High |
-| Community | 5 | 🟡 Medium |
-| Bug Fixes | 3 | 🟡 Medium |
-| Quick Wins | 3 | 🟢 Good first issues |
-| **Total** | **35+** | - |
+| Category               | Count   | Priority             |
+| ---------------------- | ------- | -------------------- |
+| High Priority Features | 5       | 🔴 Critical path     |
+| Documentation          | 4       | 🟡 Important         |
+| Performance & Quality  | 4       | 🟠 High              |
+| CLI Improvements       | 5       | 🟠 High              |
+| Community              | 5       | 🟡 Medium            |
+| Bug Fixes              | 3       | 🟡 Medium            |
+| Quick Wins             | 3       | 🟢 Good first issues |
+| **Total**              | **35+** | -                    |
 
 ## 🏷️ Label System
 
 ### Priority (4 labels)
+
 - 🔴 `priority: critical` - Blocking, security
 - 🟠 `priority: high` - Important features
 - 🟡 `priority: medium` - Standard work
 - 🟢 `priority: low` - Nice to have
 
 ### Type (7 labels)
+
 - 🚀 `type: feature` - New functionality
 - 🐛 `type: bug` - Bug fixes
 - 📚 `type: docs` - Documentation
@@ -117,6 +131,7 @@ Based on the roadmap and project needs:
 - 🎨 `type: ui` - UI/UX
 
 ### Area (7 labels)
+
 - 🏗️ `area: core` - Core framework
 - 🌐 `area: rpc` - RPC system
 - 📖 `area: openapi` - OpenAPI
@@ -126,7 +141,9 @@ Based on the roadmap and project needs:
 - 📚 `area: docs` - Docs site
 
 ### Size (5 labels)
+
 Auto-applied to PRs:
+
 - `size: XS` - < 10 lines
 - `size: S` - < 100 lines
 - `size: M` - < 500 lines
@@ -140,15 +157,15 @@ Auto-applied to PRs:
 ✅ **Auto-move merged:** PR Merged → Done  
 ✅ **Auto-label PRs:** Based on changed files  
 ✅ **Auto-size PRs:** XS/S/M/L/XL labels  
-✅ **Auto-close issues:** Via commit messages  
+✅ **Auto-close issues:** Via commit messages
 
 ## 👥 Team Roles
 
-| Role | Permissions | Responsibilities |
-|------|-------------|------------------|
-| **Maintainers** | Admin | Triage, prioritize, merge PRs |
-| **Contributors** | Write | Work on issues, create PRs |
-| **Community** | Read | Report bugs, suggest features |
+| Role             | Permissions | Responsibilities              |
+| ---------------- | ----------- | ----------------------------- |
+| **Maintainers**  | Admin       | Triage, prioritize, merge PRs |
+| **Contributors** | Write       | Work on issues, create PRs    |
+| **Community**    | Read        | Report bugs, suggest features |
 
 ## 📈 Success Metrics
 
@@ -164,38 +181,43 @@ Track these metrics to measure project health:
 ## 🔄 Weekly Workflow
 
 ### Monday
+
 - Review Backlog
 - Prioritize new issues → Ready
 - Plan sprint/week
 
 ### Daily
+
 - Check Review column
 - Review open PRs
 - Update In Progress items
 
 ### Friday
+
 - Move Done items to archive
 - Review week's progress
 - Update metrics
 
 ## 📚 Documentation Guide
 
-| Document | When to Use |
-|----------|-------------|
-| [GITHUB_PROJECTS_SETUP.md](GITHUB_PROJECTS_SETUP.md) | First-time setup |
-| [PROJECT_BOARD.md](PROJECT_BOARD.md) | Understanding workflow |
-| [INITIAL_ISSUES.md](INITIAL_ISSUES.md) | Creating issues |
-| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Daily use |
-| [CONTRIBUTING.md](../CONTRIBUTING.md) | Contributing guide |
+| Document                                             | When to Use            |
+| ---------------------------------------------------- | ---------------------- |
+| [GITHUB_PROJECTS_SETUP.md](GITHUB_PROJECTS_SETUP.md) | First-time setup       |
+| [PROJECT_BOARD.md](PROJECT_BOARD.md)                 | Understanding workflow |
+| [INITIAL_ISSUES.md](INITIAL_ISSUES.md)               | Creating issues        |
+| [QUICK_REFERENCE.md](QUICK_REFERENCE.md)             | Daily use              |
+| [CONTRIBUTING.md](../CONTRIBUTING.md)                | Contributing guide     |
 
 ## 🎓 Learning Resources
 
 ### GitHub Docs
+
 - [Projects Documentation](https://docs.github.com/en/issues/planning-and-tracking-with-projects)
 - [GitHub Actions](https://docs.github.com/en/actions)
 - [Issue Templates](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests)
 
 ### Ultimo Specific
+
 - [Main README](../README.md)
 - [Contributing Guide](../CONTRIBUTING.md)
 - [Documentation Site](https://docs.ultimo.dev)
@@ -268,5 +290,5 @@ Once setup is complete:
 
 ---
 
-*Last updated: 2025-11-24*  
-*Version: 1.0*
+_Last updated: 2025-11-24_  
+_Version: 1.0_

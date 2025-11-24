@@ -1,9 +1,9 @@
 ---
 name: Bug Report
 about: Report a bug in Ultimo
-title: '[BUG] '
-labels: 'type: bug'
-assignees: ''
+title: "[BUG] "
+labels: "type: bug"
+assignees: ""
 ---
 
 ## Bug Description

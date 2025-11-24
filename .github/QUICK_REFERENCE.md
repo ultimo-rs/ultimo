@@ -9,12 +9,14 @@
 ## 🏷️ Label Quick Reference
 
 ### Priority
+
 - 🔴 `priority: critical` - Urgent, blocking
 - 🟠 `priority: high` - Important
 - 🟡 `priority: medium` - Standard
 - 🟢 `priority: low` - Nice to have
 
 ### Type
+
 - 🚀 `type: feature` - New feature
 - 🐛 `type: bug` - Bug fix
 - 📚 `type: docs` - Documentation
@@ -23,6 +25,7 @@
 - 🧪 `type: test` - Tests
 
 ### Area
+
 - 🏗️ `area: core` - Core framework
 - 🌐 `area: rpc` - RPC system
 - 📖 `area: openapi` - OpenAPI
@@ -66,7 +69,8 @@ git rebase origin/main
 ```markdown
 **Title:** [TYPE] Clear description
 
-**Labels:** 
+**Labels:**
+
 - priority: [critical/high/medium/low]
 - type: [feature/bug/docs/etc]
 - area: [core/rpc/cli/etc]
@@ -75,6 +79,7 @@ git rebase origin/main
 What needs to be done?
 
 **Acceptance Criteria:**
+
 - [ ] Criterion 1
 - [ ] Criterion 2
 - [ ] Tests added
@@ -85,29 +90,34 @@ What needs to be done?
 
 ## 🔄 Workflow States
 
-| State | Who | Action |
-|-------|-----|--------|
-| **Backlog** | Anyone | Created, not yet prioritized |
-| **Ready** | Maintainers | Prioritized, ready to start |
-| **In Progress** | Assignee | Actively working |
-| **Review** | Reviewers | PR open, needs review |
-| **Done** | Auto | Merged and closed |
+| State           | Who         | Action                       |
+| --------------- | ----------- | ---------------------------- |
+| **Backlog**     | Anyone      | Created, not yet prioritized |
+| **Ready**       | Maintainers | Prioritized, ready to start  |
+| **In Progress** | Assignee    | Actively working             |
+| **Review**      | Reviewers   | PR open, needs review        |
+| **Done**        | Auto        | Merged and closed            |
 
 ## 📊 Project Views
 
 ### 1. Board View (Default)
+
 See all issues in Kanban columns
 
 ### 2. By Priority
+
 Group by priority labels
 
-### 3. By Area  
+### 3. By Area
+
 Group by area labels
 
 ### 4. My Work
+
 Filter: `assignee:@me`
 
 ### 5. Ready to Work
+
 Filter: Status = Ready, No assignee
 
 ## 🎯 Current Priorities (Top 5)
@@ -134,21 +144,25 @@ Filter: Status = Ready, No assignee
 ## 🔍 Finding Issues to Work On
 
 **Good first issues:**
+
 ```
 label:"good first issue"
 ```
 
 **Available tasks:**
+
 ```
 is:open is:issue no:assignee label:"status: ready"
 ```
 
 **High priority:**
+
 ```
 is:open is:issue label:"priority: high"
 ```
 
 **By area:**
+
 ```
 is:open is:issue label:"area: core"
 ```
@@ -156,7 +170,7 @@ is:open is:issue label:"area: core"
 ## 📈 Metrics to Track
 
 - **Velocity:** Issues closed per week
-- **Cycle Time:** Days from Ready → Done  
+- **Cycle Time:** Days from Ready → Done
 - **WIP Limit:** Max 5 items in "In Progress"
 - **Test Coverage:** Target 80%
 - **Response Time:** Review PRs within 48h
@@ -168,7 +182,7 @@ is:open is:issue label:"area: core"
 ✅ Move to "In Progress" when assigned  
 ✅ Move to "Review" when PR opened  
 ✅ Move to "Done" when PR merged  
-✅ Close issues from commit messages  
+✅ Close issues from commit messages
 
 ## 📚 Documentation Links
 
@@ -195,13 +209,13 @@ is:open is:issue label:"area: core"
 
 ## ⚡ Quick Actions
 
-| Want to... | Do this... |
-|------------|------------|
-| Report a bug | Use bug report template |
-| Suggest a feature | Use feature request template |
+| Want to...         | Do this...                   |
+| ------------------ | ---------------------------- |
+| Report a bug       | Use bug report template      |
+| Suggest a feature  | Use feature request template |
 | Start contributing | Pick from "good first issue" |
-| Review code | Check "Review" column |
-| Track progress | View project insights |
+| Review code        | Check "Review" column        |
+| Track progress     | View project insights        |
 
 ---
 

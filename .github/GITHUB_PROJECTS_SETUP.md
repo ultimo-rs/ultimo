@@ -19,16 +19,19 @@ This guide walks you through setting up a GitHub Projects Kanban board for the U
 GitHub Projects comes with default columns. Customize them:
 
 **Default columns to rename/modify:**
+
 - Rename "Todo" → "📋 Backlog"
 - Rename "In Progress" → "🚧 In Progress"
 - Rename "Done" → "✅ Done"
 
 **Additional columns to add:**
+
 1. Click **+ Add column**
 2. Add "🎯 Ready" (between Backlog and In Progress)
 3. Add "👀 Review" (between In Progress and Done)
 
 **Final column order:**
+
 1. 📋 Backlog
 2. 🎯 Ready
 3. 🚧 In Progress
@@ -40,12 +43,14 @@ GitHub Projects comes with default columns. Customize them:
 Navigate to https://github.com/ultimo-rs/ultimo/labels and create:
 
 #### Priority Labels
+
 - `priority: critical` - Red (#d73a4a)
 - `priority: high` - Orange (#d9730d)
 - `priority: medium` - Yellow (#f9d0c4)
 - `priority: low` - Green (#0e8a16)
 
 #### Type Labels
+
 - `type: feature` - Blue (#0075ca) - New functionality
 - `type: bug` - Red (#d73a4a) - Bug fixes
 - `type: docs` - Light blue (#0366d6) - Documentation
@@ -55,6 +60,7 @@ Navigate to https://github.com/ultimo-rs/ultimo/labels and create:
 - `type: chore` - Gray (#fef2c0) - Maintenance
 
 #### Area Labels
+
 - `area: core` - Dark blue (#1d76db) - Core framework
 - `area: rpc` - Blue (#0e8a16) - RPC system
 - `area: openapi` - Blue (#0075ca) - OpenAPI
@@ -64,12 +70,14 @@ Navigate to https://github.com/ultimo-rs/ultimo/labels and create:
 - `area: docs` - Light blue (#c5def5) - Documentation site
 
 #### Status Labels
+
 - `status: planning` - Yellow (#fbca04)
 - `status: investigating` - Blue (#1d76db)
 - `status: blocked` - Red (#b60205)
 - `status: paused` - Gray (#d4c5f9)
 
 #### Special Labels
+
 - `good first issue` - Green (#7057ff) - Good for newcomers
 - `help wanted` - Green (#008672) - Extra attention needed
 - `size: XS` - Light gray (#e4e4e4) - < 10 lines
@@ -90,6 +98,7 @@ Use the templates in `.github/INITIAL_ISSUES.md` to create issues. For each issu
 6. Set initial status (usually "📋 Backlog")
 
 **Priority order for creating issues:**
+
 1. WebSocket Support (High Priority)
 2. SSE Support (High Priority)
 3. Session Management (High Priority)
@@ -100,16 +109,19 @@ Use the templates in `.github/INITIAL_ISSUES.md` to create issues. For each issu
 ### 5. Configure Project Automation
 
 GitHub Actions are already set up in `.github/workflows/`:
+
 - `project-automation.yml` - Auto-moves issues based on actions
 - `label-pr.yml` - Auto-labels PRs based on changed files
 
 **Enable workflows:**
+
 1. Push these files to your repository
 2. Go to **Actions** tab
 3. Enable GitHub Actions if not already enabled
 4. Workflows will run automatically
 
 **What the automation does:**
+
 - ✅ Moves issues to "In Progress" when assigned
 - ✅ Moves PRs to "Review" when opened
 - ✅ Moves PRs to "Done" when merged
@@ -121,6 +133,7 @@ GitHub Actions are already set up in `.github/workflows/`:
 Create custom views for different perspectives:
 
 #### View 1: By Priority
+
 1. In your project, click **+ New view**
 2. Select **Table** layout
 3. Name it "By Priority"
@@ -129,17 +142,20 @@ Create custom views for different perspectives:
 6. Sort by: Priority (High → Low)
 
 #### View 2: By Area
+
 1. Create another view
 2. Name it "By Area"
 3. Group by: Area label
 4. Shows all work organized by component
 
 #### View 3: My Work
+
 1. Create view "My Work"
 2. Filter by: `assignee:@me`
 3. Shows only your assigned issues
 
 #### View 4: Ready to Work
+
 1. Create view "Ready to Work"
 2. Filter by: Status = "Ready"
 3. Filter by: No assignee
@@ -151,6 +167,7 @@ Create custom views for different perspectives:
 2. Select **Settings**
 
 **Recommended settings:**
+
 - ✅ Enable **Public access** (if open source)
 - ✅ Enable **Link issues and PRs**
 - ✅ Enable **Automation**
@@ -159,11 +176,13 @@ Create custom views for different perspectives:
 ### 8. Pin Important Issues
 
 Pin high-priority issues to the top:
+
 1. Open an important issue
 2. Click **Pin issue** on the right sidebar
 3. Issue stays at top of board
 
 **Suggested pins:**
+
 - Roadmap issue (create one linking to all major features)
 - Contributing guide issue
 - Current sprint/milestone
@@ -173,11 +192,13 @@ Pin high-priority issues to the top:
 ### For Maintainers
 
 **Morning routine:**
+
 1. Check **Review** column for PRs to review
 2. Check **Backlog** for new issues to triage
 3. Move prioritized issues to **Ready**
 
 **During development:**
+
 1. Pick issue from **Ready** column
 2. Assign to yourself (auto-moves to **In Progress**)
 3. Create branch: `git checkout -b feature/issue-name`
@@ -198,6 +219,7 @@ Pin high-priority issues to the top:
 ### Milestones
 
 Create milestones for releases:
+
 1. Go to **Issues** → **Milestones**
 2. Click **New milestone**
 3. Add milestone (e.g., "v0.2.0 - WebSockets")
@@ -207,6 +229,7 @@ Create milestones for releases:
 ### Project Insights
 
 Track progress with insights:
+
 1. In project, click **Insights**
 2. View:
    - Burn-down chart
@@ -217,6 +240,7 @@ Track progress with insights:
 ### Custom Fields
 
 Add custom fields to track more data:
+
 1. In project settings, add fields:
    - **Estimated Size** (number) - Story points
    - **Actual Size** (number) - Actual effort
@@ -226,6 +250,7 @@ Add custom fields to track more data:
 ### Saved Filters
 
 Create quick filters:
+
 1. Apply filters to a view
 2. Click **Save filter**
 3. Name it (e.g., "High Priority Bugs")
@@ -236,6 +261,7 @@ Create quick filters:
 ### Auto-close issues from commits
 
 In commit messages:
+
 ```bash
 git commit -m "feat: add WebSocket support
 
@@ -246,6 +272,7 @@ Fixes #124"
 ### Link PRs to issues
 
 In PR description:
+
 ```markdown
 Closes #123
 Resolves #124
@@ -255,6 +282,7 @@ Fixes #125
 ### Status checks
 
 PRs automatically show:
+
 - ✅ Tests passing
 - ✅ Coverage maintained
 - ✅ Linting passed
@@ -263,6 +291,7 @@ PRs automatically show:
 ## Best Practices
 
 ### Issue Creation
+
 - ✅ Use templates (bug report, feature request)
 - ✅ Add clear acceptance criteria
 - ✅ Estimate size (S/M/L/XL)
@@ -270,6 +299,7 @@ PRs automatically show:
 - ✅ Link related issues
 
 ### PR Creation
+
 - ✅ Use PR template
 - ✅ Link to issue(s)
 - ✅ Add screenshots if UI-related
@@ -277,6 +307,7 @@ PRs automatically show:
 - ✅ Write clear commit messages
 
 ### Code Review
+
 - ✅ Review within 24-48 hours
 - ✅ Provide constructive feedback
 - ✅ Test locally if possible
@@ -284,6 +315,7 @@ PRs automatically show:
 - ✅ Approve or request changes
 
 ### Board Management
+
 - ✅ Triage new issues daily
 - ✅ Keep **Ready** column stocked
 - ✅ Limit **In Progress** (WIP limit: 3-5)
@@ -293,16 +325,19 @@ PRs automatically show:
 ## Troubleshooting
 
 ### Issues not appearing in project
+
 - Check if issue is added to project
 - Verify project visibility settings
 - Check filters on current view
 
 ### Automation not working
+
 - Verify GitHub Actions are enabled
 - Check workflow permissions
 - Review workflow run logs in Actions tab
 
 ### Labels not applying automatically
+
 - Check `.github/labeler.yml` configuration
 - Verify workflow is running
 - Manually apply labels if needed

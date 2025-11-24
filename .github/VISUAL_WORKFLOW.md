@@ -318,4 +318,4 @@ ISSUE                           PR                          DISCUSSION
 
 ---
 
-*This visual guide complements the detailed documentation in `.github/` directory.*
+_This visual guide complements the detailed documentation in `.github/` directory._

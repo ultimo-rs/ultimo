@@ -6,12 +6,14 @@ Copy these to create issues on GitHub and add them to the project board.
 ## 🚀 High Priority Features (Coming Soon)
 
 ### WebSocket Support
+
 **Title:** Add WebSocket support  
 **Labels:** `type: feature`, `priority: high`, `area: core`  
 **Description:**
 Implement WebSocket support for real-time bidirectional communication.
 
 **Acceptance Criteria:**
+
 - [ ] WebSocket connection handling (upgrade from HTTP)
 - [ ] Message send/receive API
 - [ ] Connection state management
@@ -24,6 +26,7 @@ Implement WebSocket support for real-time bidirectional communication.
 - [ ] Documentation
 
 **Technical Notes:**
+
 - Use `tokio-tungstenite` for WebSocket protocol
 - Consider connection pooling for scalability
 - Add rate limiting for WebSocket messages
@@ -33,12 +36,14 @@ Implement WebSocket support for real-time bidirectional communication.
 ---
 
 ### Server-Sent Events (SSE)
+
 **Title:** Add Server-Sent Events (SSE) support  
 **Labels:** `type: feature`, `priority: high`, `area: core`  
 **Description:**
 Implement SSE for server-to-client real-time updates.
 
 **Acceptance Criteria:**
+
 - [ ] SSE endpoint creation API
 - [ ] Event streaming with custom event types
 - [ ] Client connection management
@@ -49,6 +54,7 @@ Implement SSE for server-to-client real-time updates.
 - [ ] Documentation
 
 **Example API:**
+
 ```rust
 app.sse("/events", |ctx| async move {
     let stream = ctx.sse_stream();
@@ -62,12 +68,14 @@ app.sse("/events", |ctx| async move {
 ---
 
 ### Session Management
+
 **Title:** Add session management system  
 **Labels:** `type: feature`, `priority: high`, `area: core`  
 **Description:**
 Built-in session management with multiple storage backends.
 
 **Acceptance Criteria:**
+
 - [ ] Session creation and destruction
 - [ ] Cookie-based session IDs
 - [ ] In-memory session store
@@ -80,6 +88,7 @@ Built-in session management with multiple storage backends.
 - [ ] Documentation
 
 **Technical Notes:**
+
 - Use secure random IDs
 - Support HttpOnly and Secure cookies
 - Consider session serialization format (JSON/MessagePack)
@@ -89,12 +98,14 @@ Built-in session management with multiple storage backends.
 ---
 
 ### Testing Utilities
+
 **Title:** Create comprehensive testing utilities  
 **Labels:** `type: feature`, `priority: high`, `area: core`, `type: test`  
 **Description:**
 Build testing utilities to make it easier to test Ultimo applications.
 
 **Acceptance Criteria:**
+
 - [ ] `TestClient` for making requests
 - [ ] Mock request builder
 - [ ] Response assertion helpers
@@ -106,6 +117,7 @@ Build testing utilities to make it easier to test Ultimo applications.
 - [ ] Guide on testing patterns
 
 **Example API:**
+
 ```rust
 let app = create_test_app();
 let client = TestClient::new(app);
@@ -120,12 +132,14 @@ assert_json_eq!(res.json(), expected);
 ---
 
 ### Multi-language Client Generation
+
 **Title:** Support client generation in multiple languages  
 **Labels:** `type: feature`, `priority: medium`, `area: cli`  
 **Description:**
 Extend the CLI to generate clients in Python, Go, Java, etc.
 
 **Acceptance Criteria:**
+
 - [ ] Python client generation
 - [ ] Go client generation
 - [ ] Java/Kotlin client generation
@@ -143,12 +157,14 @@ Extend the CLI to generate clients in Python, Go, Java, etc.
 ## 📚 Documentation
 
 ### More Middleware Examples
+
 **Title:** Add comprehensive middleware pattern examples  
 **Labels:** `type: docs`, `priority: medium`, `area: docs`  
 **Description:**
 Create detailed examples showing various middleware patterns.
 
 **Topics to Cover:**
+
 - [ ] Authentication middleware
 - [ ] Rate limiting strategies
 - [ ] Caching middleware
@@ -162,12 +178,14 @@ Create detailed examples showing various middleware patterns.
 ---
 
 ### Video Tutorials
+
 **Title:** Create video tutorial series  
 **Labels:** `type: docs`, `priority: low`, `area: docs`  
 **Description:**
 Create video tutorials for getting started and advanced topics.
 
 **Planned Videos:**
+
 - [ ] Quick start (5 min)
 - [ ] Building a REST API (15 min)
 - [ ] RPC system deep dive (20 min)
@@ -180,12 +198,14 @@ Create video tutorials for getting started and advanced topics.
 ---
 
 ### Troubleshooting Guide
+
 **Title:** Create comprehensive troubleshooting guide  
 **Labels:** `type: docs`, `priority: medium`, `area: docs`  
 **Description:**
 Document common issues and their solutions.
 
 **Sections:**
+
 - [ ] Common errors and fixes
 - [ ] Performance issues
 - [ ] TypeScript client generation issues
@@ -199,12 +219,14 @@ Document common issues and their solutions.
 ---
 
 ### Production Deployment Best Practices
+
 **Title:** Document production deployment best practices  
 **Labels:** `type: docs`, `priority: high`, `area: docs`  
 **Description:**
 Guide for deploying Ultimo apps to production.
 
 **Topics:**
+
 - [ ] Docker containerization
 - [ ] Kubernetes deployment
 - [ ] Cloud platform guides (AWS, GCP, Azure)
@@ -221,17 +243,20 @@ Guide for deploying Ultimo apps to production.
 ## ⚡ Performance & Quality
 
 ### Increase Test Coverage to 80%
+
 **Title:** Increase test coverage from 63% to 80%  
 **Labels:** `type: test`, `priority: high`, `area: core`  
 **Description:**
 Improve test coverage across all modules, focusing on low-coverage areas.
 
 **Current Coverage:**
+
 - Overall: 63.58%
 - app.rs: 25.62% ⚠️
 - context.rs: 40.18% ⚠️
 
 **Target Areas:**
+
 - [ ] app.rs: 25% → 70%
 - [ ] context.rs: 40% → 75%
 - [ ] Add integration tests
@@ -243,12 +268,14 @@ Improve test coverage across all modules, focusing on low-coverage areas.
 ---
 
 ### Framework Benchmarks
+
 **Title:** Add more framework benchmarks  
 **Labels:** `type: performance`, `priority: medium`, `area: core`  
 **Description:**
 Expand benchmarks to compare against more frameworks.
 
 **Frameworks to Benchmark:**
+
 - [ ] Actix-web (Rust)
 - [ ] Rocket (Rust)
 - [ ] Warp (Rust)
@@ -257,6 +284,7 @@ Expand benchmarks to compare against more frameworks.
 - [ ] FastAPI vs Ultimo (same features)
 
 **Metrics:**
+
 - Throughput (req/sec)
 - Latency (p50, p95, p99)
 - Memory usage
@@ -267,12 +295,14 @@ Expand benchmarks to compare against more frameworks.
 ---
 
 ### Performance Regression Tests
+
 **Title:** Add automated performance regression tests  
 **Labels:** `type: performance`, `type: test`, `priority: medium`, `area: core`  
 **Description:**
 Implement automated tests to detect performance regressions.
 
 **Acceptance Criteria:**
+
 - [ ] Benchmark suite in CI
 - [ ] Performance baselines
 - [ ] Automated comparison against main branch
@@ -284,12 +314,14 @@ Implement automated tests to detect performance regressions.
 ---
 
 ### Optimize TypeScript Generation
+
 **Title:** Optimize TypeScript client generation speed  
 **Labels:** `type: performance`, `priority: low`, `area: cli`  
 **Description:**
 Profile and optimize the TypeScript client generation process.
 
 **Goals:**
+
 - [ ] Reduce generation time by 50%
 - [ ] Cache unchanged types
 - [ ] Incremental generation
@@ -302,12 +334,14 @@ Profile and optimize the TypeScript client generation process.
 ## 🛠️ CLI Improvements
 
 ### Project Scaffolding
+
 **Title:** Implement `ultimo new` command  
 **Labels:** `type: feature`, `priority: high`, `area: cli`  
 **Description:**
 Add command to create new Ultimo projects from templates.
 
 **Templates:**
+
 - [ ] Basic REST API
 - [ ] Full-stack (backend + React frontend)
 - [ ] Microservice
@@ -315,6 +349,7 @@ Add command to create new Ultimo projects from templates.
 - [ ] Database-backed API
 
 **Features:**
+
 - [ ] Interactive prompts
 - [ ] Project name configuration
 - [ ] Database selection
@@ -322,6 +357,7 @@ Add command to create new Ultimo projects from templates.
 - [ ] Git initialization
 
 **Example:**
+
 ```bash
 ultimo new my-app --template fullstack
 cd my-app
@@ -333,12 +369,14 @@ ultimo dev
 ---
 
 ### Hot Reload Dev Server
+
 **Title:** Implement `ultimo dev` command with hot reload  
 **Labels:** `type: feature`, `priority: high`, `area: cli`  
 **Description:**
 Add development server with automatic reloading on file changes.
 
 **Features:**
+
 - [ ] Watch Rust files for changes
 - [ ] Auto-rebuild on save
 - [ ] Auto-restart server
@@ -350,12 +388,14 @@ Add development server with automatic reloading on file changes.
 ---
 
 ### Production Build Tools
+
 **Title:** Implement `ultimo build` command  
 **Labels:** `type: feature`, `priority: medium`, `area: cli`  
 **Description:**
 Add optimized production build command.
 
 **Features:**
+
 - [ ] Release profile build
 - [ ] Asset bundling
 - [ ] Size optimization
@@ -367,12 +407,14 @@ Add optimized production build command.
 ---
 
 ### Better Error Messages
+
 **Title:** Improve CLI error messages and diagnostics  
 **Labels:** `type: feature`, `priority: medium`, `area: cli`  
 **Description:**
 Make error messages more helpful and actionable.
 
 **Improvements:**
+
 - [ ] Colorized output
 - [ ] Suggestions for common mistakes
 - [ ] Links to documentation
@@ -384,12 +426,14 @@ Make error messages more helpful and actionable.
 ---
 
 ### Debug Logging Utilities
+
 **Title:** Add debug logging utilities  
 **Labels:** `type: feature`, `priority: low`, `area: core`  
 **Description:**
 Built-in utilities for structured logging and debugging.
 
 **Features:**
+
 - [ ] Request/response logging
 - [ ] Performance timing
 - [ ] SQL query logging
@@ -403,6 +447,7 @@ Built-in utilities for structured logging and debugging.
 ## 👥 Community
 
 ### Contribution Guidelines
+
 **Title:** Enhance contribution guidelines  
 **Labels:** `type: docs`, `priority: high`  
 **Status:** ✅ Completed (CONTRIBUTING.md created)
@@ -410,6 +455,7 @@ Built-in utilities for structured logging and debugging.
 ---
 
 ### Issue Templates
+
 **Title:** Create issue templates  
 **Labels:** `type: docs`, `priority: high`  
 **Status:** ✅ Completed (Bug report and feature request templates created)
@@ -417,6 +463,7 @@ Built-in utilities for structured logging and debugging.
 ---
 
 ### Pull Request Template
+
 **Title:** Create PR template  
 **Labels:** `type: docs`, `priority: high`  
 **Status:** ✅ Completed (PR template created)
@@ -424,12 +471,14 @@ Built-in utilities for structured logging and debugging.
 ---
 
 ### Code of Conduct
+
 **Title:** Add code of conduct  
 **Labels:** `type: docs`, `priority: high`  
 **Description:**
 Create a code of conduct for the community.
 
 **Include:**
+
 - [ ] Expected behavior
 - [ ] Unacceptable behavior
 - [ ] Reporting guidelines
@@ -441,12 +490,14 @@ Create a code of conduct for the community.
 ---
 
 ### Discord/Community Channel
+
 **Title:** Set up community Discord server  
 **Labels:** `priority: medium`  
 **Description:**
 Create a Discord server for community discussions.
 
 **Channels:**
+
 - [ ] #general
 - [ ] #help
 - [ ] #showcase
@@ -460,6 +511,7 @@ Create a Discord server for community discussions.
 ## 🐛 Bug Fixes & Improvements
 
 ### Context Request Body Consumption
+
 **Title:** Fix context body consumption issues  
 **Labels:** `type: bug`, `priority: medium`, `area: core`  
 **Description:**
@@ -469,6 +521,7 @@ Investigate and fix issues where request body can only be read once.
 Calling `ctx.req.json()` multiple times fails.
 
 **Proposed Solution:**
+
 - Cache parsed body in context
 - Allow multiple reads
 - Add `ctx.req.raw_body()` for raw access
@@ -478,12 +531,14 @@ Calling `ctx.req.json()` multiple times fails.
 ---
 
 ### Router Edge Cases
+
 **Title:** Handle router edge cases  
 **Labels:** `type: bug`, `priority: medium`, `area: core`  
 **Description:**
 Fix edge cases in route matching.
 
 **Issues:**
+
 - [ ] Trailing slashes
 - [ ] Overlapping routes
 - [ ] Parameter precedence
@@ -494,12 +549,14 @@ Fix edge cases in route matching.
 ---
 
 ### OpenAPI Schema Generation
+
 **Title:** Improve OpenAPI schema generation  
 **Labels:** `type: feature`, `priority: medium`, `area: openapi`  
 **Description:**
 Enhance OpenAPI spec generation with more features.
 
 **Improvements:**
+
 - [ ] Support for request/response examples
 - [ ] Better error response schemas
 - [ ] Security schemes
@@ -513,6 +570,7 @@ Enhance OpenAPI spec generation with more features.
 ## 🎯 Quick Wins (Good First Issues)
 
 ### Add More Examples
+
 **Title:** Add middleware composition example  
 **Labels:** `good first issue`, `type: docs`, `area: examples`  
 **Description:**
@@ -523,6 +581,7 @@ Create example showing how to compose multiple middleware.
 ---
 
 ### Improve Error Messages
+
 **Title:** Add better error context for route not found  
 **Labels:** `good first issue`, `type: feature`, `area: core`  
 **Description:**
@@ -533,6 +592,7 @@ When route not found, suggest similar routes.
 ---
 
 ### Documentation Improvements
+
 **Title:** Fix typos and improve clarity in README  
 **Labels:** `good first issue`, `type: docs`  
 **Description:**
@@ -545,23 +605,27 @@ Review and improve README for clarity.
 ## Priority Matrix
 
 ### Critical (Start Immediately)
+
 1. Test coverage to 80%
 2. WebSocket support
 3. Production deployment docs
 
 ### High (Next Sprint)
+
 1. SSE support
 2. Session management
 3. CLI project scaffolding
 4. Testing utilities
 
 ### Medium (Backlog)
+
 1. More benchmarks
 2. Multi-language clients
 3. Hot reload dev server
 4. OpenAPI improvements
 
 ### Low (Nice to Have)
+
 1. Video tutorials
 2. Debug logging
 3. Performance optimizations
@@ -581,6 +645,7 @@ Review and improve README for clarity.
 ## GitHub Project Board Setup
 
 Create columns:
+
 - 📋 Backlog (All new issues)
 - 🎯 Ready (Prioritized, ready to start)
 - 🚧 In Progress (Actively being worked on)

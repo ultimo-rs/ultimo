@@ -1,9 +1,9 @@
 ---
 name: Feature Request
 about: Suggest a new feature or enhancement for Ultimo
-title: '[FEATURE] '
-labels: 'type: feature'
-assignees: ''
+title: "[FEATURE] "
+labels: "type: feature"
+assignees: ""
 ---
 
 ## Feature Description

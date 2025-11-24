@@ -15,12 +15,14 @@ This document describes our GitHub Projects Kanban board configuration for manag
 ## Label System
 
 ### Priority
+
 - 🔴 `priority: critical` - Blocking issues, security vulnerabilities
 - 🟠 `priority: high` - Important features, significant bugs
 - 🟡 `priority: medium` - Standard features and improvements
 - 🟢 `priority: low` - Nice-to-have features, minor improvements
 
 ### Type
+
 - 🚀 `type: feature` - New functionality
 - 🐛 `type: bug` - Bug fixes
 - 📚 `type: docs` - Documentation updates
@@ -30,6 +32,7 @@ This document describes our GitHub Projects Kanban board configuration for manag
 - 🎨 `type: ui` - UI/UX improvements (docs site, examples)
 
 ### Area
+
 - 🏗️ `area: core` - Core framework functionality
 - 🌐 `area: rpc` - RPC system
 - 📖 `area: openapi` - OpenAPI generation
@@ -39,6 +42,7 @@ This document describes our GitHub Projects Kanban board configuration for manag
 - 📚 `area: docs` - Documentation site
 
 ### Status
+
 - 💡 `status: planning` - In planning phase
 - 🔍 `status: investigating` - Investigating technical approach
 - 🚫 `status: blocked` - Blocked by dependencies
@@ -49,6 +53,7 @@ This document describes our GitHub Projects Kanban board configuration for manag
 Based on the README and project structure, here are the key items for the board:
 
 ### High Priority (Coming Soon)
+
 - [ ] WebSocket support
 - [ ] Server-Sent Events (SSE)
 - [ ] Session management
@@ -56,18 +61,21 @@ Based on the README and project structure, here are the key items for the board:
 - [ ] Multi-language client generation
 
 ### Documentation
+
 - [ ] Add more examples for middleware patterns
 - [ ] Create video tutorials
 - [ ] Add troubleshooting guide
 - [ ] Document best practices for production deployment
 
 ### Performance & Quality
+
 - [ ] Increase test coverage to 80%
 - [ ] Benchmark against more frameworks
 - [ ] Add performance regression tests
 - [ ] Optimize TypeScript client generation
 
 ### Developer Experience
+
 - [ ] CLI: Project scaffolding (`ultimo new`)
 - [ ] CLI: Hot reload dev server (`ultimo dev`)
 - [ ] CLI: Production build tools (`ultimo build`)
@@ -75,6 +83,7 @@ Based on the README and project structure, here are the key items for the board:
 - [ ] Add debug logging utilities
 
 ### Community
+
 - [ ] Create contribution guidelines
 - [ ] Set up issue templates
 - [ ] Create PR template
@@ -84,6 +93,7 @@ Based on the README and project structure, here are the key items for the board:
 ## Workflow
 
 ### For New Issues
+
 1. Issues start in **📋 Backlog**
 2. Once prioritized and requirements clear → move to **🎯 Ready**
 3. When starting work → move to **🚧 In Progress** and assign yourself
@@ -91,6 +101,7 @@ Based on the README and project structure, here are the key items for the board:
 5. When merged → move to **✅ Done**
 
 ### For Pull Requests
+
 1. Link to related issue(s)
 2. Automatically moves to **👀 Review** when opened
 3. Moves to **✅ Done** when merged
@@ -99,6 +110,7 @@ Based on the README and project structure, here are the key items for the board:
 ## Automation
 
 We can set up GitHub Actions to automatically:
+
 - Move issues to "In Progress" when assigned
 - Move to "Review" when PR is opened
 - Move to "Done" when PR is merged
@@ -133,6 +145,7 @@ We can set up GitHub Actions to automatically:
 ### Creating Issues from This Document
 
 You can create issues directly from the roadmap items listed above. Each issue should include:
+
 - Clear description
 - Acceptance criteria
 - Related documentation

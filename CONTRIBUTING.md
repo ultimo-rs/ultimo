@@ -5,6 +5,7 @@ Thank you for your interest in contributing to Ultimo! This document provides gu
 ## 📋 GitHub Projects Board
 
 We use a GitHub Projects Kanban board to track all work. See [`.github/README.md`](.github/README.md) for:
+
 - 🎯 [Complete setup guide](.github/GITHUB_PROJECTS_SETUP.md)
 - 📊 [Project board structure](.github/PROJECT_BOARD.md)
 - 📝 [35+ initial issues ready to work on](.github/INITIAL_ISSUES.md)
@@ -12,6 +13,7 @@ We use a GitHub Projects Kanban board to track all work. See [`.github/README.md
 - 🎨 [Visual workflow diagrams](.github/VISUAL_WORKFLOW.md)
 
 **Quick links:**
+
 - [View Project Board](https://github.com/ultimo-rs/ultimo/projects)
 - [Browse Issues](https://github.com/ultimo-rs/ultimo/issues)
 - [Good First Issues](https://github.com/ultimo-rs/ultimo/labels/good%20first%20issue)
@@ -68,6 +70,7 @@ git checkout -b fix/bug-description
 ```
 
 Branch naming conventions:
+
 - `feature/` - New features
 - `fix/` - Bug fixes
 - `docs/` - Documentation updates
@@ -121,6 +124,7 @@ git commit -m "test: add middleware tests"
 ```
 
 Commit types:
+
 - `feat:` - New features
 - `fix:` - Bug fixes
 - `docs:` - Documentation only
@@ -139,6 +143,7 @@ git push origin feature/your-feature-name
 ```
 
 Use the PR template and:
+
 - Link related issues
 - Describe your changes clearly
 - Add screenshots if applicable
@@ -173,6 +178,7 @@ ultimo/
 ## Areas to Contribute
 
 ### 🚀 High Priority (Coming Soon)
+
 - WebSocket support
 - Server-Sent Events (SSE)
 - Session management
@@ -180,6 +186,7 @@ ultimo/
 - Multi-language client generation
 
 ### 🐛 Bug Fixes
+
 - Check [open bugs](https://github.com/ultimo-rs/ultimo/labels/type%3A%20bug)
 - Reproduce the issue
 - Write a failing test
@@ -187,18 +194,21 @@ ultimo/
 - Verify test passes
 
 ### 📚 Documentation
+
 - Improve existing docs
 - Add more examples
 - Write tutorials
 - Fix typos and clarify explanations
 
 ### ⚡ Performance
+
 - Profile code for bottlenecks
 - Optimize hot paths
 - Add benchmarks
 - Reduce allocations
 
 ### 🧪 Testing
+
 - Increase test coverage
 - Add edge case tests
 - Write integration tests
@@ -208,7 +218,7 @@ ultimo/
 
 ### Rust Code
 
-```rust
+````rust
 // Use descriptive names
 pub struct Context {
     req: Request,
@@ -235,7 +245,7 @@ pub fn parse_json(&self) -> Result<Value> {
 
 // Use type aliases for clarity
 pub type Result<T> = std::result::Result<T, Error>;
-```
+````
 
 ### Error Handling
 
@@ -251,7 +261,7 @@ return Err(Error::NotFound(format!(
 pub enum Error {
     #[error("Route not found: {0}")]
     NotFound(String),
-    
+
     #[error("Validation failed: {0}")]
     Validation(String),
 }
@@ -270,7 +280,7 @@ mod tests {
     fn test_route_matching() {
         let router = Router::new();
         router.add_route("/users/:id", handler);
-        
+
         let (handler, params) = router.match_route("/users/123");
         assert!(handler.is_some());
         assert_eq!(params.get("id"), Some(&"123".to_string()));
@@ -290,10 +300,10 @@ async fn test_full_request_flow() {
     app.get("/test", |c| async move {
         c.json(json!({"status": "ok"}))
     });
-    
+
     let client = TestClient::new(app);
     let res = client.get("/test").await;
-    
+
     assert_eq!(res.status(), 200);
     assert_eq!(res.json::<Value>().await?, json!({"status": "ok"}));
 }
@@ -308,6 +318,7 @@ async fn test_full_request_flow() {
 ## Recognition
 
 Contributors are recognized in:
+
 - README.md contributors section
 - Release notes
 - GitHub contributors page
