@@ -4,7 +4,18 @@ This document describes the comprehensive testing approach for Ultimo's WebSocke
 
 ## Test Suite Overview
 
-The WebSocket implementation includes **42 total tests** across multiple categories:
+The WebSocket implementation includes **93 total tests** across multiple categories:
+
+- **21 Unit Tests** - Core frame codec, pub/sub, upgrade
+- **9 Integration Tests** - Real WebSocket connections and pub/sub
+- **12 Property-Based Tests** - Thousands of randomized test cases
+- **5 Router Integration Tests** - Router + WebSocket integration
+- **14 Error Handling Tests** - Protocol violations and edge cases
+- **11 Concurrency Tests** - Multi-threaded safety and stress tests
+- **18 Edge Case Tests** - Large payloads, fragmentation, UTF-8 boundaries
+- **3 Benchmark Tests** - Performance measurement with Criterion
+
+**Total**: 93 tests, 210 passing, 2 ignored (UTF-8 validation future enhancement)
 
 ### 1. Unit Tests (21 tests)
 
@@ -75,7 +86,75 @@ Located in `tests/websocket_property.rs` - use proptest to verify properties acr
 - `test_fin_bit_combinations` - FIN bit true/false
 - `test_rsv_bits_always_zero` - RSV bits always 0 without extensions
 
-### 4. Benchmark Tests
+### 4. Router Integration Tests (5 tests)
+
+Located in `tests/websocket_router_integration.rs` - test WebSocket integration with Ultimo's router.
+
+- `test_websocket_route_registration` - WebSocket route registration and connection
+- `test_websocket_echo` - Echo messages through router
+- `test_multiple_websocket_connections` - Multiple concurrent connections
+- `test_http_and_websocket_coexist` - HTTP and WebSocket routes together
+- `test_websocket_binary_messages` - Binary message handling through router
+
+### 5. Error Handling Tests (14 tests, 2 ignored)
+
+Located in `tests/websocket_error_handling.rs` - test protocol violations and error cases.
+
+- `test_invalid_opcode` - Invalid opcode rejection
+- `test_control_frame_too_large` - Control frame > 125 bytes
+- `test_fragmented_control_frame` - FIN=false on control frame
+- `test_unmasked_client_frame` - Client frame without mask
+- `test_invalid_utf8_text_frame` - Invalid UTF-8 in text frame (ignored)
+- `test_reserved_bits_set` - RSV bits set without extensions
+- `test_partial_frame_with_corrupted_data` - Incomplete frame data
+- `test_empty_close_frame` - Empty close frame handling
+- `test_close_frame_invalid_code` - Invalid close code
+- `test_close_frame_invalid_utf8_reason` - Invalid UTF-8 in close reason (ignored)
+- `test_large_payload_64bit` - Large payload handling
+- `test_huge_payload_stress` - Stress test with huge payloads
+- `test_continuation_without_initial_frame` - Invalid fragmentation sequence
+- `test_concurrent_frame_parsing` - Thread-safe frame parsing
+
+### 6. Concurrency Tests (11 tests)
+
+Located in `tests/websocket_concurrency.rs` - test thread safety and concurrent operations.
+
+- `test_channel_manager_concurrent_subscribe` - Concurrent subscriptions
+- `test_channel_manager_concurrent_publish` - Concurrent publishing
+- `test_channel_manager_subscribe_unsubscribe_race` - Subscribe/unsubscribe races
+- `test_channel_manager_publish_while_disconnecting` - Publish during disconnect
+- `test_many_subscribers_one_topic` - Broadcast to many subscribers
+- `test_many_topics_one_subscriber` - Single client, many topics
+- `test_concurrent_connection_management` - Concurrent connect/disconnect
+- `test_stress_rapid_subscribe_unsubscribe` - Rapid subscription changes
+- `test_stress_high_message_throughput` - High-volume message stress test
+- `test_message_ordering_per_connection` - Message order preservation
+- `test_topic_cleanup_under_load` - Memory cleanup under load
+
+### 7. Edge Case Tests (18 tests)
+
+Located in `tests/websocket_edge_cases.rs` - test boundary conditions and special cases.
+
+- `test_fragmented_text_message` - Multi-frame text messages
+- `test_fragmented_binary_message` - Multi-frame binary messages
+- `test_interleaved_control_frames` - Control frames during fragmentation
+- `test_maximum_control_frame_payload` - 125-byte control frames
+- `test_large_masked_payload` - Large payload with masking
+- `test_empty_close_frame` - Close with no payload
+- `test_close_frame_with_code_only` - Close with code, no reason
+- `test_close_frame_with_code_and_reason` - Close with code and reason
+- `test_ping_pong_round_trip` - Ping/pong echo
+- `test_multiple_frames_in_buffer` - Multiple frames in one read
+- `test_partial_frame_received_in_chunks` - Chunked frame reception
+- `test_boundary_payload_lengths` - All length boundaries (0, 1, 125, 126, 127, 65535, 65536)
+- `test_utf8_emoji_in_text_frame` - Emoji and multibyte UTF-8
+- `test_multibyte_utf8_boundaries` - UTF-8 boundary handling
+- `test_subscribe_with_timeout` - Subscribe timeout handling
+- `test_publish_with_timeout` - Publish timeout handling
+- `test_zero_length_text_frame` - Empty text message
+- `test_zero_length_binary_frame` - Empty binary message
+
+### 8. Benchmark Tests (3 tests)
 
 Located in `benches/websocket_bench.rs` - measure performance with Criterion.
 
@@ -198,23 +277,46 @@ let frame = Frame {
 
 ## Test Quality Metrics
 
-- **Total Tests**: 42 (21 unit + 9 integration + 12 property-based)
-- **Property Test Cases**: Each proptest runs 256 cases by default = ~2,048 additional test executions
-- **Coverage Areas**: Frame encoding/decoding, connection lifecycle, pub/sub, typed context, control frames
-- **Edge Cases**: Empty payloads, maximum sizes, partial frames, invalid data, UTF-8 validation
-- **Performance**: Benchmarks across 7 payload sizes (0B to 65KB+)
+- **Total Tests**: 93 tests across 8 categories
+- **Unit Tests**: 21 (frame codec, pub/sub, upgrade)
+- **Integration Tests**: 9 (real connections, JSON, pub/sub)
+- **Property-Based Tests**: 12 (each runs 256 random cases = 3,072 executions)
+- **Router Integration**: 5 (Ultimo router + WebSocket)
+- **Error Handling**: 14 (protocol violations, 2 ignored for future work)
+- **Concurrency**: 11 (thread safety, race conditions, stress tests)
+- **Edge Cases**: 18 (fragmentation, UTF-8, boundaries, timeouts)
+- **Benchmarks**: 3 (performance across payload sizes)
+- **Status**: 210 passing, 2 ignored (UTF-8 validation future enhancement)
+
+### Coverage Areas
+
+- ✅ Frame encoding/decoding (all opcodes, all length encodings)
+- ✅ Connection lifecycle (open, message, close, error)
+- ✅ Pub/sub system (subscribe, unsubscribe, publish, broadcast)
+- ✅ Typed context data (`WebSocket<T>`)
+- ✅ Control frames (ping, pong, close)
+- ✅ Router integration (Radix Tree)
+- ✅ Error handling (invalid frames, protocol violations)
+- ✅ Concurrency (thread safety, race conditions)
+- ✅ Edge cases (fragmentation, large payloads, UTF-8)
+- ✅ Performance (benchmarks across payload sizes)
 
 ## Future Test Additions
 
-Phase 2 (Ultimo Integration):
+Phase 2 (Advanced Features):
 
-- Router `.websocket()` method tests
-- Middleware integration tests
-- Upgrade handling tests
+- Compression tests (per-message deflate RFC 7692)
+- Backpressure tests (drain callback, write buffer)
+- Automatic ping/pong heartbeat tests
+- Configuration tests (max_message_size, timeouts)
+- Graceful shutdown tests
 
-Phase 3 (Advanced Features):
+Phase 3 (Scalability):
 
-- Compression tests (per-message deflate)
+- Pattern matching subscription tests (wildcards)
+- Message filtering tests
+- Topic metrics tests
+- Load tests (100k+ concurrent connections)
 - Backpressure tests (drain callback)
 - Fragmentation tests (large message splitting)
 - Ping/Pong timeout tests
