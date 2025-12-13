@@ -1,5 +1,5 @@
 [workspace]
-members = ["ultimo", "examples/basic", "examples/rpc-modes", "examples/openapi-demo", "examples/database-sqlx", "examples/database-diesel", "examples/database-api-styles", "ultimo-cli", "coverage-tool"]
+members = ["ultimo", "examples/basic", "examples/rpc-modes", "examples/openapi-demo", "examples/database-sqlx", "examples/database-diesel", "examples/database-api-styles", "examples/websocket-chat", "examples/websocket-chat-react", "ultimo-cli", "coverage-tool"]
 resolver = "2"
 
 [workspace.package]

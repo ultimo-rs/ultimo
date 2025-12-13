@@ -36,23 +36,23 @@ let app = Ultimo::new()
                 // Access typed context data
                 let user_id = &ws.data().user_id;
                 let channel = &ws.data().channel;
-                
+
                 // Subscribe to channels
                 ws.subscribe(&format!("chat:{}", channel)).await;
                 ws.subscribe("global").await;
-                
+
                 // Send welcome message
                 ws.send_json(&ChatMessage {
                     text: format!("Welcome {}!", user_id),
                     timestamp: now(),
                 }).await.ok();
-                
+
                 // Announce to channel
                 ws.publish(&format!("chat:{}", channel), &ChatMessage {
                     text: format!("{} joined", user_id),
                     timestamp: now(),
                 }).await.ok();
-                
+
                 // Handle messages
                 while let Some(msg) = ws.recv().await {
                     match msg {
@@ -67,7 +67,7 @@ let app = Ultimo::new()
                         _ => {}
                     }
                 }
-                
+
                 // Cleanup on disconnect
                 ws.unsubscribe(&format!("chat:{}", channel)).await;
             })
@@ -88,17 +88,17 @@ struct ChatHandler;
 
 impl WebSocketHandler for ChatHandler {
     type Data = WsData;
-    
+
     async fn on_open(&self, ws: &WebSocket<Self::Data>) {
         let channel = &ws.data().channel;
         ws.subscribe(&format!("chat:{}", channel)).await;
-        
+
         ws.send_json(&ChatMessage {
             text: "Welcome!".to_string(),
             timestamp: now(),
         }).await.ok();
     }
-    
+
     async fn on_message(&self, ws: &WebSocket<Self::Data>, msg: Message) {
         if let Message::Text(text) = msg {
             let channel = &ws.data().channel;
@@ -108,12 +108,12 @@ impl WebSocketHandler for ChatHandler {
             }).await.ok();
         }
     }
-    
+
     async fn on_close(&self, ws: &WebSocket<Self::Data>, code: u16, reason: &str) {
         let channel = &ws.data().channel;
         ws.unsubscribe(&format!("chat:{}", channel)).await;
     }
-    
+
     async fn on_drain(&self, ws: &WebSocket<Self::Data>) {
         // Handle backpressure - called when send buffer is writable again
     }
@@ -136,37 +136,37 @@ pub struct WebSocket<T = ()> {
 impl<T> WebSocket<T> {
     /// Get reference to typed context data
     pub fn data(&self) -> &T;
-    
+
     /// Get mutable reference to typed context data
     pub fn data_mut(&mut self) -> &mut T;
-    
+
     /// Send text message
     pub async fn send(&self, text: impl Into<String>) -> Result<()>;
-    
+
     /// Send binary message
     pub async fn send_binary(&self, data: impl Into<Vec<u8>>) -> Result<()>;
-    
+
     /// Send JSON message
     pub async fn send_json<S: Serialize>(&self, data: &S) -> Result<()>;
-    
+
     /// Receive next message
     pub async fn recv(&mut self) -> Option<Message>;
-    
+
     /// Subscribe to a channel/topic
     pub async fn subscribe(&self, topic: impl AsRef<str>) -> Result<()>;
-    
+
     /// Unsubscribe from a channel/topic
     pub async fn unsubscribe(&self, topic: impl AsRef<str>) -> Result<()>;
-    
+
     /// Publish message to all subscribers of a topic
     pub async fn publish<S: Serialize>(&self, topic: impl AsRef<str>, data: &S) -> Result<()>;
-    
+
     /// Close the connection with optional code and reason
     pub async fn close(&self, code: Option<u16>, reason: Option<&str>) -> Result<()>;
-    
+
     /// Check if connection is writable (for backpressure handling)
     pub fn is_writable(&self) -> bool;
-    
+
     /// Get remote address
     pub fn remote_addr(&self) -> Option<SocketAddr>;
 }
@@ -182,22 +182,22 @@ pub struct WebSocketUpgrade<T = ()> {
 impl<T> WebSocketUpgrade<T> {
     /// Create new upgrade from HTTP request
     pub fn new(req: Request) -> Self;
-    
+
     /// Set typed context data
     pub fn with_data(self, data: T) -> Self;
-    
+
     /// Set custom headers for upgrade response
     pub fn with_header(self, key: impl Into<String>, value: impl Into<String>) -> Self;
-    
+
     /// Set protocols
     pub fn with_protocols(self, protocols: Vec<String>) -> Self;
-    
+
     /// Set on_upgrade callback
     pub fn on_upgrade<F, Fut>(self, callback: F) -> Self
     where
         F: FnOnce(WebSocket<T>) -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static;
-    
+
     /// Build the upgrade response
     pub fn build(self) -> Response;
 }
@@ -209,25 +209,25 @@ impl<T> WebSocketUpgrade<T> {
 #[async_trait]
 pub trait WebSocketHandler: Send + Sync {
     type Data: Send + Sync + 'static;
-    
+
     /// Called when connection is established
     async fn on_open(&self, ws: &WebSocket<Self::Data>) {
         let _ = ws;
     }
-    
+
     /// Called when message is received
     async fn on_message(&self, ws: &WebSocket<Self::Data>, msg: Message);
-    
+
     /// Called when connection is closed
     async fn on_close(&self, ws: &WebSocket<Self::Data>, code: u16, reason: &str) {
         let _ = (ws, code, reason);
     }
-    
+
     /// Called when send buffer is writable again (backpressure)
     async fn on_drain(&self, ws: &WebSocket<Self::Data>) {
         let _ = ws;
     }
-    
+
     /// Called on error
     async fn on_error(&self, ws: &WebSocket<Self::Data>, error: Error) {
         let _ = (ws, error);
@@ -280,25 +280,25 @@ impl ChannelManager {
 pub struct WebSocketConfig {
     /// Maximum message size in bytes (default: 64 MB)
     pub max_message_size: usize,
-    
+
     /// Maximum frame size in bytes (default: 16 MB)
     pub max_frame_size: usize,
-    
+
     /// Ping interval (default: 30 seconds)
     pub ping_interval: Option<Duration>,
-    
+
     /// Ping timeout (default: 10 seconds)
     pub ping_timeout: Duration,
-    
+
     /// Enable per-message compression (default: false)
     pub compression: bool,
-    
+
     /// Write buffer size (default: 128 KB)
     pub write_buffer_size: usize,
-    
+
     /// Max write queue size (default: 1024)
     pub max_write_queue_size: usize,
-    
+
     /// Accepted subprotocols
     pub subprotocols: Vec<String>,
 }
@@ -322,6 +322,7 @@ impl Default for WebSocketConfig {
 ## Implementation Strategy
 
 ### Phase 1: WebSocket Protocol & Core (Week 1)
+
 - [ ] Implement hyper upgrade mechanism
 - [ ] WebSocket frame codec (RFC 6455)
   - [ ] Frame header parsing (FIN, opcode, mask, length)
@@ -334,6 +335,7 @@ impl Default for WebSocketConfig {
 - [ ] Automatic ping/pong handling
 
 ### Phase 2: Pub/Sub System (Week 2)
+
 - [ ] Channel manager implementation
   - [ ] Topic → Subscribers mapping (HashMap<String, HashSet<Uuid>>)
   - [ ] Connection → Sender mapping (HashMap<Uuid, mpsc::Sender>)
@@ -343,6 +345,7 @@ impl Default for WebSocketConfig {
 - [ ] Automatic cleanup on disconnect
 
 ### Phase 3: Advanced Features (Week 3)
+
 - [ ] Backpressure handling (drain callback)
 - [ ] Per-message deflate compression (RFC 7692)
 - [ ] Binary and JSON helpers (send_json, recv_json)
@@ -351,6 +354,7 @@ impl Default for WebSocketConfig {
 - [ ] Graceful shutdown
 
 ### Phase 4: Integration & Polish (Week 4)
+
 - [ ] Ultimo router integration (.websocket() method)
 - [ ] Middleware support for WebSocket routes
 - [ ] OpenAPI/TypeScript generation for WebSocket endpoints
@@ -362,6 +366,7 @@ impl Default for WebSocketConfig {
 ## Library Evaluation
 
 ### Option 1: tokio-tungstenite
+
 - ✅ Mature, widely used
 - ✅ Good tokio integration
 - ❌ No built-in pub/sub
@@ -370,6 +375,7 @@ impl Default for WebSocketConfig {
 - ❌ Requires wrapping for typed context
 
 ### Option 2: fastwebsockets
+
 - ✅ Claims 7x faster than tungstenite
 - ✅ Modern API
 - ❌ Still another dependency
@@ -377,6 +383,7 @@ impl Default for WebSocketConfig {
 - ❌ Still needs wrapper for our API
 
 ### Option 3: Direct Hyper Implementation ✅ RECOMMENDED
+
 - ✅ **Zero extra dependencies** - We already have hyper
 - ✅ **Full control** over API design and optimizations
 - ✅ **Built-in pub/sub** from day one
@@ -398,6 +405,7 @@ Implement WebSocket protocol directly using **hyper's upgrade mechanism**:
 5. Add Ultimo-specific integrations
 
 **Why this is better:**
+
 - Hyper already handles HTTP upgrade handshake
 - WebSocket framing is straightforward (bit manipulation for headers, XOR for masking)
 - We control performance optimizations
@@ -405,6 +413,7 @@ Implement WebSocket protocol directly using **hyper's upgrade mechanism**:
 - Can benchmark and iterate quickly
 
 **Architecture:**
+
 ```
 HTTP Request → Hyper Handler → hyper::upgrade::on()
                                       ↓
@@ -420,19 +429,21 @@ HTTP Request → Hyper Handler → hyper::upgrade::on()
 ## Example Use Cases
 
 ### Real-time Chat
+
 ```rust
 app.websocket("/chat", ChatHandler)
 ```
 
 ### Live Updates
+
 ```rust
 app.get("/api/orders/:id/ws", |req: Request| async move {
     let order_id = req.param("id")?;
-    
+
     WebSocketUpgrade::new(req)
         .on_upgrade(|ws: WebSocket<OrderData>| async move {
             ws.subscribe(&format!("order:{}", order_id)).await;
-            
+
             while let Some(msg) = ws.recv().await {
                 // Handle client messages
             }
@@ -443,6 +454,7 @@ app.get("/api/orders/:id/ws", |req: Request| async move {
 ```
 
 ### Game Server
+
 ```rust
 app.websocket("/game", GameHandler)
     .with_config(WebSocketConfig {
@@ -467,17 +479,19 @@ interface ChatMessage {
 }
 
 // Type-safe client
-const ws = new WebSocket('/ws?user_id=john&channel=general');
+const ws = new WebSocket("/ws?user_id=john&channel=general");
 
-ws.addEventListener('message', (event) => {
+ws.addEventListener("message", (event) => {
   const msg: ChatMessage = JSON.parse(event.data);
   console.log(msg.text);
 });
 
-ws.send(JSON.stringify({
-  text: "Hello!",
-  timestamp: Date.now()
-} as ChatMessage));
+ws.send(
+  JSON.stringify({
+    text: "Hello!",
+    timestamp: Date.now(),
+  } as ChatMessage)
+);
 ```
 
 ## Performance Targets
@@ -491,6 +505,7 @@ ws.send(JSON.stringify({
 ## WebSocket Protocol Implementation Notes
 
 ### Frame Structure (RFC 6455)
+
 ```
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -513,6 +528,7 @@ ws.send(JSON.stringify({
 ```
 
 ### Key Implementation Points
+
 1. **Client frames MUST be masked** (server frames MUST NOT be masked)
 2. **Control frames** (close, ping, pong) must have payload ≤ 125 bytes
 3. **Fragmentation**: Large messages can be split into multiple frames
@@ -520,12 +536,14 @@ ws.send(JSON.stringify({
 5. **Ping/Pong**: Server should respond to ping with pong (same payload)
 
 ### Dependencies We Already Have
+
 - `tokio` - Async runtime
 - `hyper` - HTTP server with upgrade support
 - `bytes` - Efficient byte buffer manipulation
 - `serde_json` - JSON serialization for messages
 
 ### What We Need to Build
+
 - Frame parser/serializer (~200 lines)
 - Frame masking/unmasking (~20 lines)
 - Connection state machine (~100 lines)

@@ -7,9 +7,11 @@ This document describes the comprehensive testing approach for Ultimo's WebSocke
 The WebSocket implementation includes **42 total tests** across multiple categories:
 
 ### 1. Unit Tests (21 tests)
+
 Located inline with the implementation code following Rust best practices.
 
 #### Frame Codec Tests (`src/websocket/frame.rs`)
+
 - `test_text_frame_encode_decode` - Basic text frame round-trip
 - `test_binary_frame_encode_decode` - Basic binary frame round-trip
 - `test_masked_frame` - Frame masking/unmasking
@@ -28,14 +30,17 @@ Located inline with the implementation code following Rust best practices.
 - `test_invalid_opcode` - Invalid opcode rejection
 
 #### Pub/Sub Tests (`src/websocket/pubsub.rs`)
+
 - `test_subscribe_unsubscribe` - Basic subscription lifecycle
 - `test_publish_to_subscribers` - Multi-subscriber broadcasting
 - `test_disconnect_cleanup` - Automatic cleanup on disconnect
 
 #### Upgrade Tests (`src/websocket/upgrade.rs`)
+
 - `test_calculate_accept_key` - WebSocket handshake key calculation
 
 ### 2. Integration Tests (9 tests)
+
 Located in `tests/websocket_integration.rs` - test real-world usage scenarios.
 
 - `test_websocket_send_receive` - Text and binary message exchange
@@ -49,9 +54,11 @@ Located in `tests/websocket_integration.rs` - test real-world usage scenarios.
 - `test_websocket_is_writable` - Writable state checking
 
 ### 3. Property-Based Tests (12 tests)
+
 Located in `tests/websocket_property.rs` - use proptest to verify properties across thousands of random inputs.
 
 #### Proptest Tests (8 tests)
+
 - `prop_frame_round_trip` - Encode/decode preserves payload (all sizes, masked/unmasked)
 - `prop_text_frame_valid_utf8` - UTF-8 text always parses correctly
 - `prop_opcode_preservation` - All opcodes survive encode/decode
@@ -62,12 +69,14 @@ Located in `tests/websocket_property.rs` - use proptest to verify properties acr
 - `prop_control_frames_no_fragment` - Control frames always have FIN=true
 
 #### Exhaustive Tests (4 tests)
+
 - `test_all_valid_opcodes` - All 6 valid opcodes encode correctly
 - `test_payload_length_boundaries` - All length encoding ranges (0, 125, 126, 127, 65535, 65536)
 - `test_fin_bit_combinations` - FIN bit true/false
 - `test_rsv_bits_always_zero` - RSV bits always 0 without extensions
 
 ### 4. Benchmark Tests
+
 Located in `benches/websocket_bench.rs` - measure performance with Criterion.
 
 - `bench_frame_encode` - Encoding speed across payload sizes (0, 125, 126, 1KB, 4KB, 64KB, 65KB)
@@ -101,6 +110,7 @@ cargo bench --package ultimo --bench websocket_bench --features websocket,test-h
 ## Test Coverage
 
 ### Frame Codec Coverage
+
 - ✅ All 6 valid opcodes (Continue, Text, Binary, Close, Ping, Pong)
 - ✅ All 3 payload length encodings (7-bit, 16-bit, 64-bit extended)
 - ✅ Masked and unmasked frames
@@ -115,6 +125,7 @@ cargo bench --package ultimo --bench websocket_bench --features websocket,test-h
 - ✅ Ping/Pong control frames
 
 ### Connection & Messaging Coverage
+
 - ✅ Text message send/receive
 - ✅ Binary message send/receive
 - ✅ JSON serialization/deserialization
@@ -123,6 +134,7 @@ cargo bench --package ultimo --bench websocket_bench --features websocket,test-h
 - ✅ Writable state checking
 
 ### Pub/Sub Coverage
+
 - ✅ Subscribe to topics
 - ✅ Unsubscribe from topics
 - ✅ Publish to single topic
@@ -134,6 +146,7 @@ cargo bench --package ultimo --bench websocket_bench --features websocket,test-h
 - ✅ Subscriber count per topic
 
 ### Property-Based Testing
+
 - ✅ Frame round-trip correctness (all sizes, masking combinations)
 - ✅ UTF-8 validation in text frames
 - ✅ Opcode preservation across encode/decode
@@ -172,6 +185,7 @@ let frame = Frame {
 ## Testing Philosophy
 
 1. **Inline Unit Tests**: Following Rust best practices (tokio, serde, std), unit tests live next to the code they test. This provides:
+
    - Direct access to private functions and types
    - Clear documentation through examples
    - Easy refactoring (tests move with code)
@@ -193,17 +207,20 @@ let frame = Frame {
 ## Future Test Additions
 
 Phase 2 (Ultimo Integration):
+
 - Router `.websocket()` method tests
 - Middleware integration tests
 - Upgrade handling tests
 
 Phase 3 (Advanced Features):
+
 - Compression tests (per-message deflate)
 - Backpressure tests (drain callback)
 - Fragmentation tests (large message splitting)
 - Ping/Pong timeout tests
 
 Phase 4 (Tooling):
+
 - Autobahn Test Suite compliance
 - Performance benchmarks vs tokio-tungstenite
 - Memory leak tests

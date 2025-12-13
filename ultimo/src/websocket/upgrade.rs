@@ -1,6 +1,7 @@
 //! WebSocket upgrade mechanism for Hyper
 
 use super::connection::{ConnectionHandler, WebSocket};
+use super::frame::Message;
 use super::pubsub::ChannelManager;
 use super::WebSocketConfig;
 use bytes::Bytes;
@@ -12,6 +13,7 @@ use hyper::{Request as HyperRequest, Response as HyperResponse, StatusCode};
 use sha1::{Digest, Sha1};
 use std::future::Future;
 use std::sync::Arc;
+use tokio::sync::mpsc;
 
 const WEBSOCKET_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
@@ -121,7 +123,7 @@ where
         tokio::spawn(async move {
             match hyper::upgrade::on(self.request).await {
                 Ok(upgraded) => {
-                    let (handler, sender) =
+                    let (handler, sender, mut incoming_rx) =
                         ConnectionHandler::new(upgraded, channel_manager.clone());
                     let connection_id = uuid::Uuid::new_v4();
                     let remote_addr = None; // TODO: Get from request
@@ -129,13 +131,111 @@ where
                     let ws =
                         WebSocket::new(data, sender, channel_manager, connection_id, remote_addr);
 
-                    // Call user callback
-                    callback(ws).await;
+                    // Spawn the connection handler
+                    let handler_task = tokio::spawn(async move {
+                        if let Err(e) = handler.handle().await {
+                            tracing::error!("WebSocket handler error: {}", e);
+                        }
+                    });
 
-                    // Handle connection
-                    if let Err(e) = handler.handle().await {
-                        tracing::error!("WebSocket handler error: {}", e);
-                    }
+                    // Spawn user callback with message receiver
+                    let callback_task = tokio::spawn(async move {
+                        // Call user callback first
+                        callback(ws).await;
+                        
+                        // Keep receiving messages to keep task alive
+                        while incoming_rx.recv().await.is_some() {
+                            // Messages handled by user's on_message callback
+                        }
+                    });
+
+                    // Wait for both tasks
+                    let _ = tokio::join!(handler_task, callback_task);
+                }
+                Err(e) => {
+                    tracing::error!("WebSocket upgrade error: {}", e);
+                }
+            }
+        });
+
+        response
+    }
+
+    /// Set callback that receives incoming messages through a channel
+    pub fn on_upgrade_with_receiver<F, Fut>(
+        self,
+        callback: F,
+    ) -> HyperResponse<Full<Bytes>>
+    where
+        F: FnOnce(WebSocket<T>, mpsc::UnboundedReceiver<Message>) -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+        T: Send + 'static,
+    {
+        // Validate WebSocket upgrade request
+        if !is_valid_upgrade_request(&self.request) {
+            return HyperResponse::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Full::new(Bytes::from("Invalid WebSocket upgrade request")))
+                .unwrap();
+        }
+
+        // Extract WebSocket key
+        let key = match self.request.headers().get(SEC_WEBSOCKET_KEY) {
+            Some(key) => key.to_str().unwrap_or(""),
+            None => {
+                return HyperResponse::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Full::new(Bytes::from("Missing Sec-WebSocket-Key header")))
+                    .unwrap();
+            }
+        };
+
+        // Calculate accept key
+        let accept_key = calculate_accept_key(key);
+
+        // Build upgrade response
+        let mut response = HyperResponse::builder()
+            .status(StatusCode::SWITCHING_PROTOCOLS)
+            .header(UPGRADE, "websocket")
+            .header(CONNECTION, "Upgrade")
+            .header(SEC_WEBSOCKET_ACCEPT, accept_key);
+
+        // Add custom headers
+        for (key, value) in self.headers {
+            response = response.header(key, value);
+        }
+
+        let response = response.body(Full::new(Bytes::new())).unwrap();
+
+        // Spawn upgrade handler
+        let data = self.data.expect("WebSocket data not set");
+        let channel_manager = self.channel_manager;
+
+        tokio::spawn(async move {
+            match hyper::upgrade::on(self.request).await {
+                Ok(upgraded) => {
+                    let (handler, sender, incoming_rx) =
+                        ConnectionHandler::new(upgraded, channel_manager.clone());
+                    let connection_id = uuid::Uuid::new_v4();
+                    let remote_addr = None; // TODO: Get from request
+
+                    let ws =
+                        WebSocket::new(data, sender, channel_manager, connection_id, remote_addr);
+
+                    // Spawn the connection handler
+                    let handler_task = tokio::spawn(async move {
+                        if let Err(e) = handler.handle().await {
+                            tracing::error!("WebSocket handler error: {}", e);
+                        }
+                    });
+
+                    // Spawn user callback with message receiver
+                    let callback_task = tokio::spawn(async move {
+                        callback(ws, incoming_rx).await;
+                    });
+
+                    // Wait for both tasks
+                    let _ = tokio::join!(handler_task, callback_task);
                 }
                 Err(e) => {
                     tracing::error!("WebSocket upgrade error: {}", e);

@@ -1,0 +1,64 @@
+# Moon configuration for WebSocket Chat React example
+# https://moonrepo.dev/docs/config/project
+
+type: application
+language: rust
+
+# Define tasks for this project
+tasks:
+  # Build the Rust server
+  build:
+    command: cargo build --bin websocket-chat-react
+    inputs:
+      - src/**/*.rs
+      - Cargo.toml
+
+  # Run the Rust WebSocket server
+  dev-server:
+    command: cargo run --bin websocket-chat-react
+    local: true
+    options:
+      runInCI: false
+
+  # Install frontend dependencies
+  install:
+    command: npm install
+    inputs:
+      - package.json
+      - pnpm-lock.yaml
+    outputs:
+      - node_modules
+
+  # Run the React frontend dev server
+  dev-frontend:
+    command: npm run dev
+    deps:
+      - ~:install
+    local: true
+    options:
+      runInCI: false
+
+  # Show dev instructions
+  dev:
+    command: 'echo "WebSocket Chat - Run in separate terminals:" && echo "  Server: moon run websocket-chat-react:dev-server" && echo "  Frontend: moon run websocket-chat-react:dev-frontend"'
+    deps:
+      - ~:install
+
+  # Type check TypeScript
+  typecheck:
+    command: npm run build -- --mode development
+    deps:
+      - ~:install
+    inputs:
+      - src/**/*.{ts,tsx}
+      - "*.ts"
+      - tsconfig*.json
+
+  # Lint frontend code
+  lint:
+    command: npm run lint
+    deps:
+      - ~:install
+    inputs:
+      - src/**/*.{ts,tsx}
+      - eslint.config.js

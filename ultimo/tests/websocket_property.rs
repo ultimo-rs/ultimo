@@ -7,7 +7,7 @@
 
 use bytes::{Bytes, BytesMut};
 use proptest::prelude::*;
-use ultimo::websocket::test_helpers::{Frame, Message, OpCode};
+use ultimo::websocket::test_helpers::{Frame, OpCode};
 
 /// Strategy for generating random payloads
 fn payload_strategy() -> impl Strategy<Value = Bytes> {
@@ -200,7 +200,6 @@ proptest! {
 
 #[cfg(test)]
 mod exhaustive_tests {
-    use super::*;
     use bytes::{Bytes, BytesMut};
     use ultimo::websocket::test_helpers::{Frame, OpCode};
 

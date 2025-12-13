@@ -134,8 +134,8 @@ impl<T> WebSocket<T> {
 /// WebSocket connection handler that manages the connection lifecycle
 pub(crate) struct ConnectionHandler {
     upgraded: Upgraded,
-    sender: mpsc::UnboundedSender<Message>,
     receiver: mpsc::UnboundedReceiver<Message>,
+    incoming_tx: mpsc::UnboundedSender<Message>,
     channel_manager: Arc<ChannelManager>,
     connection_id: uuid::Uuid,
 }
@@ -144,29 +144,33 @@ impl ConnectionHandler {
     pub fn new(
         upgraded: Upgraded,
         channel_manager: Arc<ChannelManager>,
-    ) -> (Self, mpsc::UnboundedSender<Message>) {
+    ) -> (Self, mpsc::UnboundedSender<Message>, mpsc::UnboundedReceiver<Message>) {
         let (tx, rx) = mpsc::unbounded_channel();
+        let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
         let connection_id = uuid::Uuid::new_v4();
 
         let handler = Self {
             upgraded,
-            sender: tx.clone(),
             receiver: rx,
+            incoming_tx,
             channel_manager,
             connection_id,
         };
 
-        (handler, tx)
+        (handler, tx, incoming_rx)
     }
 
     pub async fn handle(self) -> Result<(), std::io::Error> {
+        tracing::info!("ConnectionHandler::handle() started");
         let mut read_buf = BytesMut::with_capacity(8192);
         let io = TokioIo::new(self.upgraded);
         let (mut reader, mut writer) = tokio::io::split(io);
         let mut receiver = self.receiver;
         let channel_manager = self.channel_manager;
         let connection_id = self.connection_id;
+        let incoming_tx = self.incoming_tx;
 
+        tracing::info!("Entering main WebSocket loop");
         loop {
             tokio::select! {
                 // Read frames from client
@@ -176,9 +180,31 @@ impl ConnectionHandler {
                         Ok(_) => {
                             // Try to parse frames
                             while let Some(frame) = Frame::parse(&mut read_buf)? {
-                                if let Err(e) = handle_frame(frame, &mut writer).await {
-                                    tracing::error!("Error handling frame: {}", e);
-                                    break;
+                                match frame.opcode {
+                                    OpCode::Text | OpCode::Binary => {
+                                        // Convert frame to message and send to handler
+                                        if let Ok(message) = Message::from_frame(frame) {
+                                            let _ = incoming_tx.send(message);
+                                        }
+                                    }
+                                    OpCode::Close => {
+                                        // Send close frame to handler
+                                        if let Ok(message) = Message::from_frame(frame) {
+                                            let _ = incoming_tx.send(message);
+                                        }
+                                        // Echo close frame back
+                                        let close_frame = Frame::close(Some(1000), Some("Normal closure"));
+                                        let _ = writer.write_all(&close_frame.encode()).await;
+                                        break;
+                                    }
+                                    OpCode::Ping => {
+                                        // Respond with pong
+                                        let pong = Frame::pong(frame.payload);
+                                        let _ = writer.write_all(&pong.encode()).await;
+                                    }
+                                    OpCode::Pong | OpCode::Continue => {
+                                        // Ignore
+                                    }
                                 }
                             }
                         }
@@ -206,38 +232,5 @@ impl ConnectionHandler {
         channel_manager.disconnect(connection_id).await;
 
         Ok(())
-    }
-}
-
-async fn handle_frame(
-    frame: Frame,
-    writer: &mut tokio::io::WriteHalf<TokioIo<Upgraded>>,
-) -> Result<(), std::io::Error> {
-    match frame.opcode {
-        OpCode::Text | OpCode::Binary => {
-            // These are handled by the user's message handler
-            // We just validate here
-            Ok(())
-        }
-        OpCode::Close => {
-            // Echo close frame back
-            let close_frame = Frame::close(Some(1000), Some("Normal closure"));
-            writer.write_all(&close_frame.encode()).await?;
-            Ok(())
-        }
-        OpCode::Ping => {
-            // Respond with pong
-            let pong = Frame::pong(frame.payload);
-            writer.write_all(&pong.encode()).await?;
-            Ok(())
-        }
-        OpCode::Pong => {
-            // Ignore pong frames
-            Ok(())
-        }
-        OpCode::Continue => {
-            // TODO: Handle fragmented messages
-            Ok(())
-        }
     }
 }

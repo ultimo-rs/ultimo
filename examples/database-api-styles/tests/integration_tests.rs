@@ -202,10 +202,12 @@ fn test_database_operation_abstraction() {
             ]
         }
 
+        #[allow(dead_code)]
         pub fn get_user(id: i32) -> Option<User> {
             list_users().into_iter().find(|u| u.id == id)
         }
 
+        #[allow(dead_code)]
         pub fn create_user(name: String, email: String) -> User {
             User { id: 3, name, email }
         }
@@ -247,6 +249,7 @@ fn test_database_operation_abstraction() {
 fn test_api_style_comparison() {
     // Document the trade-offs between API styles
 
+    #[allow(dead_code)]
     struct ApiStyle {
         name: &'static str,
         endpoints: usize,
@@ -311,7 +314,7 @@ async fn test_rest_endpoint_integration() {
     assert_eq!(response.status(), 200);
 
     let users: Vec<User> = response.json().await.expect("Failed to parse JSON");
-    assert!(users.len() >= 0);
+    assert!(!users.is_empty(), "Expected at least some users");
 }
 
 #[tokio::test]
@@ -336,7 +339,7 @@ async fn test_json_rpc_endpoint_integration() {
     assert_eq!(response.status(), 200);
 
     let users: Vec<User> = response.json().await.expect("Failed to parse JSON");
-    assert!(users.len() >= 0);
+    assert!(!users.is_empty(), "Expected at least some users");
 }
 
 #[tokio::test]
@@ -355,5 +358,5 @@ async fn test_rpc_rest_endpoint_integration() {
     assert_eq!(response.status(), 200);
 
     let users: Vec<User> = response.json().await.expect("Failed to parse JSON");
-    assert!(users.len() >= 0);
+    assert!(!users.is_empty(), "Expected at least some users");
 }

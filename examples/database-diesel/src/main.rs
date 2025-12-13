@@ -83,8 +83,6 @@ async fn main() -> ultimo::Result<()> {
 
     // Health check endpoint
     app.get("/health", |ctx: Context| async move {
-        let db = ctx.database()?;
-
         // Test database connection by getting a connection from the pool
         let _conn = ctx.diesel::<diesel::PgConnection>()?;
 
