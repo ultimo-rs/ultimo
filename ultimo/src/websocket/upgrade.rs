@@ -142,7 +142,7 @@ where
                     let callback_task = tokio::spawn(async move {
                         // Call user callback first
                         callback(ws).await;
-                        
+
                         // Keep receiving messages to keep task alive
                         while incoming_rx.recv().await.is_some() {
                             // Messages handled by user's on_message callback
@@ -162,10 +162,7 @@ where
     }
 
     /// Set callback that receives incoming messages through a channel
-    pub fn on_upgrade_with_receiver<F, Fut>(
-        self,
-        callback: F,
-    ) -> HyperResponse<Full<Bytes>>
+    pub fn on_upgrade_with_receiver<F, Fut>(self, callback: F) -> HyperResponse<Full<Bytes>>
     where
         F: FnOnce(WebSocket<T>, mpsc::UnboundedReceiver<Message>) -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static,

@@ -10,13 +10,13 @@ impl WebSocketHandler for ChatHandler {
 
     async fn on_open(&self, ws: &WebSocket<Self::Data>) {
         println!("Client connected");
-        
+
         // Subscribe to chat channel for broadcasting
         if let Err(e) = ws.subscribe("chat").await {
             eprintln!("Error subscribing to chat: {}", e);
             return;
         }
-        
+
         // Send welcome message
         if let Err(e) = ws.send("Welcome to WebSocket Chat!").await {
             eprintln!("Error sending welcome message: {}", e);
@@ -27,7 +27,7 @@ impl WebSocketHandler for ChatHandler {
         match message {
             Message::Text(text) => {
                 println!("Received message: {}", text);
-                
+
                 // Broadcast to all subscribers (including sender)
                 if let Err(e) = ws.publish("chat", &text).await {
                     eprintln!("Error publishing message: {}", e);
@@ -38,7 +38,10 @@ impl WebSocketHandler for ChatHandler {
             }
             Message::Close(close_frame) => {
                 if let Some(frame) = close_frame {
-                    println!("Received close message (code: {}, reason: {})", frame.code, frame.reason);
+                    println!(
+                        "Received close message (code: {}, reason: {})",
+                        frame.code, frame.reason
+                    );
                 } else {
                     println!("Received close message");
                 }
@@ -64,7 +67,7 @@ async fn main() -> Result<()> {
     println!("🚀 WebSocket Chat server running on http://localhost:4000");
     println!("📡 WebSocket endpoint: ws://localhost:4000/ws");
     println!("💬 Open React app at http://localhost:5173");
-    
+
     // Start server
     app.listen("127.0.0.1:4000").await?;
 

@@ -11,8 +11,11 @@
 //! Run with: cargo run --example websocket-chat
 //! Then open: http://localhost:3000
 
-use ultimo::{prelude::*, websocket::{WebSocket, WebSocketHandler, Message}};
 use async_trait::async_trait;
+use ultimo::{
+    prelude::*,
+    websocket::{Message, WebSocket, WebSocketHandler},
+};
 
 /// Chat room handler
 struct ChatHandler {
@@ -25,7 +28,7 @@ impl WebSocketHandler for ChatHandler {
 
     async fn on_open(&self, ws: &WebSocket<Self::Data>) {
         tracing::info!("New client connected to {}", self.room);
-        
+
         // Subscribe to chat room
         if let Err(e) = ws.subscribe(self.room).await {
             tracing::error!("Failed to subscribe: {}", e);
@@ -34,7 +37,7 @@ impl WebSocketHandler for ChatHandler {
 
         // Send welcome message
         ws.send("Welcome to the chat room!").await.ok();
-        
+
         // Notify all users in the room (including this one)
         let join_msg = json!({"type": "join", "message": "A user joined the room"});
         ws.publish(self.room, &join_msg).await.ok();
@@ -44,7 +47,7 @@ impl WebSocketHandler for ChatHandler {
         match msg {
             Message::Text(text) => {
                 tracing::info!("Received message: {}", text);
-                
+
                 // Parse message
                 if let Ok(msg_data) = serde_json::from_str::<serde_json::Value>(&text) {
                     // Broadcast to all clients in the room
@@ -69,7 +72,7 @@ impl WebSocketHandler for ChatHandler {
 
     async fn on_close(&self, ws: &WebSocket<Self::Data>, code: u16, reason: &str) {
         tracing::info!("Client disconnected: {} - {}", code, reason);
-        
+
         // Notify others
         let leave_msg = json!({"type": "leave", "message": "A user left the room"});
         ws.publish(self.room, &leave_msg).await.ok();
@@ -91,7 +94,9 @@ async fn main() -> Result<()> {
 
     // Serve static HTML page
     app.get("/", |_ctx: Context| async move {
-        Ok(ultimo::response::helpers::html(include_str!("../index.html"))?)
+        Ok(ultimo::response::helpers::html(include_str!(
+            "../index.html"
+        ))?)
     });
 
     // WebSocket endpoint
@@ -99,6 +104,6 @@ async fn main() -> Result<()> {
 
     tracing::info!("Starting chat server on http://localhost:4000");
     tracing::info!("Open your browser and navigate to http://localhost:4000");
-    
+
     app.listen("127.0.0.1:4000").await
 }

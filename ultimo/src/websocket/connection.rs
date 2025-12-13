@@ -144,7 +144,11 @@ impl ConnectionHandler {
     pub fn new(
         upgraded: Upgraded,
         channel_manager: Arc<ChannelManager>,
-    ) -> (Self, mpsc::UnboundedSender<Message>, mpsc::UnboundedReceiver<Message>) {
+    ) -> (
+        Self,
+        mpsc::UnboundedSender<Message>,
+        mpsc::UnboundedReceiver<Message>,
+    ) {
         let (tx, rx) = mpsc::unbounded_channel();
         let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
         let connection_id = uuid::Uuid::new_v4();
