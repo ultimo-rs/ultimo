@@ -2,48 +2,66 @@
 
 # Core framework
 "area: core":
-  - ultimo/src/**/*
-  - ultimo/Cargo.toml
+  - changed-files:
+    - any-glob-to-any-file:
+      - ultimo/src/**/*
+      - ultimo/Cargo.toml
 
 # RPC system
 "area: rpc":
-  - ultimo/src/rpc.rs
-  - ultimo/src/rpc/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - ultimo/src/rpc.rs
+      - ultimo/src/rpc/**/*
 
 # OpenAPI
 "area: openapi":
-  - ultimo/src/openapi.rs
-  - ultimo/src/openapi/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - ultimo/src/openapi.rs
+      - ultimo/src/openapi/**/*
 
 # Database
 "area: database":
-  - examples/database-**/*
-  - ultimo/src/database.rs
+  - changed-files:
+    - any-glob-to-any-file:
+      - examples/database-**/*
+      - ultimo/src/database.rs
 
 # CLI
 "area: cli":
-  - ultimo-cli/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - ultimo-cli/**/*
 
 # Examples
 "area: examples":
-  - examples/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - examples/**/*
 
 # Documentation
 "area: docs":
-  - docs/**/*
-  - docs-site/**/*
-  - "*.md"
-  - website/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - docs/**/*
+      - docs-site/**/*
+      - "*.md"
+      - website/**/*
 
 # Tests
 "type: test":
-  - "**/*.test.rs"
-  - "**/tests/**/*"
-  - coverage-tool/**/*
+  - changed-files:
+    - any-glob-to-any-file:
+      - "**/*.test.rs"
+      - "**/tests/**/*"
+      - coverage-tool/**/*
 
 # CI/CD
 "type: chore":
-  - .github/workflows/**/*
-  - .github/**/*
-  - scripts/**/*
-  - Makefile
+  - changed-files:
+    - any-glob-to-any-file:
+      - .github/workflows/**/*
+      - .github/**/*
+      - scripts/**/*
+      - Makefile
