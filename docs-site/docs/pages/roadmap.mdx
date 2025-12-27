@@ -6,9 +6,9 @@ Upcoming features and improvements planned for Ultimo.
 
 ### Real-time Features
 
-- 🔌 **WebSocket Support** - Real-time bidirectional communication
 - 📡 **Server-Sent Events** - Streaming updates to clients
 - 🔄 **Long Polling** - Fallback for older browsers
+- 🔌 **WebSocket Phase 2** - Compression, backpressure, advanced features
 
 ### Performance & Streaming
 
@@ -69,9 +69,9 @@ Upcoming features and improvements planned for Ultimo.
 | **CLI Tools**             | ✅ Available     | 0.1.0   |
 | **CORS**                  | ✅ Available     | 0.1.0   |
 | **Rate Limiting**         | ✅ Available     | 0.1.0   |
-| Database Integration\*\*  | ✅ Available     | 0.1.0   |
-| Hot Reload                | 🔥 High Priority | 0.2.0   |
-| WebSockets                | 📋 Planned       | 0.3.0   |
+| **Database Integration**  | ✅ Available     | 0.1.0   |
+| **WebSocket (Phase 1)**   | ✅ Available     | 0.2.0   |
+| WebSocket Phase 2         | 🔥 High Priority | 0.3.0   |
 | Sessions                  | 📋 Planned       | 0.3.0   |
 | Test Client               | 📋 Planned       | 0.3.0   |
 | Static Files              | 📋 Planned       | 0.4.0   |
@@ -91,12 +91,21 @@ Upcoming features and improvements planned for Ultimo.
 - CLI tools
 - Database integration (SQLx & Diesel)
 
-### v0.2.0 (Next)
+### v0.2.0 (Current)
 
+- ✅ WebSocket Support (Phase 1) - Zero-dependency RFC 6455 implementation
+- ✅ Built-in Pub/Sub System - Topic-based messaging
+- ✅ Type-safe WebSocketHandler - Typed context data
+- ✅ Router Optimization - Radix Tree for O(L) lookups
+- ✅ 93 Comprehensive Tests - Production-ready
+- ✅ Two Working Examples - Simple chat + React chat
+
+### v0.3.0 (Next)
+
+- WebSocket Phase 2 (compression, backpressure, advanced features)
 - Enhanced error handling
 - Improved documentation
 - Performance optimizations
-- Hot reload with file watching and automatic restart
 
 ### v0.3.0
 

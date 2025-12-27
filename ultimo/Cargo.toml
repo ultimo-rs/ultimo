@@ -25,6 +25,12 @@ ts-rs = { workspace = true }
 tracing = { workspace = true }
 bytes = { workspace = true }
 
+# WebSocket support (zero additional dependencies - built on hyper)
+uuid = { version = "1.0", features = ["v4"] }
+sha1 = "0.10"
+base64 = "0.21"
+async-trait = "0.1"
+
 # Database support (optional)
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls"], optional = true }
 diesel = { version = "2.1", optional = true }
@@ -33,9 +39,20 @@ r2d2 = { version = "0.8", optional = true }
 [dev-dependencies]
 tokio-test = "0.4"
 tracing-subscriber = { workspace = true }
+proptest = "1.5"
+criterion = { version = "0.5", features = ["async_tokio"] }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+reqwest = { version = "0.12", features = ["json"] }
 
 [features]
 default = []
+
+# WebSocket feature (zero additional dependencies)
+websocket = []
+
+# Test helpers (for integration tests)
+test-helpers = []
 
 # Database features
 database = []
@@ -45,3 +62,8 @@ sqlx-sqlite = ["database", "sqlx", "sqlx/sqlite"]
 diesel-postgres = ["database", "diesel", "diesel/postgres", "diesel/r2d2", "r2d2"]
 diesel-mysql = ["database", "diesel", "diesel/mysql", "diesel/r2d2", "r2d2"]
 diesel-sqlite = ["database", "diesel", "diesel/sqlite", "diesel/r2d2", "r2d2"]
+
+[[bench]]
+name = "websocket_bench"
+harness = false
+required-features = ["websocket", "test-helpers"]

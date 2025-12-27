@@ -35,6 +35,7 @@
 - 🚀 **Automatic TypeScript Generation** - RPC endpoints automatically generate type-safe TypeScript clients
 - 📋 **OpenAPI Support** - Generate OpenAPI 3.0 specs from your RPC procedures for Swagger UI, Prism, and OpenAPI Generator
 - 🔄 **Hybrid RPC Modes** - Choose between REST (individual endpoints) or JSON-RPC (single endpoint) style
+- 🔌 **WebSocket Support** - Zero-dependency RFC 6455 compliant implementation with built-in pub/sub
 - 🔧 **CLI Tools** - Build, develop, and generate clients with the `ultimo` CLI
 - 🎯 **Hybrid API Design** - Support both REST endpoints and type-safe RPC procedures
 - 🛡️ **Type Safety Everywhere** - From Rust backend to TypeScript frontend
@@ -45,7 +46,6 @@
 
 See the [full roadmap](https://docs.ultimo.dev/roadmap) for upcoming features:
 
-- 🔌 WebSocket Support
 - 📡 Streaming & SSE
 - 🎫 Session Management
 - 🧪 Testing Utilities

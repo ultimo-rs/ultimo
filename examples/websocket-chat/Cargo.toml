@@ -1,0 +1,13 @@
+[package]
+name = "websocket-chat"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ultimo = { path = "../../ultimo", features = ["websocket"] }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+async-trait = "0.1"

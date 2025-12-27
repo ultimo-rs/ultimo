@@ -15,6 +15,7 @@ struct TestInput {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[allow(dead_code)]
 struct TestOutput {
     id: u64,
     name: String,

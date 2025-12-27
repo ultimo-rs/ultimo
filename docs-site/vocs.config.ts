@@ -56,6 +56,10 @@ export default defineConfig({
       text: "Features",
       items: [
         {
+          text: "WebSocket",
+          link: "/websocket",
+        },
+        {
           text: "TypeScript Clients",
           link: "/typescript",
         },

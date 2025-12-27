@@ -6,6 +6,7 @@ import {
   FileType,
   Globe,
   Layers,
+  Radio,
   ShieldCheck,
   Zap,
 } from "lucide-react";
@@ -50,6 +51,18 @@ const featureCategories = [
           "JSON-RPC procedures",
           "Mix and match freely",
           "Flexible configuration",
+        ],
+      },
+      {
+        title: "WebSocket Support",
+        description:
+          "Zero-dependency RFC 6455 compliant WebSocket with built-in pub/sub system.",
+        icon: Radio,
+        details: [
+          "Zero external dependencies",
+          "Built-in pub/sub",
+          "Type-safe handlers",
+          "Production-ready with 93 tests",
         ],
       },
     ],

@@ -24,6 +24,17 @@ use tracing::{error, info};
 #[cfg(feature = "database")]
 use crate::database::Database;
 
+#[cfg(feature = "websocket")]
+use crate::websocket::{ChannelManager, WebSocketHandler, WebSocketUpgrade};
+
+/// WebSocket handler function type
+#[cfg(feature = "websocket")]
+type BoxedWebSocketHandler = Arc<
+    dyn Fn(WebSocketUpgrade<()>) -> hyper::Response<http_body_util::Full<bytes::Bytes>>
+        + Send
+        + Sync,
+>;
+
 /// Main Ultimo application
 pub struct Ultimo {
     router: Router,
@@ -32,6 +43,12 @@ pub struct Ultimo {
 
     #[cfg(feature = "database")]
     database: Option<Database>,
+
+    #[cfg(feature = "websocket")]
+    websocket_routes: HashMap<String, BoxedWebSocketHandler>,
+
+    #[cfg(feature = "websocket")]
+    channel_manager: Arc<ChannelManager>,
 }
 
 impl Ultimo {
@@ -46,6 +63,10 @@ impl Ultimo {
             middleware: Vec::new(),
             #[cfg(feature = "database")]
             database: None,
+            #[cfg(feature = "websocket")]
+            websocket_routes: HashMap::new(),
+            #[cfg(feature = "websocket")]
+            channel_manager: Arc::new(ChannelManager::new()),
         };
 
         // Add X-Powered-By header by default (like Express.js)
@@ -66,6 +87,10 @@ impl Ultimo {
             middleware: Vec::new(),
             #[cfg(feature = "database")]
             database: None,
+            #[cfg(feature = "websocket")]
+            websocket_routes: HashMap::new(),
+            #[cfg(feature = "websocket")]
+            channel_manager: Arc::new(ChannelManager::new()),
         }
     }
 
@@ -122,6 +147,72 @@ impl Ultimo {
         self.add_route(Method::OPTIONS, path, handler)
     }
 
+    /// Add a WebSocket route
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use ultimo::prelude::*;
+    /// use ultimo::websocket::{WebSocketHandler, WebSocket, Message};
+    ///
+    /// struct ChatHandler;
+    ///
+    /// #[async_trait::async_trait]
+    /// impl WebSocketHandler for ChatHandler {
+    ///     type Data = ();
+    ///
+    ///     async fn on_open(&self, ws: &WebSocket<Self::Data>) {
+    ///         println!("Client connected!");
+    ///     }
+    ///
+    ///     async fn on_message(&self, ws: &WebSocket<Self::Data>, msg: Message) {
+    ///         if let Message::Text(text) = msg {
+    ///             ws.send(&text).await.ok();
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// # async {
+    /// let mut app = Ultimo::new();
+    /// app.websocket("/ws", ChatHandler);
+    /// # };
+    /// ```
+    #[cfg(feature = "websocket")]
+    pub fn websocket<H>(&mut self, path: &str, handler: H) -> &mut Self
+    where
+        H: WebSocketHandler<Data = ()> + 'static,
+    {
+        let handler = Arc::new(handler);
+        let channel_manager = self.channel_manager.clone();
+
+        let ws_handler = move |upgrade: WebSocketUpgrade<()>| {
+            let handler = handler.clone();
+            let upgrade = upgrade
+                .with_data(())
+                .with_channel_manager(channel_manager.clone());
+
+            upgrade.on_upgrade_with_receiver(move |ws, mut incoming_rx| {
+                let handler = handler.clone();
+                async move {
+                    // Call on_open
+                    handler.on_open(&ws).await;
+
+                    // Handle incoming messages
+                    while let Some(msg) = incoming_rx.recv().await {
+                        handler.on_message(&ws, msg).await;
+                    }
+
+                    // Call on_close when connection ends
+                    handler.on_close(&ws, 1000, "Connection closed").await;
+                }
+            })
+        };
+
+        self.websocket_routes
+            .insert(path.to_string(), Arc::new(ws_handler));
+        self
+    }
+
     /// Add a route with any method
     fn add_route(
         &mut self,
@@ -145,6 +236,24 @@ impl Ultimo {
     async fn handle_request(&self, req: HyperRequest<Incoming>) -> Response {
         let method_str = req.method().clone();
         let path = req.uri().path().to_string();
+
+        // Check for WebSocket upgrade request
+        #[cfg(feature = "websocket")]
+        {
+            if let Some(ws_handler) = self.websocket_routes.get(&path) {
+                // Check if this is a WebSocket upgrade request
+                if req
+                    .headers()
+                    .get(hyper::header::UPGRADE)
+                    .and_then(|v| v.to_str().ok())
+                    .map(|v| v.eq_ignore_ascii_case("websocket"))
+                    .unwrap_or(false)
+                {
+                    let upgrade = WebSocketUpgrade::new(req);
+                    return ws_handler(upgrade);
+                }
+            }
+        }
 
         // Parse method
         let method = match Method::from_hyper(&method_str) {
@@ -273,7 +382,11 @@ impl Ultimo {
                     async move { Ok::<_, hyper::Error>(app.handle_request(req).await) }
                 });
 
-                if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+                if let Err(err) = http1::Builder::new()
+                    .serve_connection(io, service)
+                    .with_upgrades() // Enable HTTP upgrades for WebSockets
+                    .await
+                {
                     error!("Connection error: {}", err);
                 }
             });
