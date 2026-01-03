@@ -7,6 +7,7 @@ use bytes::{Bytes, BytesMut};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use serde::Serialize;
+use std::io::{self, ErrorKind};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -150,6 +151,13 @@ pub(crate) struct ConnectionHandler {
     config: Arc<WebSocketConfig>,
 }
 
+/// Fragment accumulator for reassembling fragmented messages
+struct FragmentAccumulator {
+    opcode: Option<OpCode>,
+    fragments: BytesMut,
+    total_size: usize,
+}
+
 impl ConnectionHandler {
     pub fn new(
         upgraded: Upgraded,
@@ -186,6 +194,7 @@ impl ConnectionHandler {
         let connection_id = self.connection_id;
         let incoming_tx = self.incoming_tx;
         let config = self.config;
+        let mut fragment_accumulator: Option<FragmentAccumulator> = None;
 
         tracing::info!("Entering main WebSocket loop");
         loop {
@@ -199,9 +208,63 @@ impl ConnectionHandler {
                             while let Some(frame) = Frame::parse_with_limits(&mut read_buf, Some(config.max_frame_size))? {
                                 match frame.opcode {
                                     OpCode::Text | OpCode::Binary => {
-                                        // Convert frame to message with size limit and send to handler
-                                        if let Ok(message) = Message::from_frame_with_limit(frame, Some(config.max_message_size)) {
-                                            let _ = incoming_tx.send(message);
+                                        if frame.fin {
+                                            // Single unfragmented message
+                                            if let Ok(message) = Message::from_frame_with_limit(frame, Some(config.max_message_size)) {
+                                                let _ = incoming_tx.send(message);
+                                            }
+                                        } else {
+                                            // Start of fragmented message
+                                            if fragment_accumulator.is_some() {
+                                                return Err(io::Error::new(
+                                                    ErrorKind::InvalidData,
+                                                    "received new fragment before previous completed",
+                                                ));
+                                            }
+                                            fragment_accumulator = Some(FragmentAccumulator {
+                                                opcode: Some(frame.opcode),
+                                                fragments: BytesMut::from(frame.payload.as_ref()),
+                                                total_size: frame.payload.len(),
+                                            });
+                                        }
+                                    }
+                                    OpCode::Continue => {
+                                        // Continuation frame
+                                        let should_clear = if let Some(ref mut accumulator) = fragment_accumulator {
+                                            accumulator.total_size += frame.payload.len();
+
+                                            // Check message size limit
+                                            if accumulator.total_size > config.max_message_size {
+                                                return Err(io::Error::new(
+                                                    ErrorKind::InvalidData,
+                                                    format!("fragmented message size {} exceeds maximum {}",
+                                                        accumulator.total_size, config.max_message_size),
+                                                ));
+                                            }
+
+                                            accumulator.fragments.extend_from_slice(&frame.payload);
+                                            frame.fin // Clear accumulator if this is the final fragment
+                                        } else {
+                                            return Err(io::Error::new(
+                                                ErrorKind::InvalidData,
+                                                "received continuation frame without initial fragment",
+                                            ));
+                                        };
+
+                                        if should_clear {
+                                            // Take ownership and reassemble
+                                            if let Some(accumulator) = fragment_accumulator.take() {
+                                                let reassembled_frame = Frame {
+                                                    fin: true,
+                                                    opcode: accumulator.opcode.unwrap(),
+                                                    mask: None,
+                                                    payload: accumulator.fragments.freeze(),
+                                                };
+
+                                                if let Ok(message) = Message::from_frame(reassembled_frame) {
+                                                    let _ = incoming_tx.send(message);
+                                                }
+                                            }
                                         }
                                     }
                                     OpCode::Close => {
@@ -219,8 +282,8 @@ impl ConnectionHandler {
                                         let pong = Frame::pong(frame.payload);
                                         let _ = writer.write_all(&pong.encode()).await;
                                     }
-                                    OpCode::Pong | OpCode::Continue => {
-                                        // Ignore
+                                    OpCode::Pong => {
+                                        // Ignore pong frames
                                     }
                                 }
                             }
@@ -234,12 +297,15 @@ impl ConnectionHandler {
 
                 // Send frames to client
                 Some(message) = receiver.recv() => {
-                    let frame = message.to_frame();
-                    let encoded = frame.encode();
+                    // Use fragmentation if message exceeds max frame size
+                    let frames = message.to_fragmented_frames(config.max_frame_size);
 
-                    if let Err(e) = writer.write_all(&encoded).await {
-                        tracing::error!("Error writing to socket: {}", e);
-                        break;
+                    for frame in frames {
+                        let encoded = frame.encode();
+                        if let Err(e) = writer.write_all(&encoded).await {
+                            tracing::error!("Error writing to socket: {}", e);
+                            break;
+                        }
                     }
                 }
             }

@@ -336,6 +336,44 @@ impl Message {
             }
         }
     }
+
+    /// Convert message to fragmented frames with given chunk size
+    /// Returns a vector of frames that should be sent in sequence
+    pub fn to_fragmented_frames(&self, max_chunk_size: usize) -> Vec<Frame> {
+        let (opcode, payload) = match self {
+            Message::Text(text) => (OpCode::Text, Bytes::from(text.as_bytes().to_vec())),
+            Message::Binary(data) => (OpCode::Binary, data.clone()),
+            // Control frames cannot be fragmented
+            _ => return vec![self.to_frame()],
+        };
+
+        if payload.len() <= max_chunk_size {
+            // No need to fragment
+            return vec![self.to_frame()];
+        }
+
+        let mut frames = Vec::new();
+        let mut offset = 0;
+
+        while offset < payload.len() {
+            let end = (offset + max_chunk_size).min(payload.len());
+            let chunk = payload.slice(offset..end);
+            let is_first = offset == 0;
+            let is_last = end >= payload.len();
+
+            let frame = Frame {
+                fin: is_last,
+                opcode: if is_first { opcode } else { OpCode::Continue },
+                mask: None,
+                payload: chunk,
+            };
+
+            frames.push(frame);
+            offset = end;
+        }
+
+        frames
+    }
 }
 
 #[cfg(test)]
