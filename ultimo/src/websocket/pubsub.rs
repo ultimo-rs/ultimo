@@ -169,6 +169,25 @@ impl ChannelManager {
             .map(|s| s.len())
             .unwrap_or(0)
     }
+
+    /// Broadcast a message to all connected clients (for graceful shutdown)
+    pub async fn broadcast_all(&self, message: Message) -> usize {
+        let connections = self.connections.read().await;
+        let mut count = 0;
+
+        for sender in connections.values() {
+            if sender.send(message.clone()).is_ok() {
+                count += 1;
+            }
+        }
+
+        count
+    }
+
+    /// Get all connection IDs
+    pub async fn all_connection_ids(&self) -> Vec<Uuid> {
+        self.connections.read().await.keys().copied().collect()
+    }
 }
 
 impl Default for ChannelManager {

@@ -9,7 +9,7 @@ mod pubsub;
 mod upgrade;
 
 pub use connection::WebSocket;
-pub use frame::Message;
+pub use frame::{CloseFrame, Message};
 pub use pubsub::ChannelManager;
 pub use upgrade::WebSocketUpgrade;
 
@@ -17,7 +17,7 @@ pub use upgrade::WebSocketUpgrade;
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
     pub use super::connection::WebSocket;
-    pub use super::frame::{Frame, Message, OpCode};
+    pub use super::frame::{CloseFrame, Frame, Message, OpCode};
     pub use super::pubsub::ChannelManager;
     use std::net::SocketAddr;
     use std::sync::Arc;
