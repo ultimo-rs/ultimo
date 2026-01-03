@@ -115,11 +115,15 @@ async fn test_websocket_echo() {
         .await
         .unwrap();
 
-    // Receive echo
-    if let Some(Ok(TungsteniteMessage::Text(text))) = ws.next().await {
-        assert_eq!(text, "echo: hello");
-    } else {
-        panic!("Expected echo response");
+    // Receive echo with timeout
+    match tokio::time::timeout(tokio::time::Duration::from_millis(500), ws.next()).await {
+        Ok(Some(Ok(TungsteniteMessage::Text(text)))) => {
+            assert_eq!(text, "echo: hello");
+        }
+        Ok(None) => panic!("Connection closed unexpectedly"),
+        Ok(Some(Err(e))) => panic!("WebSocket error: {}", e),
+        Ok(Some(Ok(msg))) => panic!("Unexpected message type: {:?}", msg),
+        Err(_) => panic!("Timeout waiting for echo response"),
     }
 }
 

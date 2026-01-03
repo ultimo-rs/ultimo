@@ -2,14 +2,9 @@
 
 #[cfg(feature = "websocket")]
 mod websocket_shutdown_tests {
-    use bytes::Bytes;
     use std::sync::Arc;
     use ultimo::websocket::test_helpers::*;
     use ultimo::websocket::{ChannelManager, WebSocketConfig};
-
-    fn default_config() -> Arc<WebSocketConfig> {
-        Arc::new(WebSocketConfig::default())
-    }
 
     #[tokio::test]
     async fn test_close_frame_creation() {
@@ -41,7 +36,7 @@ mod websocket_shutdown_tests {
             channel_manager,
             uuid::Uuid::new_v4(),
             None,
-            default_config(),
+            Arc::new(WebSocketConfig::default()),
         );
 
         // Close the connection
@@ -69,7 +64,7 @@ mod websocket_shutdown_tests {
             channel_manager,
             uuid::Uuid::new_v4(),
             None,
-            default_config(),
+            Arc::new(WebSocketConfig::default()),
         );
 
         ws.close(None, None).await.unwrap();
@@ -202,7 +197,7 @@ mod websocket_shutdown_tests {
             channel_manager,
             uuid::Uuid::new_v4(),
             None,
-            default_config(),
+            Arc::new(WebSocketConfig::default()),
         );
 
         // Should be writable when channel is open
@@ -230,7 +225,7 @@ mod websocket_shutdown_tests {
             channel_manager,
             uuid::Uuid::new_v4(),
             None,
-            default_config(),
+            Arc::new(WebSocketConfig::default()),
         );
 
         ws.close(Some(1000), Some("")).await.unwrap();

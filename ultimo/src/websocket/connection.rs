@@ -147,16 +147,14 @@ impl<T> WebSocket<T> {
             Message::Close(None)
         };
 
-        self.sender
-            .try_send(close_frame)
-            .map_err(|e| match e {
-                mpsc::error::TrySendError::Full(_) => {
-                    std::io::Error::new(std::io::ErrorKind::WouldBlock, "write buffer full")
-                }
-                mpsc::error::TrySendError::Closed(_) => {
-                    std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed")
-                }
-            })
+        self.sender.try_send(close_frame).map_err(|e| match e {
+            mpsc::error::TrySendError::Full(_) => {
+                std::io::Error::new(std::io::ErrorKind::WouldBlock, "write buffer full")
+            }
+            mpsc::error::TrySendError::Closed(_) => {
+                std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed")
+            }
+        })
     }
 
     /// Get remote address
@@ -388,7 +386,7 @@ impl ConnectionHandler {
                 Some(message) = receiver.recv() => {
                     // Check if buffer was full before this recv
                     let is_now_draining = was_full;
-                    
+
                     // Use fragmentation if message exceeds max frame size
                     let frames = message.to_fragmented_frames(config.max_frame_size);
 

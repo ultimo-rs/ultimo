@@ -4,14 +4,8 @@
 mod websocket_ping_pong_tests {
     use bytes::Bytes;
     use std::sync::Arc;
-    use std::time::Duration;
-    use tokio::time::sleep;
     use ultimo::websocket::test_helpers::*;
     use ultimo::websocket::{ChannelManager, WebSocketConfig};
-
-    fn default_config() -> Arc<WebSocketConfig> {
-        Arc::new(WebSocketConfig::default())
-    }
 
     #[tokio::test]
     async fn test_config_with_ping_enabled() {

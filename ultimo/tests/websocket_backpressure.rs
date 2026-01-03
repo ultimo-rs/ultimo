@@ -18,14 +18,7 @@ mod websocket_backpressure_tests {
             ..Default::default()
         });
 
-        let ws = create_websocket(
-            (),
-            tx.clone(),
-            channel_manager,
-            conn_id,
-            None,
-            config,
-        );
+        let ws = create_websocket((), tx.clone(), channel_manager, conn_id, None, config);
 
         // Fill the buffer
         assert!(ws.send("message1").await.is_ok());
@@ -53,14 +46,7 @@ mod websocket_backpressure_tests {
             ..Default::default()
         });
 
-        let ws = create_websocket(
-            (),
-            tx,
-            channel_manager,
-            conn_id,
-            None,
-            config,
-        );
+        let ws = create_websocket((), tx, channel_manager, conn_id, None, config);
 
         // Check initial capacity
         assert_eq!(ws.max_capacity(), 10);
@@ -86,14 +72,7 @@ mod websocket_backpressure_tests {
             ..Default::default()
         });
 
-        let ws = create_websocket(
-            (),
-            tx,
-            channel_manager,
-            conn_id,
-            None,
-            config,
-        );
+        let ws = create_websocket((), tx, channel_manager, conn_id, None, config);
 
         // Fill buffer with binary message
         assert!(ws.send_binary(vec![1, 2, 3, 4]).await.is_ok());
@@ -113,7 +92,7 @@ mod websocket_backpressure_tests {
     #[tokio::test]
     async fn test_publish_skips_backpressured_connections() {
         let manager = ChannelManager::new();
-        
+
         // Connection 1: normal buffer
         let (tx1, mut rx1) = mpsc::channel(10);
         let conn1 = uuid::Uuid::new_v4();
@@ -122,7 +101,7 @@ mod websocket_backpressure_tests {
         // Connection 2: full buffer (size 1)
         let (tx2, _rx2) = mpsc::channel(1);
         let conn2 = uuid::Uuid::new_v4();
-        
+
         // Fill conn2's buffer
         tx2.try_send(Message::Text("blocking".to_string())).unwrap();
         manager.subscribe(conn2, "topic", tx2).await.unwrap();
@@ -154,7 +133,10 @@ mod websocket_backpressure_tests {
         // Add connections with different buffer states
         let (tx1, mut rx1) = mpsc::channel(10);
         let conn1 = uuid::Uuid::new_v4();
-        manager.subscribe(conn1, "topic1", tx1.clone()).await.unwrap();
+        manager
+            .subscribe(conn1, "topic1", tx1.clone())
+            .await
+            .unwrap();
 
         let (tx2, _rx2) = mpsc::channel(1);
         let conn2 = uuid::Uuid::new_v4();
@@ -163,7 +145,9 @@ mod websocket_backpressure_tests {
         manager.subscribe(conn2, "topic2", tx2).await.unwrap();
 
         // Broadcast to all
-        let count = manager.broadcast_all(Message::Text("broadcast".to_string())).await;
+        let count = manager
+            .broadcast_all(Message::Text("broadcast".to_string()))
+            .await;
 
         // Only conn1 should receive (conn2 backpressured)
         assert_eq!(count, 1);
@@ -186,14 +170,7 @@ mod websocket_backpressure_tests {
             ..Default::default()
         });
 
-        let ws = create_websocket(
-            (),
-            tx,
-            channel_manager,
-            conn_id,
-            None,
-            config,
-        );
+        let ws = create_websocket((), tx, channel_manager, conn_id, None, config);
 
         // Fill buffer
         assert!(ws.send("message").await.is_ok());
@@ -217,14 +194,7 @@ mod websocket_backpressure_tests {
         let conn_id = uuid::Uuid::new_v4();
         let config = Arc::new(ultimo::websocket::WebSocketConfig::default());
 
-        let ws = create_websocket(
-            (),
-            tx.clone(),
-            channel_manager,
-            conn_id,
-            None,
-            config,
-        );
+        let ws = create_websocket((), tx.clone(), channel_manager, conn_id, None, config);
 
         // Should be writable initially
         assert!(ws.is_writable());
@@ -247,14 +217,7 @@ mod websocket_backpressure_tests {
             ..Default::default()
         });
 
-        let ws = create_websocket(
-            (),
-            tx,
-            channel_manager,
-            conn_id,
-            None,
-            config,
-        );
+        let ws = create_websocket((), tx, channel_manager, conn_id, None, config);
 
         // Fill buffer
         ws.send("msg1").await.unwrap();
@@ -314,21 +277,20 @@ mod websocket_backpressure_tests {
             ..Default::default()
         });
 
-        let ws = create_websocket(
-            (),
-            tx,
-            channel_manager,
-            conn_id,
-            None,
-            config,
-        );
+        let ws = create_websocket((), tx, channel_manager, conn_id, None, config);
 
         // Fill buffer
-        let data1 = TestData { message: "first".to_string(), count: 1 };
+        let data1 = TestData {
+            message: "first".to_string(),
+            count: 1,
+        };
         assert!(ws.send_json(&data1).await.is_ok());
 
         // Next send should fail
-        let data2 = TestData { message: "second".to_string(), count: 2 };
+        let data2 = TestData {
+            message: "second".to_string(),
+            count: 2,
+        };
         let result = ws.send_json(&data2).await;
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
@@ -337,7 +299,10 @@ mod websocket_backpressure_tests {
         let _ = rx.recv().await;
 
         // Should work now
-        let data3 = TestData { message: "third".to_string(), count: 3 };
+        let data3 = TestData {
+            message: "third".to_string(),
+            count: 3,
+        };
         assert!(ws.send_json(&data3).await.is_ok());
     }
 }

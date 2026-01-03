@@ -171,7 +171,13 @@ where
     /// Set callback that receives incoming messages through a channel
     pub fn on_upgrade_with_receiver<F, Fut>(self, callback: F) -> HyperResponse<Full<Bytes>>
     where
-        F: FnOnce(WebSocket<T>, mpsc::UnboundedReceiver<Message>, mpsc::UnboundedReceiver<()>) -> Fut + Send + 'static,
+        F: FnOnce(
+                WebSocket<T>,
+                mpsc::UnboundedReceiver<Message>,
+                mpsc::UnboundedReceiver<()>,
+            ) -> Fut
+            + Send
+            + 'static,
         Fut: Future<Output = ()> + Send + 'static,
         T: Send + 'static,
     {

@@ -98,7 +98,10 @@ impl ChannelManager {
                     Ok(_) => sent_count += 1,
                     Err(mpsc::error::TrySendError::Full(_)) => {
                         // Connection is backpressured, skip but don't disconnect
-                        tracing::warn!("Connection {} backpressured, skipping message", connection_id);
+                        tracing::warn!(
+                            "Connection {} backpressured, skipping message",
+                            connection_id
+                        );
                     }
                     Err(mpsc::error::TrySendError::Closed(_)) => {
                         // Connection closed, mark for removal
