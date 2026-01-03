@@ -10,8 +10,10 @@ use serde::Serialize;
 use std::io::{self, ErrorKind};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
+use tokio::time;
 
 /// WebSocket connection with typed context data
 pub struct WebSocket<T = ()> {
@@ -196,9 +198,43 @@ impl ConnectionHandler {
         let config = self.config;
         let mut fragment_accumulator: Option<FragmentAccumulator> = None;
 
+        // Setup ping interval if configured
+        let mut ping_interval = if let Some(interval_secs) = config.ping_interval {
+            Some(time::interval(Duration::from_secs(interval_secs)))
+        } else {
+            None
+        };
+
+        let mut last_pong_received = Instant::now();
+        let ping_timeout = Duration::from_secs(config.ping_timeout);
+
         tracing::info!("Entering main WebSocket loop");
         loop {
+            // Check for ping timeout
+            if config.ping_interval.is_some() && last_pong_received.elapsed() > ping_timeout {
+                tracing::warn!("Ping timeout - closing connection");
+                let close_frame = Frame::close(Some(1001), Some("Ping timeout"));
+                let _ = writer.write_all(&close_frame.encode()).await;
+                break;
+            }
+
             tokio::select! {
+                // Ping interval
+                _ = async {
+                    match &mut ping_interval {
+                        Some(interval) => interval.tick().await,
+                        None => std::future::pending().await,
+                    }
+                } => {
+                    // Send ping frame
+                    let ping = Frame::ping(Bytes::new());
+                    if let Err(e) = writer.write_all(&ping.encode()).await {
+                        tracing::error!("Error sending ping: {}", e);
+                        break;
+                    }
+                    tracing::trace!("Sent ping frame");
+                }
+
                 // Read frames from client
                 result = reader.read_buf(&mut read_buf) => {
                     match result {
@@ -283,7 +319,9 @@ impl ConnectionHandler {
                                         let _ = writer.write_all(&pong.encode()).await;
                                     }
                                     OpCode::Pong => {
-                                        // Ignore pong frames
+                                        // Update last pong received time
+                                        last_pong_received = Instant::now();
+                                        tracing::trace!("Received pong frame");
                                     }
                                 }
                             }
