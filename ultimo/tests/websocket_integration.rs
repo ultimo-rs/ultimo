@@ -14,7 +14,7 @@ mod websocket_tests {
     #[tokio::test]
     async fn test_websocket_send_receive() {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
 
         let ws: WebSocket<()> = create_websocket(
             (),
@@ -53,7 +53,7 @@ mod websocket_tests {
         }
 
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
 
         let ws: WebSocket<()> = create_websocket(
             (),
@@ -90,7 +90,7 @@ mod websocket_tests {
         }
 
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, _rx) = tokio::sync::mpsc::channel(1000);
 
         let user_data = UserData {
             user_id: "user123".to_string(),
@@ -114,9 +114,9 @@ mod websocket_tests {
     async fn test_pubsub_multiple_subscribers() {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
 
-        let (tx1, mut rx1) = tokio::sync::mpsc::unbounded_channel();
-        let (tx2, mut rx2) = tokio::sync::mpsc::unbounded_channel();
-        let (tx3, mut rx3) = tokio::sync::mpsc::unbounded_channel();
+        let (tx1, mut rx1) = tokio::sync::mpsc::channel(1000);
+        let (tx2, mut rx2) = tokio::sync::mpsc::channel(1000);
+        let (tx3, mut rx3) = tokio::sync::mpsc::channel(1000);
 
         let ws1: WebSocket<()> = create_websocket(
             (),
@@ -185,7 +185,7 @@ mod websocket_tests {
     #[tokio::test]
     async fn test_pubsub_unsubscribe() {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, _rx) = tokio::sync::mpsc::channel(1000);
 
         let ws: WebSocket<()> = create_websocket(
             (),
@@ -212,8 +212,8 @@ mod websocket_tests {
     async fn test_pubsub_isolated_topics() {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
 
-        let (tx1, mut rx1) = tokio::sync::mpsc::unbounded_channel();
-        let (tx2, mut rx2) = tokio::sync::mpsc::unbounded_channel();
+        let (tx1, mut rx1) = tokio::sync::mpsc::channel(1000);
+        let (tx2, mut rx2) = tokio::sync::mpsc::channel(1000);
 
         let ws1: WebSocket<()> = create_websocket(
             (),
@@ -258,8 +258,8 @@ mod websocket_tests {
 
         assert_eq!(channel_manager.connection_count().await, 0);
 
-        let (tx1, _rx1) = tokio::sync::mpsc::unbounded_channel();
-        let (tx2, _rx2) = tokio::sync::mpsc::unbounded_channel();
+        let (tx1, _rx1) = tokio::sync::mpsc::channel(1000);
+        let (tx2, _rx2) = tokio::sync::mpsc::channel(1000);
 
         let id1 = uuid::Uuid::new_v4();
         let id2 = uuid::Uuid::new_v4();
@@ -279,7 +279,7 @@ mod websocket_tests {
     #[tokio::test]
     async fn test_websocket_close() {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
 
         let ws: WebSocket<()> = create_websocket(
             (),
@@ -305,7 +305,7 @@ mod websocket_tests {
     #[tokio::test]
     async fn test_websocket_is_writable() {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, rx) = tokio::sync::mpsc::channel(1000);
 
         let ws: WebSocket<()> = create_websocket(
             (),

@@ -46,7 +46,7 @@ mod websocket_config_tests {
     #[tokio::test]
     async fn test_websocket_with_custom_config() {
         let channel_manager = Arc::new(ChannelManager::new());
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, _rx) = tokio::sync::mpsc::channel(1000);
 
         let config = Arc::new(WebSocketConfig {
             max_message_size: 1024,

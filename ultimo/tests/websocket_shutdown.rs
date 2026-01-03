@@ -33,7 +33,7 @@ mod websocket_shutdown_tests {
     #[tokio::test]
     async fn test_websocket_close_method() {
         let channel_manager = Arc::new(ChannelManager::new());
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
 
         let ws = create_websocket(
             (),
@@ -61,7 +61,7 @@ mod websocket_shutdown_tests {
     #[tokio::test]
     async fn test_close_without_code() {
         let channel_manager = Arc::new(ChannelManager::new());
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
 
         let ws = create_websocket(
             (),
@@ -134,9 +134,9 @@ mod websocket_shutdown_tests {
     async fn test_broadcast_all_connections() {
         let manager = Arc::new(ChannelManager::new());
 
-        let (tx1, mut rx1) = tokio::sync::mpsc::unbounded_channel();
-        let (tx2, mut rx2) = tokio::sync::mpsc::unbounded_channel();
-        let (tx3, mut rx3) = tokio::sync::mpsc::unbounded_channel();
+        let (tx1, mut rx1) = tokio::sync::mpsc::channel(1000);
+        let (tx2, mut rx2) = tokio::sync::mpsc::channel(1000);
+        let (tx3, mut rx3) = tokio::sync::mpsc::channel(1000);
 
         let conn1 = uuid::Uuid::new_v4();
         let conn2 = uuid::Uuid::new_v4();
@@ -176,8 +176,8 @@ mod websocket_shutdown_tests {
     async fn test_all_connection_ids() {
         let manager = Arc::new(ChannelManager::new());
 
-        let (tx1, _rx1) = tokio::sync::mpsc::unbounded_channel();
-        let (tx2, _rx2) = tokio::sync::mpsc::unbounded_channel();
+        let (tx1, _rx1) = tokio::sync::mpsc::channel(1000);
+        let (tx2, _rx2) = tokio::sync::mpsc::channel(1000);
 
         let conn1 = uuid::Uuid::new_v4();
         let conn2 = uuid::Uuid::new_v4();
@@ -194,7 +194,7 @@ mod websocket_shutdown_tests {
     #[tokio::test]
     async fn test_connection_writable_check() {
         let channel_manager = Arc::new(ChannelManager::new());
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, rx) = tokio::sync::mpsc::channel(1000);
 
         let ws = create_websocket(
             (),
@@ -222,7 +222,7 @@ mod websocket_shutdown_tests {
     #[tokio::test]
     async fn test_empty_close_reason() {
         let channel_manager = Arc::new(ChannelManager::new());
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
 
         let ws = create_websocket(
             (),

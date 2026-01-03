@@ -124,7 +124,7 @@ where
         tokio::spawn(async move {
             match hyper::upgrade::on(self.request).await {
                 Ok(upgraded) => {
-                    let (handler, sender, mut incoming_rx) =
+                    let (handler, sender, mut incoming_rx, mut _drain_rx) =
                         ConnectionHandler::new(upgraded, channel_manager.clone(), config.clone());
                     let connection_id = uuid::Uuid::new_v4();
                     let remote_addr = None; // TODO: Get from request
@@ -171,7 +171,7 @@ where
     /// Set callback that receives incoming messages through a channel
     pub fn on_upgrade_with_receiver<F, Fut>(self, callback: F) -> HyperResponse<Full<Bytes>>
     where
-        F: FnOnce(WebSocket<T>, mpsc::UnboundedReceiver<Message>) -> Fut + Send + 'static,
+        F: FnOnce(WebSocket<T>, mpsc::UnboundedReceiver<Message>, mpsc::UnboundedReceiver<()>) -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static,
         T: Send + 'static,
     {
@@ -219,7 +219,7 @@ where
         tokio::spawn(async move {
             match hyper::upgrade::on(self.request).await {
                 Ok(upgraded) => {
-                    let (handler, sender, incoming_rx) =
+                    let (handler, sender, incoming_rx, drain_rx) =
                         ConnectionHandler::new(upgraded, channel_manager.clone(), config.clone());
                     let connection_id = uuid::Uuid::new_v4();
                     let remote_addr = None; // TODO: Get from request
@@ -242,7 +242,7 @@ where
 
                     // Spawn user callback with message receiver
                     let callback_task = tokio::spawn(async move {
-                        callback(ws, incoming_rx).await;
+                        callback(ws, incoming_rx, drain_rx).await;
                     });
 
                     // Wait for both tasks

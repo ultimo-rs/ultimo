@@ -18,7 +18,7 @@ use tokio::time;
 /// WebSocket connection with typed context data
 pub struct WebSocket<T = ()> {
     data: T,
-    sender: mpsc::UnboundedSender<Message>,
+    sender: mpsc::Sender<Message>,
     channel_manager: Arc<ChannelManager>,
     connection_id: uuid::Uuid,
     remote_addr: Option<SocketAddr>,
@@ -29,7 +29,7 @@ impl<T> WebSocket<T> {
     /// Create a new WebSocket connection
     pub(crate) fn new(
         data: T,
-        sender: mpsc::UnboundedSender<Message>,
+        sender: mpsc::Sender<Message>,
         channel_manager: Arc<ChannelManager>,
         connection_id: uuid::Uuid,
         remote_addr: Option<SocketAddr>,
@@ -61,17 +61,37 @@ impl<T> WebSocket<T> {
     }
 
     /// Send text message
+    ///
+    /// Returns `Err` if the connection is closed or the write buffer is full.
+    /// When the buffer is full, consider waiting for `on_drain` callback before retrying.
     pub async fn send(&self, text: impl Into<String>) -> Result<(), std::io::Error> {
         self.sender
-            .send(Message::Text(text.into()))
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed"))
+            .try_send(Message::Text(text.into()))
+            .map_err(|e| match e {
+                mpsc::error::TrySendError::Full(_) => {
+                    std::io::Error::new(std::io::ErrorKind::WouldBlock, "write buffer full")
+                }
+                mpsc::error::TrySendError::Closed(_) => {
+                    std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed")
+                }
+            })
     }
 
     /// Send binary message
+    ///
+    /// Returns `Err` if the connection is closed or the write buffer is full.
+    /// When the buffer is full, consider waiting for `on_drain` callback before retrying.
     pub async fn send_binary(&self, data: impl Into<Bytes>) -> Result<(), std::io::Error> {
         self.sender
-            .send(Message::Binary(data.into()))
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed"))
+            .try_send(Message::Binary(data.into()))
+            .map_err(|e| match e {
+                mpsc::error::TrySendError::Full(_) => {
+                    std::io::Error::new(std::io::ErrorKind::WouldBlock, "write buffer full")
+                }
+                mpsc::error::TrySendError::Closed(_) => {
+                    std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed")
+                }
+            })
     }
 
     /// Send JSON message
@@ -128,8 +148,15 @@ impl<T> WebSocket<T> {
         };
 
         self.sender
-            .send(close_frame)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed"))
+            .try_send(close_frame)
+            .map_err(|e| match e {
+                mpsc::error::TrySendError::Full(_) => {
+                    std::io::Error::new(std::io::ErrorKind::WouldBlock, "write buffer full")
+                }
+                mpsc::error::TrySendError::Closed(_) => {
+                    std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed")
+                }
+            })
     }
 
     /// Get remote address
@@ -141,13 +168,29 @@ impl<T> WebSocket<T> {
     pub fn is_writable(&self) -> bool {
         !self.sender.is_closed()
     }
+
+    /// Get maximum capacity of the write queue
+    pub fn max_capacity(&self) -> usize {
+        self.sender.max_capacity()
+    }
+
+    /// Get current number of messages in the write queue
+    pub fn capacity(&self) -> usize {
+        self.sender.capacity()
+    }
+
+    /// Check if the write buffer has available capacity
+    pub fn has_capacity(&self) -> bool {
+        self.sender.capacity() > 0
+    }
 }
 
 /// WebSocket connection handler that manages the connection lifecycle
 pub(crate) struct ConnectionHandler {
     upgraded: Upgraded,
-    receiver: mpsc::UnboundedReceiver<Message>,
+    receiver: mpsc::Receiver<Message>,
     incoming_tx: mpsc::UnboundedSender<Message>,
+    drain_tx: mpsc::UnboundedSender<()>,
     channel_manager: Arc<ChannelManager>,
     connection_id: uuid::Uuid,
     config: Arc<WebSocketConfig>,
@@ -167,23 +210,29 @@ impl ConnectionHandler {
         config: Arc<WebSocketConfig>,
     ) -> (
         Self,
-        mpsc::UnboundedSender<Message>,
+        mpsc::Sender<Message>,
         mpsc::UnboundedReceiver<Message>,
+        mpsc::UnboundedReceiver<()>,
     ) {
-        let (tx, rx) = mpsc::unbounded_channel();
+        // Use bounded channel for outgoing messages (backpressure)
+        let (tx, rx) = mpsc::channel(config.max_write_queue_size);
+        // Use unbounded channel for incoming messages (from client)
         let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
+        // Use unbounded channel for drain notifications
+        let (drain_tx, drain_rx) = mpsc::unbounded_channel();
         let connection_id = uuid::Uuid::new_v4();
 
         let handler = Self {
             upgraded,
             receiver: rx,
             incoming_tx,
+            drain_tx,
             channel_manager,
             connection_id,
             config,
         };
 
-        (handler, tx, incoming_rx)
+        (handler, tx, incoming_rx, drain_rx)
     }
 
     pub async fn handle(self) -> Result<(), std::io::Error> {
@@ -195,15 +244,17 @@ impl ConnectionHandler {
         let channel_manager = self.channel_manager;
         let connection_id = self.connection_id;
         let incoming_tx = self.incoming_tx;
+        let drain_tx = self.drain_tx;
         let config = self.config;
         let mut fragment_accumulator: Option<FragmentAccumulator> = None;
 
+        // Track write buffer state for backpressure
+        let mut was_full = false;
+
         // Setup ping interval if configured
-        let mut ping_interval = if let Some(interval_secs) = config.ping_interval {
-            Some(time::interval(Duration::from_secs(interval_secs)))
-        } else {
-            None
-        };
+        let mut ping_interval = config
+            .ping_interval
+            .map(|interval_secs| time::interval(Duration::from_secs(interval_secs)));
 
         let mut last_pong_received = Instant::now();
         let ping_timeout = Duration::from_secs(config.ping_timeout);
@@ -335,6 +386,9 @@ impl ConnectionHandler {
 
                 // Send frames to client
                 Some(message) = receiver.recv() => {
+                    // Check if buffer was full before this recv
+                    let is_now_draining = was_full;
+                    
                     // Use fragmentation if message exceeds max frame size
                     let frames = message.to_fragmented_frames(config.max_frame_size);
 
@@ -344,6 +398,16 @@ impl ConnectionHandler {
                             tracing::error!("Error writing to socket: {}", e);
                             break;
                         }
+                    }
+
+                    // Update full state - buffer is full if no capacity remains
+                    let has_capacity = !receiver.is_empty() || receiver.is_closed();
+                    was_full = !has_capacity;
+
+                    // Notify on_drain if buffer was full and now has drained
+                    if is_now_draining && has_capacity {
+                        let _ = drain_tx.send(());
+                        tracing::trace!("Write buffer drained, notified handler");
                     }
                 }
             }

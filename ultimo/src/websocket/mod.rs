@@ -26,7 +26,7 @@ pub mod test_helpers {
     /// Test helper to create WebSocket instances
     pub fn create_websocket<T>(
         data: T,
-        sender: mpsc::UnboundedSender<Message>,
+        sender: mpsc::Sender<Message>,
         channel_manager: Arc<ChannelManager>,
         connection_id: uuid::Uuid,
         remote_addr: Option<SocketAddr>,

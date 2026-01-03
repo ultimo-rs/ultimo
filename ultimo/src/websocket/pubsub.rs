@@ -11,7 +11,7 @@ pub struct ChannelManager {
     /// Maps topic -> set of connection IDs
     subscriptions: Arc<RwLock<HashMap<String, HashSet<Uuid>>>>,
     /// Maps connection ID -> sender
-    connections: Arc<RwLock<HashMap<Uuid, mpsc::UnboundedSender<Message>>>>,
+    connections: Arc<RwLock<HashMap<Uuid, mpsc::Sender<Message>>>>,
 }
 
 impl ChannelManager {
@@ -28,7 +28,7 @@ impl ChannelManager {
         &self,
         connection_id: Uuid,
         topic: &str,
-        sender: mpsc::UnboundedSender<Message>,
+        sender: mpsc::Sender<Message>,
     ) -> Result<(), std::io::Error> {
         // Register connection if not already registered
         {
@@ -93,11 +93,17 @@ impl ChannelManager {
 
         for connection_id in subscribers {
             if let Some(sender) = connections.get(connection_id) {
-                if sender.send(message.clone()).is_ok() {
-                    sent_count += 1;
-                } else {
-                    // Mark for removal if send failed
-                    failed_connections.push(*connection_id);
+                // Use try_send to avoid blocking on backpressure
+                match sender.try_send(message.clone()) {
+                    Ok(_) => sent_count += 1,
+                    Err(mpsc::error::TrySendError::Full(_)) => {
+                        // Connection is backpressured, skip but don't disconnect
+                        tracing::warn!("Connection {} backpressured, skipping message", connection_id);
+                    }
+                    Err(mpsc::error::TrySendError::Closed(_)) => {
+                        // Connection closed, mark for removal
+                        failed_connections.push(*connection_id);
+                    }
                 }
             }
         }
@@ -176,7 +182,8 @@ impl ChannelManager {
         let mut count = 0;
 
         for sender in connections.values() {
-            if sender.send(message.clone()).is_ok() {
+            // Use try_send to avoid blocking
+            if sender.try_send(message.clone()).is_ok() {
                 count += 1;
             }
         }
@@ -203,7 +210,7 @@ mod tests {
     #[tokio::test]
     async fn test_subscribe_unsubscribe() {
         let manager = ChannelManager::new();
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::channel(100);
         let conn_id = Uuid::new_v4();
 
         manager
@@ -219,8 +226,8 @@ mod tests {
     #[tokio::test]
     async fn test_publish() {
         let manager = ChannelManager::new();
-        let (tx1, mut rx1) = mpsc::unbounded_channel();
-        let (tx2, mut rx2) = mpsc::unbounded_channel();
+        let (tx1, mut rx1) = mpsc::channel(100);
+        let (tx2, mut rx2) = mpsc::channel(100);
 
         let conn1 = Uuid::new_v4();
         let conn2 = Uuid::new_v4();
@@ -250,7 +257,7 @@ mod tests {
     #[tokio::test]
     async fn test_disconnect_cleanup() {
         let manager = ChannelManager::new();
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::channel(100);
         let conn_id = Uuid::new_v4();
 
         manager

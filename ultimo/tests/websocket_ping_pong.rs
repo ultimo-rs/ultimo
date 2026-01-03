@@ -186,7 +186,7 @@ mod websocket_ping_pong_tests {
     #[tokio::test]
     async fn test_websocket_with_ping_config() {
         let channel_manager = Arc::new(ChannelManager::new());
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, _rx) = tokio::sync::mpsc::channel(1000);
 
         let config = Arc::new(WebSocketConfig {
             ping_interval: Some(2), // 2 seconds
