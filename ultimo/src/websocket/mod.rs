@@ -30,9 +30,17 @@ pub mod test_helpers {
         channel_manager: Arc<ChannelManager>,
         connection_id: uuid::Uuid,
         remote_addr: Option<SocketAddr>,
+        config: Arc<super::WebSocketConfig>,
     ) -> WebSocket<T> {
         // Call the private constructor directly since we're in the same module
-        super::connection::WebSocket::new(data, sender, channel_manager, connection_id, remote_addr)
+        super::connection::WebSocket::new(
+            data,
+            sender,
+            channel_manager,
+            connection_id,
+            remote_addr,
+            config,
+        )
     }
 }
 

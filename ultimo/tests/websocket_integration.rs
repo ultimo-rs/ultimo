@@ -3,16 +3,27 @@
 #[cfg(feature = "websocket")]
 mod websocket_tests {
     use bytes::Bytes;
+    use std::sync::Arc;
     use ultimo::websocket::test_helpers::*;
-    use ultimo::websocket::{ChannelManager, Message};
+    use ultimo::websocket::{ChannelManager, Message, WebSocketConfig};
+
+    fn default_config() -> Arc<WebSocketConfig> {
+        Arc::new(WebSocketConfig::default())
+    }
 
     #[tokio::test]
     async fn test_websocket_send_receive() {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-        let ws: WebSocket<()> =
-            create_websocket((), tx, channel_manager, uuid::Uuid::new_v4(), None);
+        let ws: WebSocket<()> = create_websocket(
+            (),
+            tx,
+            channel_manager,
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
         // Send text message
         ws.send("Hello").await.unwrap();
@@ -44,8 +55,14 @@ mod websocket_tests {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-        let ws: WebSocket<()> =
-            create_websocket((), tx, channel_manager, uuid::Uuid::new_v4(), None);
+        let ws: WebSocket<()> = create_websocket(
+            (),
+            tx,
+            channel_manager,
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
         let test_msg = TestMessage {
             text: "test".to_string(),
@@ -80,7 +97,14 @@ mod websocket_tests {
             room: "general".to_string(),
         };
 
-        let ws = create_websocket(user_data, tx, channel_manager, uuid::Uuid::new_v4(), None);
+        let ws = create_websocket(
+            user_data,
+            tx,
+            channel_manager,
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
         assert_eq!(ws.data().user_id, "user123");
         assert_eq!(ws.data().room, "general");
@@ -94,14 +118,32 @@ mod websocket_tests {
         let (tx2, mut rx2) = tokio::sync::mpsc::unbounded_channel();
         let (tx3, mut rx3) = tokio::sync::mpsc::unbounded_channel();
 
-        let ws1: WebSocket<()> =
-            create_websocket((), tx1, channel_manager.clone(), uuid::Uuid::new_v4(), None);
+        let ws1: WebSocket<()> = create_websocket(
+            (),
+            tx1,
+            channel_manager.clone(),
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
-        let ws2: WebSocket<()> =
-            create_websocket((), tx2, channel_manager.clone(), uuid::Uuid::new_v4(), None);
+        let ws2: WebSocket<()> = create_websocket(
+            (),
+            tx2,
+            channel_manager.clone(),
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
-        let ws3: WebSocket<()> =
-            create_websocket((), tx3, channel_manager.clone(), uuid::Uuid::new_v4(), None);
+        let ws3: WebSocket<()> = create_websocket(
+            (),
+            tx3,
+            channel_manager.clone(),
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
         // Subscribe all to same topic
         ws1.subscribe("chat:lobby").await.unwrap();
@@ -145,8 +187,14 @@ mod websocket_tests {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
 
-        let ws: WebSocket<()> =
-            create_websocket((), tx, channel_manager.clone(), uuid::Uuid::new_v4(), None);
+        let ws: WebSocket<()> = create_websocket(
+            (),
+            tx,
+            channel_manager.clone(),
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
         ws.subscribe("topic1").await.unwrap();
         ws.subscribe("topic2").await.unwrap();
@@ -167,11 +215,23 @@ mod websocket_tests {
         let (tx1, mut rx1) = tokio::sync::mpsc::unbounded_channel();
         let (tx2, mut rx2) = tokio::sync::mpsc::unbounded_channel();
 
-        let ws1: WebSocket<()> =
-            create_websocket((), tx1, channel_manager.clone(), uuid::Uuid::new_v4(), None);
+        let ws1: WebSocket<()> = create_websocket(
+            (),
+            tx1,
+            channel_manager.clone(),
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
-        let ws2: WebSocket<()> =
-            create_websocket((), tx2, channel_manager.clone(), uuid::Uuid::new_v4(), None);
+        let ws2: WebSocket<()> = create_websocket(
+            (),
+            tx2,
+            channel_manager.clone(),
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
         ws1.subscribe("room:A").await.unwrap();
         ws2.subscribe("room:B").await.unwrap();
@@ -221,8 +281,14 @@ mod websocket_tests {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-        let ws: WebSocket<()> =
-            create_websocket((), tx, channel_manager, uuid::Uuid::new_v4(), None);
+        let ws: WebSocket<()> = create_websocket(
+            (),
+            tx,
+            channel_manager,
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
         ws.close(Some(1000), Some("Normal closure")).await.unwrap();
 
@@ -241,8 +307,14 @@ mod websocket_tests {
         let channel_manager = std::sync::Arc::new(ChannelManager::new());
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
-        let ws: WebSocket<()> =
-            create_websocket((), tx.clone(), channel_manager, uuid::Uuid::new_v4(), None);
+        let ws: WebSocket<()> = create_websocket(
+            (),
+            tx.clone(),
+            channel_manager,
+            uuid::Uuid::new_v4(),
+            None,
+            default_config(),
+        );
 
         assert!(ws.is_writable());
 

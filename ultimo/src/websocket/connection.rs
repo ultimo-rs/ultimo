@@ -2,6 +2,7 @@
 
 use super::frame::{Frame, Message, OpCode};
 use super::pubsub::ChannelManager;
+use super::WebSocketConfig;
 use bytes::{Bytes, BytesMut};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
@@ -18,6 +19,7 @@ pub struct WebSocket<T = ()> {
     channel_manager: Arc<ChannelManager>,
     connection_id: uuid::Uuid,
     remote_addr: Option<SocketAddr>,
+    config: Arc<WebSocketConfig>,
 }
 
 impl<T> WebSocket<T> {
@@ -28,6 +30,7 @@ impl<T> WebSocket<T> {
         channel_manager: Arc<ChannelManager>,
         connection_id: uuid::Uuid,
         remote_addr: Option<SocketAddr>,
+        config: Arc<WebSocketConfig>,
     ) -> Self {
         Self {
             data,
@@ -35,6 +38,7 @@ impl<T> WebSocket<T> {
             channel_manager,
             connection_id,
             remote_addr,
+            config,
         }
     }
 
@@ -46,6 +50,11 @@ impl<T> WebSocket<T> {
     /// Get mutable reference to typed context data
     pub fn data_mut(&mut self) -> &mut T {
         &mut self.data
+    }
+
+    /// Get reference to WebSocket configuration
+    pub fn config(&self) -> &WebSocketConfig {
+        &self.config
     }
 
     /// Send text message
@@ -138,12 +147,14 @@ pub(crate) struct ConnectionHandler {
     incoming_tx: mpsc::UnboundedSender<Message>,
     channel_manager: Arc<ChannelManager>,
     connection_id: uuid::Uuid,
+    config: Arc<WebSocketConfig>,
 }
 
 impl ConnectionHandler {
     pub fn new(
         upgraded: Upgraded,
         channel_manager: Arc<ChannelManager>,
+        config: Arc<WebSocketConfig>,
     ) -> (
         Self,
         mpsc::UnboundedSender<Message>,
@@ -159,6 +170,7 @@ impl ConnectionHandler {
             incoming_tx,
             channel_manager,
             connection_id,
+            config,
         };
 
         (handler, tx, incoming_rx)
@@ -173,6 +185,7 @@ impl ConnectionHandler {
         let channel_manager = self.channel_manager;
         let connection_id = self.connection_id;
         let incoming_tx = self.incoming_tx;
+        let config = self.config;
 
         tracing::info!("Entering main WebSocket loop");
         loop {
@@ -182,12 +195,12 @@ impl ConnectionHandler {
                     match result {
                         Ok(0) => break, // Connection closed
                         Ok(_) => {
-                            // Try to parse frames
-                            while let Some(frame) = Frame::parse(&mut read_buf)? {
+                            // Try to parse frames with size limits
+                            while let Some(frame) = Frame::parse_with_limits(&mut read_buf, Some(config.max_frame_size))? {
                                 match frame.opcode {
                                     OpCode::Text | OpCode::Binary => {
-                                        // Convert frame to message and send to handler
-                                        if let Ok(message) = Message::from_frame(frame) {
+                                        // Convert frame to message with size limit and send to handler
+                                        if let Ok(message) = Message::from_frame_with_limit(frame, Some(config.max_message_size)) {
                                             let _ = incoming_tx.send(message);
                                         }
                                     }

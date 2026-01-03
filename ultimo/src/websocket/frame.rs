@@ -104,6 +104,14 @@ impl Frame {
 
     /// Parse a frame from buffer
     pub fn parse(buf: &mut BytesMut) -> Result<Option<Self>, io::Error> {
+        Self::parse_with_limits(buf, None)
+    }
+
+    /// Parse a frame from buffer with size limits
+    pub fn parse_with_limits(
+        buf: &mut BytesMut,
+        max_frame_size: Option<usize>,
+    ) -> Result<Option<Self>, io::Error> {
         if buf.len() < 2 {
             return Ok(None); // Need at least 2 bytes
         }
@@ -135,6 +143,16 @@ impl Frame {
                 buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8], buf[9],
             ]);
             header_len += 8;
+        }
+
+        // Check frame size limit
+        if let Some(max_size) = max_frame_size {
+            if payload_len > max_size as u64 {
+                return Err(io::Error::new(
+                    ErrorKind::InvalidData,
+                    format!("Frame size {} exceeds maximum {}", payload_len, max_size),
+                ));
+            }
         }
 
         // Masking key (4 bytes if masked)
@@ -250,6 +268,28 @@ pub struct CloseFrame {
 impl Message {
     /// Create message from frame
     pub fn from_frame(frame: Frame) -> Result<Self, io::Error> {
+        Self::from_frame_with_limit(frame, None)
+    }
+
+    /// Create message from frame with size limit
+    pub fn from_frame_with_limit(
+        frame: Frame,
+        max_message_size: Option<usize>,
+    ) -> Result<Self, io::Error> {
+        // Check message size limit
+        if let Some(max_size) = max_message_size {
+            if frame.payload.len() > max_size {
+                return Err(io::Error::new(
+                    ErrorKind::InvalidData,
+                    format!(
+                        "Message size {} exceeds maximum {}",
+                        frame.payload.len(),
+                        max_size
+                    ),
+                ));
+            }
+        }
+
         match frame.opcode {
             OpCode::Text => {
                 let text = String::from_utf8(frame.payload.to_vec())

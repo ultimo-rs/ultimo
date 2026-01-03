@@ -119,17 +119,24 @@ where
         // Spawn upgrade handler
         let data = self.data.expect("WebSocket data not set");
         let channel_manager = self.channel_manager;
+        let config = Arc::new(self.config);
 
         tokio::spawn(async move {
             match hyper::upgrade::on(self.request).await {
                 Ok(upgraded) => {
                     let (handler, sender, mut incoming_rx) =
-                        ConnectionHandler::new(upgraded, channel_manager.clone());
+                        ConnectionHandler::new(upgraded, channel_manager.clone(), config.clone());
                     let connection_id = uuid::Uuid::new_v4();
                     let remote_addr = None; // TODO: Get from request
 
-                    let ws =
-                        WebSocket::new(data, sender, channel_manager, connection_id, remote_addr);
+                    let ws = WebSocket::new(
+                        data,
+                        sender,
+                        channel_manager,
+                        connection_id,
+                        remote_addr,
+                        config.clone(),
+                    );
 
                     // Spawn the connection handler
                     let handler_task = tokio::spawn(async move {
@@ -207,17 +214,24 @@ where
         // Spawn upgrade handler
         let data = self.data.expect("WebSocket data not set");
         let channel_manager = self.channel_manager;
+        let config = Arc::new(self.config);
 
         tokio::spawn(async move {
             match hyper::upgrade::on(self.request).await {
                 Ok(upgraded) => {
                     let (handler, sender, incoming_rx) =
-                        ConnectionHandler::new(upgraded, channel_manager.clone());
+                        ConnectionHandler::new(upgraded, channel_manager.clone(), config.clone());
                     let connection_id = uuid::Uuid::new_v4();
                     let remote_addr = None; // TODO: Get from request
 
-                    let ws =
-                        WebSocket::new(data, sender, channel_manager, connection_id, remote_addr);
+                    let ws = WebSocket::new(
+                        data,
+                        sender,
+                        channel_manager,
+                        connection_id,
+                        remote_addr,
+                        config.clone(),
+                    );
 
                     // Spawn the connection handler
                     let handler_task = tokio::spawn(async move {
