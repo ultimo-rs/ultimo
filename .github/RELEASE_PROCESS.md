@@ -7,11 +7,13 @@ This document outlines the release process for Ultimo to ensure version consiste
 **Primary:** `Cargo.toml` (workspace.package.version)
 
 **Derived from primary:**
+
 - `ultimo/Cargo.toml` (via workspace)
 - `ultimo-cli/Cargo.toml` (via workspace)
 - All example `Cargo.toml` files (via workspace)
 
 **Must be manually synced:**
+
 - `CHANGELOG.md`
 - `docs-site/docs/pages/changelog.mdx`
 - `docs-site/docs/pages/roadmap.mdx`
@@ -43,31 +45,36 @@ This document outlines the release process for Ultimo to ensure version consiste
 
 - [ ] Merge feature/version PR to main
 - [ ] Wait for CI to pass
-- [ ] Pull latest main locally
+- [ ] **Release triggers automatically!** 🎉
 
-### 4. Automated Release (GitHub Actions)
+### 4. Automated Release (Triggers on Version Change)
 
-**Trigger the release workflow:**
+**When the PR merges to `main`:**
+
+The GitHub Actions workflow automatically detects the version change in `Cargo.toml` and:
+
+- ✅ Verifies all versions are in sync
+- ✅ Verifies on main branch
+- ✅ Runs core tests
+- ✅ Runs CLI tests
+- ✅ Runs clippy checks
+- ✅ Checks code formatting
+- ✅ Dry-run publish for both crates
+- ✅ Publishes `ultimo` to crates.io
+- ✅ Publishes `ultimo-cli` to crates.io
+- ✅ Creates git tag `vX.Y.Z`
+- ✅ Pushes tag to GitHub
+- ✅ Creates GitHub release with changelog notes
+
+**Manual Override (Optional):**
+
+If you need to manually trigger a release:
 
 1. Go to https://github.com/ultimo-rs/ultimo/actions/workflows/release.yml
 2. Click "Run workflow"
 3. Select branch: `main`
-4. Enter version: `vX.Y.Z` (e.g., `v0.2.0`)
+4. Enter version: `vX.Y.Z` (or leave empty to auto-detect)
 5. Click "Run workflow"
-
-**The workflow will automatically:**
-- ✅ Verify all versions are in sync
-- ✅ Verify on main branch
-- ✅ Run core tests
-- ✅ Run CLI tests
-- ✅ Run clippy checks
-- ✅ Check code formatting
-- ✅ Dry-run publish for both crates
-- ✅ Publish `ultimo` to crates.io
-- ✅ Publish `ultimo-cli` to crates.io
-- ✅ Create git tag
-- ✅ Push tag to GitHub
-- ✅ Create GitHub release with changelog notes
 
 ### 5. Update Project Board
 
@@ -93,6 +100,7 @@ If GitHub Actions is unavailable, use the manual script:
 ```
 
 This requires:
+
 - CARGO_REGISTRY_TOKEN environment variable set
 - Write access to GitHub repository
 - Clean main branch checked out
@@ -106,9 +114,61 @@ Given version `MAJOR.MINOR.PATCH`:
 - **PATCH** (x.y.Z): Bug fixes, backwards compatible
 
 **Pre-1.0 Guidelines:**
+
 - Major features → MINOR bump (0.1.0 → 0.2.0)
 - Bug fixes/small features → PATCH bump (0.1.0 → 0.1.1)
 - Breaking changes → Document in CHANGELOG (breaking changes are expected pre-1.0)
+
+## How Automated Release Works
+
+### The Workflow
+
+```
+Developer Workflow:
+├─ Feature Branch
+│  ├─ Update Cargo.toml (0.1.2 -> 0.2.0)
+│  ├─ Update CHANGELOG.md with release notes
+│  ├─ Update docs-site changelogs
+│  ├─ Update website/package.json
+│  ├─ Run ./scripts/check-versions.sh
+│  └─ Commit: "chore: Prepare v0.2.0 release"
+│
+├─ Create PR & Review
+│
+└─ Merge to main
+   └─> 🤖 GitHub Actions (Automatic!)
+       ├─ Detects version change in Cargo.toml
+       ├─ Verifies all versions synced
+       ├─ Runs tests & checks
+       ├─ Publishes to crates.io
+       ├─ Creates git tag v0.2.0
+       └─ Creates GitHub release
+           └─> ✅ Done!
+```
+
+### Why Manual Version Bumping?
+
+Version bumping is **intentionally manual** to ensure:
+
+1. **Semantic versioning correctness** - Human decides if it's major/minor/patch
+2. **CHANGELOG quality** - Developer writes meaningful release notes
+3. **Documentation sync** - All docs updated before release
+4. **Human review** - What's being released is understood and approved
+5. **No surprises** - Release happens when you expect it
+
+### What's Automated?
+
+- ✅ **Publishing to crates.io** - No manual cargo publish needed
+- ✅ **Git tagging** - Tag created and pushed automatically
+- ✅ **GitHub Release** - Created with changelog excerpt
+- ✅ **Version validation** - Ensures all files are in sync
+- ✅ **Quality checks** - Tests, clippy, formatting before publish
+
+### What's Manual?
+
+- 📝 **Version decision** - You choose the version number
+- 📝 **CHANGELOG writing** - You write the release notes
+- 📝 **Documentation updates** - You update docs-site
 
 ## Version Sync Verification Script
 
@@ -134,6 +194,7 @@ fi
 ```
 
 Add to `.git/hooks/pre-commit`:
+
 ```bash
 #!/bin/bash
 ./scripts/check-versions.sh || exit 1
