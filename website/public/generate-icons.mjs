@@ -14,7 +14,6 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
 
 console.log('🎨 Ultimo Icon Generation\n');
 
@@ -32,7 +31,7 @@ let sharp;
 try {
   sharp = (await import('sharp')).default;
   console.log('✅ Sharp is available\n');
-} catch (e) {
+} catch {
   console.log('❌ Sharp is not installed\n');
   console.log('To install sharp:');
   console.log('  npm install --save-dev sharp');
