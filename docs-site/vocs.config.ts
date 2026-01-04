@@ -5,6 +5,56 @@ export default defineConfig({
   rootDir: "docs",
   description: "Modern Rust web framework with automatic TypeScript generation",
   logoUrl: "/logo.svg",
+  head: {
+    meta: [
+      {
+        property: "og:type",
+        content: "website",
+      },
+      {
+        property: "og:title",
+        content: "Ultimo Documentation",
+      },
+      {
+        property: "og:description",
+        content: "Modern Rust web framework with automatic TypeScript generation",
+      },
+      {
+        property: "og:url",
+        content: "https://docs.ultimo.dev",
+      },
+      {
+        property: "og:image",
+        content: "https://ultimo.dev/api/og?title=Ultimo%20Docs&description=Modern%20Rust%20web%20framework%20with%20automatic%20TypeScript%20generation",
+      },
+      {
+        name: "twitter:card",
+        content: "summary_large_image",
+      },
+      {
+        name: "twitter:title",
+        content: "Ultimo Documentation",
+      },
+      {
+        name: "twitter:description",
+        content: "Modern Rust web framework with automatic TypeScript generation",
+      },
+      {
+        name: "twitter:image",
+        content: "https://ultimo.dev/api/og?title=Ultimo%20Docs&description=Modern%20Rust%20web%20framework%20with%20automatic%20TypeScript%20generation",
+      },
+    ],
+    link: [
+      {
+        rel: "icon",
+        href: "/favicon.ico",
+      },
+      {
+        rel: "apple-touch-icon",
+        href: "/apple-icon.png",
+      },
+    ],
+  },
   topNav: [
     { text: "Docs", link: "/getting-started" },
     {
