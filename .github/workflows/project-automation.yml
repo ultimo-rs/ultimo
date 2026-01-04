@@ -8,9 +8,11 @@ on:
 jobs:
   project-automation:
     runs-on: ubuntu-latest
+    continue-on-error: true  # Don't fail the workflow if project board updates fail
     steps:
       - name: Move issue to Ready when labeled with priority
         if: github.event_name == 'issues' && github.event.action == 'labeled'
+        continue-on-error: true
         uses: actions/add-to-project@v0.5.0
         with:
           project-url: https://github.com/orgs/ultimo-rs/projects/1
@@ -18,6 +20,7 @@ jobs:
 
       - name: Move issue to In Progress when assigned
         if: github.event_name == 'issues' && github.event.action == 'assigned'
+        continue-on-error: true
         uses: actions/add-to-project@v0.5.0
         with:
           project-url: https://github.com/orgs/ultimo-rs/projects/1
@@ -25,6 +28,7 @@ jobs:
 
       - name: Move PR to Review when opened
         if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        continue-on-error: true
         uses: actions/add-to-project@v0.5.0
         with:
           project-url: https://github.com/orgs/ultimo-rs/projects/1
@@ -32,6 +36,7 @@ jobs:
 
       - name: Move PR to Done when merged
         if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+        continue-on-error: true
         uses: actions/add-to-project@v0.5.0
         with:
           project-url: https://github.com/orgs/ultimo-rs/projects/1
