@@ -13,13 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session management
 - Testing utilities
 - Multi-language client generation
-- WebSocket Phase 2 (compression, backpressure, advanced features)
+- Per-message deflate compression (RFC 7692)
 
-## [0.2.0] - 2025-12-14
+## [0.2.0] - 2026-01-04
 
 ### Added
 
-**WebSocket Support (Phase 1)** 🔌
+**WebSocket Support (Complete)** 🔌
 
 - Zero-dependency RFC 6455 compliant WebSocket implementation
 - Built on hyper's upgrade mechanism (no tokio-tungstenite required)
@@ -27,7 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Built-in pub/sub system (ChannelManager) for topic-based messaging
 - Seamless router integration with `app.websocket()` method
 - Router optimization: Migrated to Radix Tree for O(L) lookups
-- 93 comprehensive tests (21 unit, 9 integration, 12 property-based, 5 router, 14 error, 11 concurrency, 18 edge cases)
+- 279 comprehensive tests (128 unit, 151 integration)
+- Production-ready features:
+  - **Configuration System** (`WebSocketConfig`) with size limits, timeouts, and buffer sizes
+  - **Message Fragmentation** for large payloads with automatic reassembly
+  - **Automatic Ping/Pong** heartbeat with configurable intervals and timeout detection
+  - **Graceful Shutdown** with `broadcast_all()` and proper close handshakes
+  - **Backpressure Handling** with bounded channels, `on_drain()` callback, and capacity tracking
 - Two working examples:
   - Simple HTML/JS chat application
   - Modern React + TypeScript chat with shadcn/ui
@@ -36,18 +42,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - WEBSOCKET_TESTING.md - Testing strategy and coverage
   - Example READMEs with setup instructions
 
-**Features**
+**Core Features**
 
 - Frame codec supporting all opcodes (text, binary, ping, pong, close, continuation)
 - Frame masking/unmasking (client frames must be masked per RFC 6455)
 - Control frame handling (close, ping, pong)
-- Message fragmentation support
+- Automatic message fragmentation for large payloads (>max_frame_size)
+- Fragment reassembly with `FragmentAccumulator`
 - Subscribe/unsubscribe to topics
-- Publish messages to all topic subscribers
+- Publish messages to all topic subscribers with backpressure handling
 - Automatic cleanup on disconnect
-- Connection lifecycle callbacks (on_open, on_message, on_close)
+- Connection lifecycle callbacks (on_open, on_message, on_close, on_drain)
 - Type-safe context data per connection (`WebSocket<T>`)
 - JSON message helpers (send_json, recv_json)
+
+**Production Features**
+
+- Configurable size limits (max_message_size: 10MB, max_frame_size: 1MB)
+- Bounded channels with configurable buffer (default 1024)
+- Automatic ping/pong heartbeat (configurable interval, default 30s)
+- Timeout detection for unresponsive clients (default 10s)
+- Backpressure notifications via `on_drain()` callback
+- Capacity tracking: `capacity()`, `max_capacity()`, `has_capacity()`
+- Graceful shutdown with `broadcast_all()` for server-wide notifications
+- Custom close frames with reason codes
 
 **Performance**
 
