@@ -5,6 +5,8 @@ export default defineConfig({
   rootDir: "docs",
   description: "Modern Rust web framework with automatic TypeScript generation",
   logoUrl: "/logo.svg",
+  ogImageUrl: "https://ultimo.dev/api/og?title=Ultimo%20Docs&description=Modern%20Rust%20web%20framework%20with%20automatic%20TypeScript%20generation",
+  iconUrl: "/favicon.ico",
   topNav: [
     { text: "Docs", link: "/getting-started" },
     {
