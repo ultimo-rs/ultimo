@@ -1,12 +1,12 @@
 [package]
 name = "ultimo-cli"
-version = "0.1.2"
-edition = "2021"
-authors = ["Ultimo Contributors"]
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
 description = "CLI tool for Ultimo web framework - Generate TypeScript clients, scaffold projects, and more"
-homepage = "https://ultimo.dev"
-repository = "https://github.com/ultimo-rs/ultimo"
+homepage.workspace = true
+repository.workspace = true
 keywords = ["cli", "codegen", "typescript", "web", "framework"]
 categories = ["command-line-utilities", "development-tools"]
 
