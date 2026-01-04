@@ -43,20 +43,7 @@ jobs:
             fi
           fi
 
-      - name: Skip if version unchanged
-        if: steps.version_changed.outputs.changed == 'false'
-        run: |
-          echo "No version change detected in Cargo.toml"
-          exit 0
-
-      - name: Skip if version unchanged
-        if: steps.version_changed.outputs.changed == 'false'
-        run: |
-          echo "No version change detected in Cargo.toml"
-          exit 0
-
       - name: Detect version from Cargo.toml
-        if: steps.version_changed.outputs.changed == 'true'
         id: version
         run: |
           if [ -n "${{ github.event.inputs.version }}" ]; then
@@ -68,7 +55,6 @@ jobs:
           echo "Releasing version: $VERSION"
 
       - name: Check if tag already exists
-        if: steps.version_changed.outputs.changed == 'true'
         id: tag_check
         run: |
           if git rev-parse "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
@@ -79,10 +65,15 @@ jobs:
             echo "✅ Tag ${{ steps.version.outputs.version }} does not exist, proceeding with release"
           fi
 
-      - name: Skip if tag exists
-        if: steps.tag_check.outputs.exists == 'true'
+      - name: Exit if version unchanged and tag exists
+        if: steps.version_changed.outputs.changed == 'false' || steps.tag_check.outputs.exists == 'true'
         run: |
-          echo "Release already exists for ${{ steps.version.outputs.version }}"
+          if [ "${{ steps.version_changed.outputs.changed }}" = "false" ]; then
+            echo "No version change detected in Cargo.toml and no manual trigger"
+          fi
+          if [ "${{ steps.tag_check.outputs.exists }}" = "true" ]; then
+            echo "Release already exists for ${{ steps.version.outputs.version }}"
+          fi
           exit 0
 
       - name: Setup Rust
@@ -169,16 +160,18 @@ jobs:
           fi
 
       - name: Create and push git tag
+        if: steps.tag_check.outputs.exists == 'false' && (steps.version_changed.outputs.changed == 'true' || github.event_name == 'workflow_dispatch')
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ github.event.inputs.version }}" -m "Release ${{ github.event.inputs.version }}"
-          git push origin "${{ github.event.inputs.version }}"
+          git tag -a "${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.version }}"
 
       - name: Extract changelog for this version
+        if: steps.tag_check.outputs.exists == 'false' && (steps.version_changed.outputs.changed == 'true' || github.event_name == 'workflow_dispatch')
         id: changelog
         run: |
-          VERSION="${{ github.event.inputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
           VERSION_NUM="${VERSION#v}"
 
           # Extract changelog section for this version
@@ -188,10 +181,11 @@ jobs:
           echo "$CHANGELOG" > release-notes.md
 
       - name: Create GitHub Release
+        if: steps.tag_check.outputs.exists == 'false' && (steps.version_changed.outputs.changed == 'true' || github.event_name == 'workflow_dispatch')
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.event.inputs.version }}
-          name: ${{ github.event.inputs.version }}
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
           body_path: release-notes.md
           draft: false
           prerelease: false
@@ -199,9 +193,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release Summary
+        if: steps.tag_check.outputs.exists == 'false' && (steps.version_changed.outputs.changed == 'true' || github.event_name == 'workflow_dispatch')
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ Successfully released ${{ github.event.inputs.version }}!"
+          echo "✅ Successfully released ${{ steps.version.outputs.version }}!"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
           echo "📦 Published to crates.io:"
@@ -209,7 +204,7 @@ jobs:
           echo "   - https://crates.io/crates/ultimo-cli"
           echo ""
           echo "🏷️  GitHub Release:"
-          echo "   - https://github.com/${{ github.repository }}/releases/tag/${{ github.event.inputs.version }}"
+          echo "   - https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
           echo ""
           echo "📚 Next steps:"
           echo "   - Verify crates.io shows new version"
