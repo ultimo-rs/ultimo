@@ -131,17 +131,42 @@ jobs:
         run: cargo publish -p ultimo-cli --dry-run --allow-dirty
 
       - name: Publish ultimo to crates.io
+        continue-on-error: true
+        id: publish_ultimo
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -p ultimo
+        run: |
+          if cargo publish -p ultimo 2>&1 | tee /tmp/ultimo-publish.log | grep -q "already exists"; then
+            echo "⚠️  ultimo already published, skipping"
+            echo "skipped=true" >> $GITHUB_OUTPUT
+          else
+            if [ ${PIPESTATUS[0]} -ne 0 ]; then
+              echo "❌ Failed to publish ultimo"
+              cat /tmp/ultimo-publish.log
+              exit 1
+            fi
+            echo "✅ Published ultimo"
+            echo "skipped=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Wait for crates.io to update
+        if: steps.publish_ultimo.outputs.skipped == 'false'
         run: sleep 10
 
       - name: Publish ultimo-cli to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -p ultimo-cli
+        run: |
+          if cargo publish -p ultimo-cli 2>&1 | tee /tmp/ultimo-cli-publish.log | grep -q "already exists"; then
+            echo "⚠️  ultimo-cli already published"
+          else
+            if [ ${PIPESTATUS[0]} -ne 0 ]; then
+              echo "❌ Failed to publish ultimo-cli"
+              cat /tmp/ultimo-cli-publish.log
+              exit 1
+            fi
+            echo "✅ Published ultimo-cli"
+          fi
 
       - name: Create and push git tag
         run: |
