@@ -25,11 +25,14 @@ fn bench_subscribe(c: &mut Criterion) {
                     let client_id = Uuid::new_v4();
 
                     rt.block_on(async {
-                        manager.connect(client_id, tx).await;
                         for i in 0..num_topics {
-                            manager.subscribe(client_id, format!("topic-{}", i)).await;
+                            let topic = format!("topic-{}", i);
+                            manager
+                                .subscribe(client_id, &topic, tx.clone())
+                                .await
+                                .unwrap();
                         }
-                        black_box(manager.subscriber_count(&format!("topic-0")).await)
+                        black_box(manager.subscriber_count("topic-0").await)
                     });
                 });
             },
@@ -53,15 +56,14 @@ fn bench_publish(c: &mut Criterion) {
             num_subscribers,
             |b, &num_subscribers| {
                 let manager = ChannelManager::new();
-                let topic = "benchmark-topic".to_string();
+                let topic = "benchmark-topic";
 
                 // Set up subscribers
                 rt.block_on(async {
                     for _ in 0..num_subscribers {
                         let (tx, _rx) = mpsc::channel(1000);
                         let client_id = Uuid::new_v4();
-                        manager.connect(client_id, tx).await;
-                        manager.subscribe(client_id, topic.clone()).await;
+                        manager.subscribe(client_id, topic, tx).await.unwrap();
                     }
                 });
 
@@ -69,7 +71,7 @@ fn bench_publish(c: &mut Criterion) {
 
                 b.iter(|| {
                     rt.block_on(async {
-                        black_box(manager.publish(&topic, message.clone()).await)
+                        black_box(manager.publish(&topic, message.clone()).await.unwrap())
                     });
                 });
             },
@@ -95,15 +97,14 @@ fn bench_publish_message_sizes(c: &mut Criterion) {
             &message_text,
             |b, message_text| {
                 let manager = ChannelManager::new();
-                let topic = "benchmark-topic".to_string();
+                let topic = "benchmark-topic";
 
                 // Set up subscribers
                 rt.block_on(async {
                     for _ in 0..num_subscribers {
                         let (tx, _rx) = mpsc::channel(1000);
                         let client_id = Uuid::new_v4();
-                        manager.connect(client_id, tx).await;
-                        manager.subscribe(client_id, topic.clone()).await;
+                        manager.subscribe(client_id, topic, tx).await.unwrap();
                     }
                 });
 
@@ -111,7 +112,7 @@ fn bench_publish_message_sizes(c: &mut Criterion) {
 
                 b.iter(|| {
                     rt.block_on(async {
-                        black_box(manager.publish(&topic, message.clone()).await)
+                        black_box(manager.publish(&topic, message.clone()).await.unwrap())
                     });
                 });
             },
@@ -138,16 +139,19 @@ fn bench_unsubscribe(c: &mut Criterion) {
                     let client_id = Uuid::new_v4();
 
                     rt.block_on(async {
-                        manager.connect(client_id, tx).await;
-
                         // Subscribe to topics
                         for i in 0..num_topics {
-                            manager.subscribe(client_id, format!("topic-{}", i)).await;
+                            let topic = format!("topic-{}", i);
+                            manager
+                                .subscribe(client_id, &topic, tx.clone())
+                                .await
+                                .unwrap();
                         }
 
                         // Unsubscribe from topics
                         for i in 0..num_topics {
-                            manager.unsubscribe(client_id, format!("topic-{}", i)).await;
+                            let topic = format!("topic-{}", i);
+                            manager.unsubscribe(client_id, &topic).await.unwrap();
                         }
 
                         black_box(manager.topic_count().await)
@@ -177,11 +181,13 @@ fn bench_disconnect(c: &mut Criterion) {
                     let client_id = Uuid::new_v4();
 
                     rt.block_on(async {
-                        manager.connect(client_id, tx).await;
-
                         // Subscribe to many topics
                         for i in 0..num_topics {
-                            manager.subscribe(client_id, format!("topic-{}", i)).await;
+                            let topic = format!("topic-{}", i);
+                            manager
+                                .subscribe(client_id, &topic, tx.clone())
+                                .await
+                                .unwrap();
                         }
 
                         // Disconnect (should clean up all subscriptions)
@@ -217,10 +223,8 @@ fn bench_publish_multi_topic(c: &mut Criterion) {
                     for topic_id in 0..num_topics {
                         let (tx, _rx) = mpsc::channel(1000);
                         let client_id = Uuid::new_v4();
-                        manager.connect(client_id, tx).await;
-                        manager
-                            .subscribe(client_id, format!("topic-{}", topic_id))
-                            .await;
+                        let topic = format!("topic-{}", topic_id);
+                        manager.subscribe(client_id, &topic, tx).await.unwrap();
                     }
                 });
 
@@ -231,7 +235,8 @@ fn bench_publish_multi_topic(c: &mut Criterion) {
                         for topic_id in 0..num_topics {
                             manager
                                 .publish(&format!("topic-{}", topic_id), message.clone())
-                                .await;
+                                .await
+                                .unwrap();
                         }
                         black_box(())
                     });
@@ -250,10 +255,11 @@ fn bench_connection_count(c: &mut Criterion) {
 
     // Set up some connections
     rt.block_on(async {
-        for _ in 0..100 {
+        for i in 0..100 {
             let (tx, _rx) = mpsc::channel(100);
             let client_id = Uuid::new_v4();
-            manager.connect(client_id, tx).await;
+            let topic = format!("topic-{}", i);
+            manager.subscribe(client_id, &topic, tx).await.unwrap();
         }
     });
 
@@ -271,10 +277,13 @@ fn bench_topic_count(c: &mut Criterion) {
     rt.block_on(async {
         let (tx, _rx) = mpsc::channel(100);
         let client_id = Uuid::new_v4();
-        manager.connect(client_id, tx).await;
 
         for i in 0..100 {
-            manager.subscribe(client_id, format!("topic-{}", i)).await;
+            let topic = format!("topic-{}", i);
+            manager
+                .subscribe(client_id, &topic, tx.clone())
+                .await
+                .unwrap();
         }
     });
 

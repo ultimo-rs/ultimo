@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-01-04
+
+### Fixed
+
+- Updated WebSocket pubsub benchmark to match new ChannelManager API
+
 ### Coming Soon
 
 - Server-Sent Events (SSE)

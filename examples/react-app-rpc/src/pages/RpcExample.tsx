@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Code, Loader2, Plus, Trash2 } from "lucide-react";
+import { Code, Loader2, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../components/ui/button";
 import {
