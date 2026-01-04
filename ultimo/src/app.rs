@@ -25,7 +25,7 @@ use tracing::{error, info};
 use crate::database::Database;
 
 #[cfg(feature = "websocket")]
-use crate::websocket::{ChannelManager, WebSocketHandler, WebSocketUpgrade};
+use crate::websocket::{ChannelManager, WebSocketConfig, WebSocketHandler, WebSocketUpgrade};
 
 /// WebSocket handler function type
 #[cfg(feature = "websocket")]
@@ -182,6 +182,20 @@ impl Ultimo {
     where
         H: WebSocketHandler<Data = ()> + 'static,
     {
+        self.websocket_with_config(path, handler, WebSocketConfig::default())
+    }
+
+    /// Register a WebSocket handler with custom configuration
+    #[cfg(feature = "websocket")]
+    pub fn websocket_with_config<H>(
+        &mut self,
+        path: &str,
+        handler: H,
+        config: WebSocketConfig,
+    ) -> &mut Self
+    where
+        H: WebSocketHandler<Data = ()> + 'static,
+    {
         let handler = Arc::new(handler);
         let channel_manager = self.channel_manager.clone();
 
@@ -189,17 +203,26 @@ impl Ultimo {
             let handler = handler.clone();
             let upgrade = upgrade
                 .with_data(())
-                .with_channel_manager(channel_manager.clone());
+                .with_channel_manager(channel_manager.clone())
+                .with_config(config.clone());
 
-            upgrade.on_upgrade_with_receiver(move |ws, mut incoming_rx| {
+            upgrade.on_upgrade_with_receiver(move |ws, mut incoming_rx, mut drain_rx| {
                 let handler = handler.clone();
                 async move {
                     // Call on_open
                     handler.on_open(&ws).await;
 
-                    // Handle incoming messages
-                    while let Some(msg) = incoming_rx.recv().await {
-                        handler.on_message(&ws, msg).await;
+                    // Handle incoming messages and drain notifications
+                    loop {
+                        tokio::select! {
+                            Some(msg) = incoming_rx.recv() => {
+                                handler.on_message(&ws, msg).await;
+                            }
+                            Some(_) = drain_rx.recv() => {
+                                handler.on_drain(&ws).await;
+                            }
+                            else => break,
+                        }
                     }
 
                     // Call on_close when connection ends

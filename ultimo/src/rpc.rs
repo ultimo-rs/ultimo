@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// RPC mode determines how procedures are exposed as HTTP endpoints
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RpcMode {
     /// Single JSON-RPC endpoint: POST /rpc with {"method": "...", "params": {}}
     ///
@@ -17,6 +17,7 @@ pub enum RpcMode {
     /// - When you need request batching
     /// - Simple routing requirements
     /// - When all RPCs need same middleware
+    #[default]
     JsonRpc,
 
     /// Individual REST-like endpoints: GET /api/getUser, POST /api/createUser
@@ -27,12 +28,6 @@ pub enum RpcMode {
     /// - When you need HTTP caching (GET requests)
     /// - RESTful conventions
     Rest,
-}
-
-impl Default for RpcMode {
-    fn default() -> Self {
-        Self::JsonRpc
-    }
 }
 
 /// RPC procedure handler

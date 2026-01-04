@@ -8,7 +8,7 @@ Upcoming features and improvements planned for Ultimo.
 
 - 📡 **Server-Sent Events** - Streaming updates to clients
 - 🔄 **Long Polling** - Fallback for older browsers
-- 🔌 **WebSocket Phase 2** - Compression, backpressure, advanced features
+- �️ **WebSocket Compression** - Per-message deflate (RFC 7692)
 
 ### Performance & Streaming
 
@@ -70,9 +70,8 @@ Upcoming features and improvements planned for Ultimo.
 | **CORS**                  | ✅ Available     | 0.1.0   |
 | **Rate Limiting**         | ✅ Available     | 0.1.0   |
 | **Database Integration**  | ✅ Available     | 0.1.0   |
-| **WebSocket (Phase 1)**   | ✅ Available     | 0.2.0   |
-| WebSocket Phase 2         | 🔥 High Priority | 0.3.0   |
-| Sessions                  | 📋 Planned       | 0.3.0   |
+| **WebSocket Support**     | ✅ Available     | 0.2.0   |
+| Sessions                  | 🔥 High Priority | 0.3.0   |
 | Test Client               | 📋 Planned       | 0.3.0   |
 | Static Files              | 📋 Planned       | 0.4.0   |
 | Compression               | 📋 Planned       | 0.4.0   |
@@ -93,25 +92,23 @@ Upcoming features and improvements planned for Ultimo.
 
 ### v0.2.0 (Current)
 
-- ✅ WebSocket Support (Phase 1) - Zero-dependency RFC 6455 implementation
-- ✅ Built-in Pub/Sub System - Topic-based messaging
-- ✅ Type-safe WebSocketHandler - Typed context data
-- ✅ Router Optimization - Radix Tree for O(L) lookups
-- ✅ 93 Comprehensive Tests - Production-ready
-- ✅ Two Working Examples - Simple chat + React chat
+- ✅ **WebSocket Support (Complete)** - Production-ready RFC 6455 implementation
+- ✅ **Configuration System** - WebSocketConfig with size limits, timeouts, and buffer sizes
+- ✅ **Message Fragmentation** - Automatic chunking and reassembly for large payloads
+- ✅ **Automatic Ping/Pong** - Heartbeat with configurable intervals and timeout detection
+- ✅ **Graceful Shutdown** - Server-wide notifications with broadcast_all()
+- ✅ **Backpressure Handling** - Bounded channels, on_drain callback, capacity tracking
+- ✅ **Built-in Pub/Sub System** - Topic-based messaging with backpressure support
+- ✅ **Type-safe WebSocketHandler** - Typed context data and lifecycle callbacks
+- ✅ **Router Optimization** - Radix Tree for O(L) lookups
+- ✅ **279 Comprehensive Tests** - Production-ready with extensive test coverage
+- ✅ **Two Working Examples** - Simple chat + React chat
 
 ### v0.3.0 (Next)
 
-- WebSocket Phase 2 (compression, backpressure, advanced features)
-- Enhanced error handling
-- Improved documentation
-- Performance optimizations
-
-### v0.3.0
-
-- WebSocket support
 - Session management
 - Test utilities
+- Enhanced error handling
 
 ### v0.4.0
 

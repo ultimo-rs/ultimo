@@ -1,0 +1,193 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., v0.2.0) - Leave empty to auto-detect from Cargo.toml"
+        required: false
+        type: string
+
+jobs:
+  release:
+    name: Release to crates.io and GitHub
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if version changed
+        id: version_changed
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Manual trigger - proceeding with release"
+          else
+            CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+            PREVIOUS_VERSION=$(git show HEAD~1:Cargo.toml | grep '^version = ' | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "")
+            
+            if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+              echo "changed=true" >> $GITHUB_OUTPUT
+              echo "✅ Version changed: $PREVIOUS_VERSION -> $CURRENT_VERSION"
+            else
+              echo "changed=false" >> $GITHUB_OUTPUT
+              echo "⏭️  Version unchanged ($CURRENT_VERSION), skipping release"
+            fi
+          fi
+
+      - name: Skip if version unchanged
+        if: steps.version_changed.outputs.changed == 'false'
+        run: |
+          echo "No version change detected in Cargo.toml"
+          exit 0
+
+      - name: Skip if version unchanged
+        if: steps.version_changed.outputs.changed == 'false'
+        run: |
+          echo "No version change detected in Cargo.toml"
+          exit 0
+
+      - name: Detect version from Cargo.toml
+        if: steps.version_changed.outputs.changed == 'true'
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="v$(grep '^version = ' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Releasing version: $VERSION"
+
+      - name: Check if tag already exists
+        if: steps.version_changed.outputs.changed == 'true'
+        id: tag_check
+        run: |
+          if git rev-parse "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️  Tag ${{ steps.version.outputs.version }} already exists, skipping release"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Tag ${{ steps.version.outputs.version }} does not exist, proceeding with release"
+          fi
+
+      - name: Skip if tag exists
+        if: steps.tag_check.outputs.exists == 'true'
+        run: |
+          echo "Release already exists for ${{ steps.version.outputs.version }}"
+          exit 0
+
+      - name: Setup Rust
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify version matches
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          chmod +x scripts/check-versions.sh
+          ./scripts/check-versions.sh
+
+      - name: Verify on main branch
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          BRANCH=$(git branch --show-current)
+          if [ "$BRANCH" != "main" ]; then
+            echo "❌ Must be on main branch (currently on $BRANCH)"
+            exit 1
+          fi
+
+      - name: Verify clean working directory
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "❌ Working directory is not clean"
+            git status --short
+            exit 1
+          fi
+
+      - name: Run core library tests
+        run: cargo test -p ultimo --lib
+
+      - name: Run CLI tests
+        run: cargo test -p ultimo-cli
+
+      - name: Run clippy
+        run: cargo clippy -p ultimo -p ultimo-cli -- -D warnings
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Dry run publish ultimo
+        run: cargo publish -p ultimo --dry-run
+
+      - name: Dry run publish ultimo-cli
+        run: cargo publish -p ultimo-cli --dry-run --allow-dirty
+
+      - name: Publish ultimo to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p ultimo
+
+      - name: Wait for crates.io to update
+        run: sleep 10
+
+      - name: Publish ultimo-cli to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p ultimo-cli
+
+      - name: Create and push git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ github.event.inputs.version }}" -m "Release ${{ github.event.inputs.version }}"
+          git push origin "${{ github.event.inputs.version }}"
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          VERSION_NUM="${VERSION#v}"
+
+          # Extract changelog section for this version
+          CHANGELOG=$(sed -n "/## \[$VERSION_NUM\]/,/## \[/p" CHANGELOG.md | sed '$d')
+
+          # Save to file for GitHub release
+          echo "$CHANGELOG" > release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Successfully released ${{ github.event.inputs.version }}!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "📦 Published to crates.io:"
+          echo "   - https://crates.io/crates/ultimo"
+          echo "   - https://crates.io/crates/ultimo-cli"
+          echo ""
+          echo "🏷️  GitHub Release:"
+          echo "   - https://github.com/${{ github.repository }}/releases/tag/${{ github.event.inputs.version }}"
+          echo ""
+          echo "📚 Next steps:"
+          echo "   - Verify crates.io shows new version"
+          echo "   - Check website auto-deployed"
+          echo "   - Update project board"
+          echo "   - Close related issues"

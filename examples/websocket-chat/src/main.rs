@@ -6,6 +6,9 @@
 //! - Multiple users can connect
 //! - Messages are broadcasted to all connected clients
 //! - Join/leave notifications
+//! - Custom configuration (Phase 2: ping/pong, message size limits)
+//! - Backpressure handling with on_drain callback
+//! - Graceful shutdown support
 //! - Simple web interface included
 //!
 //! Run with: cargo run --example websocket-chat
@@ -14,7 +17,7 @@
 use async_trait::async_trait;
 use ultimo::{
     prelude::*,
-    websocket::{Message, WebSocket, WebSocketHandler},
+    websocket::{Message, WebSocket, WebSocketConfig, WebSocketHandler},
 };
 
 /// Chat room handler
@@ -78,6 +81,14 @@ impl WebSocketHandler for ChatHandler {
         ws.publish(self.room, &leave_msg).await.ok();
     }
 
+    async fn on_drain(&self, ws: &WebSocket<Self::Data>) {
+        // Called when write buffer drains after being full (backpressure relief)
+        tracing::debug!(
+            "Write buffer drained, connection can receive more messages. Capacity: {}",
+            ws.capacity()
+        );
+    }
+
     async fn on_error(&self, _ws: &WebSocket<Self::Data>, error: std::io::Error) {
         tracing::error!("WebSocket error: {}", error);
     }
@@ -99,11 +110,30 @@ async fn main() -> Result<()> {
         ))?)
     });
 
-    // WebSocket endpoint
-    app.websocket("/ws", ChatHandler { room: "lobby" });
+    // WebSocket endpoint with custom configuration (Phase 2 features)
+    let config = WebSocketConfig {
+        // Limit message sizes for chat
+        max_message_size: 10 * 1024 * 1024, // 10 MB
+        max_frame_size: 1 * 1024 * 1024,    // 1 MB (enables automatic fragmentation)
+
+        // Ping/pong heartbeat to detect dead connections
+        ping_interval: Some(30), // Send ping every 30 seconds
+        ping_timeout: 10,        // Disconnect if no pong after 10 seconds
+
+        // Backpressure handling
+        max_write_queue_size: 100, // Buffer up to 100 messages per connection
+
+        ..Default::default()
+    };
+
+    app.websocket_with_config("/ws", ChatHandler { room: "lobby" }, config);
 
     tracing::info!("Starting chat server on http://localhost:4000");
     tracing::info!("Open your browser and navigate to http://localhost:4000");
+    tracing::info!("Phase 2 features enabled:");
+    tracing::info!("  - Automatic ping/pong heartbeat (30s interval)");
+    tracing::info!("  - Message fragmentation (for messages > 1MB)");
+    tracing::info!("  - Backpressure handling (100 message buffer)");
 
     app.listen("127.0.0.1:4000").await
 }

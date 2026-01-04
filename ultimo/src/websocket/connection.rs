@@ -2,32 +2,38 @@
 
 use super::frame::{Frame, Message, OpCode};
 use super::pubsub::ChannelManager;
+use super::WebSocketConfig;
 use bytes::{Bytes, BytesMut};
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use serde::Serialize;
+use std::io::{self, ErrorKind};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
+use tokio::time;
 
 /// WebSocket connection with typed context data
 pub struct WebSocket<T = ()> {
     data: T,
-    sender: mpsc::UnboundedSender<Message>,
+    sender: mpsc::Sender<Message>,
     channel_manager: Arc<ChannelManager>,
     connection_id: uuid::Uuid,
     remote_addr: Option<SocketAddr>,
+    config: Arc<WebSocketConfig>,
 }
 
 impl<T> WebSocket<T> {
     /// Create a new WebSocket connection
     pub(crate) fn new(
         data: T,
-        sender: mpsc::UnboundedSender<Message>,
+        sender: mpsc::Sender<Message>,
         channel_manager: Arc<ChannelManager>,
         connection_id: uuid::Uuid,
         remote_addr: Option<SocketAddr>,
+        config: Arc<WebSocketConfig>,
     ) -> Self {
         Self {
             data,
@@ -35,6 +41,7 @@ impl<T> WebSocket<T> {
             channel_manager,
             connection_id,
             remote_addr,
+            config,
         }
     }
 
@@ -48,18 +55,43 @@ impl<T> WebSocket<T> {
         &mut self.data
     }
 
+    /// Get reference to WebSocket configuration
+    pub fn config(&self) -> &WebSocketConfig {
+        &self.config
+    }
+
     /// Send text message
+    ///
+    /// Returns `Err` if the connection is closed or the write buffer is full.
+    /// When the buffer is full, consider waiting for `on_drain` callback before retrying.
     pub async fn send(&self, text: impl Into<String>) -> Result<(), std::io::Error> {
         self.sender
-            .send(Message::Text(text.into()))
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed"))
+            .try_send(Message::Text(text.into()))
+            .map_err(|e| match e {
+                mpsc::error::TrySendError::Full(_) => {
+                    std::io::Error::new(std::io::ErrorKind::WouldBlock, "write buffer full")
+                }
+                mpsc::error::TrySendError::Closed(_) => {
+                    std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed")
+                }
+            })
     }
 
     /// Send binary message
+    ///
+    /// Returns `Err` if the connection is closed or the write buffer is full.
+    /// When the buffer is full, consider waiting for `on_drain` callback before retrying.
     pub async fn send_binary(&self, data: impl Into<Bytes>) -> Result<(), std::io::Error> {
         self.sender
-            .send(Message::Binary(data.into()))
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed"))
+            .try_send(Message::Binary(data.into()))
+            .map_err(|e| match e {
+                mpsc::error::TrySendError::Full(_) => {
+                    std::io::Error::new(std::io::ErrorKind::WouldBlock, "write buffer full")
+                }
+                mpsc::error::TrySendError::Closed(_) => {
+                    std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed")
+                }
+            })
     }
 
     /// Send JSON message
@@ -115,9 +147,14 @@ impl<T> WebSocket<T> {
             Message::Close(None)
         };
 
-        self.sender
-            .send(close_frame)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed"))
+        self.sender.try_send(close_frame).map_err(|e| match e {
+            mpsc::error::TrySendError::Full(_) => {
+                std::io::Error::new(std::io::ErrorKind::WouldBlock, "write buffer full")
+            }
+            mpsc::error::TrySendError::Closed(_) => {
+                std::io::Error::new(std::io::ErrorKind::BrokenPipe, "connection closed")
+            }
+        })
     }
 
     /// Get remote address
@@ -129,39 +166,71 @@ impl<T> WebSocket<T> {
     pub fn is_writable(&self) -> bool {
         !self.sender.is_closed()
     }
+
+    /// Get maximum capacity of the write queue
+    pub fn max_capacity(&self) -> usize {
+        self.sender.max_capacity()
+    }
+
+    /// Get current number of messages in the write queue
+    pub fn capacity(&self) -> usize {
+        self.sender.capacity()
+    }
+
+    /// Check if the write buffer has available capacity
+    pub fn has_capacity(&self) -> bool {
+        self.sender.capacity() > 0
+    }
 }
 
 /// WebSocket connection handler that manages the connection lifecycle
 pub(crate) struct ConnectionHandler {
     upgraded: Upgraded,
-    receiver: mpsc::UnboundedReceiver<Message>,
+    receiver: mpsc::Receiver<Message>,
     incoming_tx: mpsc::UnboundedSender<Message>,
+    drain_tx: mpsc::UnboundedSender<()>,
     channel_manager: Arc<ChannelManager>,
     connection_id: uuid::Uuid,
+    config: Arc<WebSocketConfig>,
+}
+
+/// Fragment accumulator for reassembling fragmented messages
+struct FragmentAccumulator {
+    opcode: Option<OpCode>,
+    fragments: BytesMut,
+    total_size: usize,
 }
 
 impl ConnectionHandler {
     pub fn new(
         upgraded: Upgraded,
         channel_manager: Arc<ChannelManager>,
+        config: Arc<WebSocketConfig>,
     ) -> (
         Self,
-        mpsc::UnboundedSender<Message>,
+        mpsc::Sender<Message>,
         mpsc::UnboundedReceiver<Message>,
+        mpsc::UnboundedReceiver<()>,
     ) {
-        let (tx, rx) = mpsc::unbounded_channel();
+        // Use bounded channel for outgoing messages (backpressure)
+        let (tx, rx) = mpsc::channel(config.max_write_queue_size);
+        // Use unbounded channel for incoming messages (from client)
         let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
+        // Use unbounded channel for drain notifications
+        let (drain_tx, drain_rx) = mpsc::unbounded_channel();
         let connection_id = uuid::Uuid::new_v4();
 
         let handler = Self {
             upgraded,
             receiver: rx,
             incoming_tx,
+            drain_tx,
             channel_manager,
             connection_id,
+            config,
         };
 
-        (handler, tx, incoming_rx)
+        (handler, tx, incoming_rx, drain_rx)
     }
 
     pub async fn handle(self) -> Result<(), std::io::Error> {
@@ -173,22 +242,114 @@ impl ConnectionHandler {
         let channel_manager = self.channel_manager;
         let connection_id = self.connection_id;
         let incoming_tx = self.incoming_tx;
+        let drain_tx = self.drain_tx;
+        let config = self.config;
+        let mut fragment_accumulator: Option<FragmentAccumulator> = None;
+
+        // Track write buffer state for backpressure
+        let mut was_full = false;
+
+        // Setup ping interval if configured
+        let mut ping_interval = config
+            .ping_interval
+            .map(|interval_secs| time::interval(Duration::from_secs(interval_secs)));
+
+        let mut last_pong_received = Instant::now();
+        let ping_timeout = Duration::from_secs(config.ping_timeout);
 
         tracing::info!("Entering main WebSocket loop");
         loop {
+            // Check for ping timeout
+            if config.ping_interval.is_some() && last_pong_received.elapsed() > ping_timeout {
+                tracing::warn!("Ping timeout - closing connection");
+                let close_frame = Frame::close(Some(1001), Some("Ping timeout"));
+                let _ = writer.write_all(&close_frame.encode()).await;
+                break;
+            }
+
             tokio::select! {
+                // Ping interval
+                _ = async {
+                    match &mut ping_interval {
+                        Some(interval) => interval.tick().await,
+                        None => std::future::pending().await,
+                    }
+                } => {
+                    // Send ping frame
+                    let ping = Frame::ping(Bytes::new());
+                    if let Err(e) = writer.write_all(&ping.encode()).await {
+                        tracing::error!("Error sending ping: {}", e);
+                        break;
+                    }
+                    tracing::trace!("Sent ping frame");
+                }
+
                 // Read frames from client
                 result = reader.read_buf(&mut read_buf) => {
                     match result {
                         Ok(0) => break, // Connection closed
                         Ok(_) => {
-                            // Try to parse frames
-                            while let Some(frame) = Frame::parse(&mut read_buf)? {
+                            // Try to parse frames with size limits
+                            while let Some(frame) = Frame::parse_with_limits(&mut read_buf, Some(config.max_frame_size))? {
                                 match frame.opcode {
                                     OpCode::Text | OpCode::Binary => {
-                                        // Convert frame to message and send to handler
-                                        if let Ok(message) = Message::from_frame(frame) {
-                                            let _ = incoming_tx.send(message);
+                                        if frame.fin {
+                                            // Single unfragmented message
+                                            if let Ok(message) = Message::from_frame_with_limit(frame, Some(config.max_message_size)) {
+                                                let _ = incoming_tx.send(message);
+                                            }
+                                        } else {
+                                            // Start of fragmented message
+                                            if fragment_accumulator.is_some() {
+                                                return Err(io::Error::new(
+                                                    ErrorKind::InvalidData,
+                                                    "received new fragment before previous completed",
+                                                ));
+                                            }
+                                            fragment_accumulator = Some(FragmentAccumulator {
+                                                opcode: Some(frame.opcode),
+                                                fragments: BytesMut::from(frame.payload.as_ref()),
+                                                total_size: frame.payload.len(),
+                                            });
+                                        }
+                                    }
+                                    OpCode::Continue => {
+                                        // Continuation frame
+                                        let should_clear = if let Some(ref mut accumulator) = fragment_accumulator {
+                                            accumulator.total_size += frame.payload.len();
+
+                                            // Check message size limit
+                                            if accumulator.total_size > config.max_message_size {
+                                                return Err(io::Error::new(
+                                                    ErrorKind::InvalidData,
+                                                    format!("fragmented message size {} exceeds maximum {}",
+                                                        accumulator.total_size, config.max_message_size),
+                                                ));
+                                            }
+
+                                            accumulator.fragments.extend_from_slice(&frame.payload);
+                                            frame.fin // Clear accumulator if this is the final fragment
+                                        } else {
+                                            return Err(io::Error::new(
+                                                ErrorKind::InvalidData,
+                                                "received continuation frame without initial fragment",
+                                            ));
+                                        };
+
+                                        if should_clear {
+                                            // Take ownership and reassemble
+                                            if let Some(accumulator) = fragment_accumulator.take() {
+                                                let reassembled_frame = Frame {
+                                                    fin: true,
+                                                    opcode: accumulator.opcode.unwrap(),
+                                                    mask: None,
+                                                    payload: accumulator.fragments.freeze(),
+                                                };
+
+                                                if let Ok(message) = Message::from_frame(reassembled_frame) {
+                                                    let _ = incoming_tx.send(message);
+                                                }
+                                            }
                                         }
                                     }
                                     OpCode::Close => {
@@ -206,8 +367,10 @@ impl ConnectionHandler {
                                         let pong = Frame::pong(frame.payload);
                                         let _ = writer.write_all(&pong.encode()).await;
                                     }
-                                    OpCode::Pong | OpCode::Continue => {
-                                        // Ignore
+                                    OpCode::Pong => {
+                                        // Update last pong received time
+                                        last_pong_received = Instant::now();
+                                        tracing::trace!("Received pong frame");
                                     }
                                 }
                             }
@@ -221,12 +384,28 @@ impl ConnectionHandler {
 
                 // Send frames to client
                 Some(message) = receiver.recv() => {
-                    let frame = message.to_frame();
-                    let encoded = frame.encode();
+                    // Check if buffer was full before this recv
+                    let is_now_draining = was_full;
 
-                    if let Err(e) = writer.write_all(&encoded).await {
-                        tracing::error!("Error writing to socket: {}", e);
-                        break;
+                    // Use fragmentation if message exceeds max frame size
+                    let frames = message.to_fragmented_frames(config.max_frame_size);
+
+                    for frame in frames {
+                        let encoded = frame.encode();
+                        if let Err(e) = writer.write_all(&encoded).await {
+                            tracing::error!("Error writing to socket: {}", e);
+                            break;
+                        }
+                    }
+
+                    // Update full state - buffer is full if no capacity remains
+                    let has_capacity = !receiver.is_empty() || receiver.is_closed();
+                    was_full = !has_capacity;
+
+                    // Notify on_drain if buffer was full and now has drained
+                    if is_now_draining && has_capacity {
+                        let _ = drain_tx.send(());
+                        tracing::trace!("Write buffer drained, notified handler");
                     }
                 }
             }

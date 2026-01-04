@@ -23,7 +23,7 @@ mod concurrency_tests {
             let handle = tokio::spawn(async move {
                 let conn_id = uuid::Uuid::new_v4();
                 let topic = format!("topic_{}", i % 10); // 10 different topics
-                let (tx, _rx) = mpsc::unbounded_channel();
+                let (tx, _rx) = mpsc::channel(1000);
 
                 manager.subscribe(conn_id, &topic, tx).await.unwrap();
 
@@ -58,7 +58,7 @@ mod concurrency_tests {
         // Create subscribers
         let mut receivers = vec![];
         for _ in 0..num_subscribers {
-            let (tx, rx) = mpsc::unbounded_channel();
+            let (tx, rx) = mpsc::channel(1000);
             let conn_id = uuid::Uuid::new_v4();
 
             manager.subscribe(conn_id, topic, tx).await.unwrap();
@@ -110,7 +110,7 @@ mod concurrency_tests {
             let manager: Arc<ChannelManager> = Arc::clone(&manager);
             let topic = topic.to_string();
             let handle = tokio::spawn(async move {
-                let (tx, _rx) = mpsc::unbounded_channel();
+                let (tx, _rx) = mpsc::channel(1000);
                 manager.subscribe(conn_id, &topic, tx).await.ok();
                 tokio::time::sleep(Duration::from_micros(10)).await;
                 manager.unsubscribe(conn_id, &topic).await.ok();
@@ -134,7 +134,7 @@ mod concurrency_tests {
         let mut conn_ids = vec![];
         for _ in 0..100 {
             let conn_id = uuid::Uuid::new_v4();
-            let (tx, _rx) = mpsc::unbounded_channel();
+            let (tx, _rx) = mpsc::channel(1000);
 
             manager.subscribe(conn_id, topic, tx).await.unwrap();
             conn_ids.push(conn_id);
@@ -164,7 +164,7 @@ mod concurrency_tests {
     async fn test_many_topics_subscription() {
         let manager = Arc::new(ChannelManager::new());
         let conn_id = uuid::Uuid::new_v4();
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::channel(1000);
 
         // Subscribe to many topics
         let num_topics = 1000;
@@ -190,7 +190,7 @@ mod concurrency_tests {
         let barrier = Arc::new(Barrier::new(num_publishers));
 
         // Setup subscriber
-        let (tx, mut rx) = mpsc::unbounded_channel();
+        let (tx, mut rx) = mpsc::channel(1000);
         let conn_id = uuid::Uuid::new_v4();
 
         manager.subscribe(conn_id, topic, tx).await.unwrap();
@@ -239,7 +239,7 @@ mod concurrency_tests {
         let topic = "cleanup_topic";
         let conn_id = uuid::Uuid::new_v4();
 
-        let (tx, rx) = mpsc::unbounded_channel();
+        let (tx, rx) = mpsc::channel(1000);
 
         manager.subscribe(conn_id, topic, tx).await.unwrap();
 
@@ -259,7 +259,8 @@ mod concurrency_tests {
     async fn test_high_frequency_publish() {
         let manager = Arc::new(ChannelManager::new());
         let topic = "high_freq";
-        let (tx, mut rx) = mpsc::unbounded_channel();
+        // Use larger buffer to handle all messages without backpressure
+        let (tx, mut rx) = mpsc::channel(15000);
         let conn_id = uuid::Uuid::new_v4();
 
         manager.subscribe(conn_id, topic, tx).await.unwrap();
@@ -282,7 +283,7 @@ mod concurrency_tests {
     #[tokio::test]
     async fn test_multiple_topics_single_connection() {
         let manager = Arc::new(ChannelManager::new());
-        let (tx, mut rx) = mpsc::unbounded_channel();
+        let (tx, mut rx) = mpsc::channel(1000);
         let conn_id = uuid::Uuid::new_v4();
 
         // Subscribe to multiple topics
@@ -316,7 +317,7 @@ mod concurrency_tests {
             let manager: Arc<ChannelManager> = Arc::clone(&manager);
             let handle = tokio::spawn(async move {
                 let conn_id = uuid::Uuid::new_v4();
-                let (tx, _rx) = mpsc::unbounded_channel();
+                let (tx, _rx) = mpsc::channel(1000);
                 let topic = format!("topic_{}", i % 20);
 
                 // Register

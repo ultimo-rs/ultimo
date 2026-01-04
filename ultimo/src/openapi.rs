@@ -401,9 +401,7 @@ impl OpenApiSpec {
 
     /// Write to file
     pub fn write_to_file(&self, path: &str) -> std::io::Result<()> {
-        let json = self
-            .to_json()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let json = self.to_json().map_err(std::io::Error::other)?;
         std::fs::write(path, json)
     }
 

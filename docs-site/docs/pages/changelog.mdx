@@ -9,11 +9,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Coming Soon
 
-- WebSocket support
 - Server-Sent Events (SSE)
 - Session management
 - Testing utilities
 - Multi-language client generation
+- Per-message deflate compression (RFC 7692)
+
+## [0.2.0] - 2026-01-04
+
+### Added
+
+**WebSocket Support (Complete)** 🔌
+
+- Zero-dependency RFC 6455 compliant WebSocket implementation
+- Built on hyper's upgrade mechanism (no tokio-tungstenite required)
+- Type-safe WebSocketHandler trait with typed context data
+- Built-in pub/sub system (ChannelManager) for topic-based messaging
+- Seamless router integration with `app.websocket()` method
+- Router optimization: Migrated to Radix Tree for O(L) lookups
+- 279 comprehensive tests (128 unit, 151 integration)
+- Production-ready features:
+  - **Configuration System** (`WebSocketConfig`) with size limits, timeouts, and buffer sizes
+  - **Message Fragmentation** for large payloads with automatic reassembly
+  - **Automatic Ping/Pong** heartbeat with configurable intervals and timeout detection
+  - **Graceful Shutdown** with `broadcast_all()` and proper close handshakes
+  - **Backpressure Handling** with bounded channels, `on_drain()` callback, and capacity tracking
+- Two working examples:
+  - Simple HTML/JS chat application
+  - Modern React + TypeScript chat with shadcn/ui
+
+**Core Features**
+
+- Frame codec supporting all opcodes (text, binary, ping, pong, close, continuation)
+- Frame masking/unmasking (client frames must be masked per RFC 6455)
+- Control frame handling (close, ping, pong)
+- Automatic message fragmentation for large payloads (>max_frame_size)
+- Fragment reassembly with `FragmentAccumulator`
+- Subscribe/unsubscribe to topics
+- Publish messages to all topic subscribers with backpressure handling
+- Automatic cleanup on disconnect
+- Connection lifecycle callbacks (on_open, on_message, on_close, on_drain)
+- Type-safe context data per connection (`WebSocket<T>`)
+- JSON message helpers (send_json, recv_json)
+
+**Production Features**
+
+- Configurable size limits (max_message_size: 10MB, max_frame_size: 1MB)
+- Bounded channels with configurable buffer (default 1024)
+- Automatic ping/pong heartbeat (configurable interval, default 30s)
+- Timeout detection for unresponsive clients (default 10s)
+- Backpressure notifications via `on_drain()` callback
+- Capacity tracking: `capacity()`, `max_capacity()`, `has_capacity()`
+- Graceful shutdown with `broadcast_all()` for server-wide notifications
+- Custom close frames with reason codes
+
+**Performance**
+
+- Zero additional dependencies (uses existing hyper, tokio, bytes)
+- Efficient memory usage with BytesMut for frame parsing
+- O(L) router lookups with Radix Tree optimization
+
+**Documentation**
+
+- WEBSOCKET_DESIGN.md - Architecture and design decisions
+- WEBSOCKET_TESTING.md - Testing strategy and coverage
+- Example READMEs with setup instructions
 
 ## [0.1.0] - 2025-11-21
 

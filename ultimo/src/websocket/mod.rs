@@ -9,7 +9,7 @@ mod pubsub;
 mod upgrade;
 
 pub use connection::WebSocket;
-pub use frame::Message;
+pub use frame::{CloseFrame, Message};
 pub use pubsub::ChannelManager;
 pub use upgrade::WebSocketUpgrade;
 
@@ -17,7 +17,7 @@ pub use upgrade::WebSocketUpgrade;
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod test_helpers {
     pub use super::connection::WebSocket;
-    pub use super::frame::{Frame, Message, OpCode};
+    pub use super::frame::{CloseFrame, Frame, Message, OpCode};
     pub use super::pubsub::ChannelManager;
     use std::net::SocketAddr;
     use std::sync::Arc;
@@ -26,13 +26,21 @@ pub mod test_helpers {
     /// Test helper to create WebSocket instances
     pub fn create_websocket<T>(
         data: T,
-        sender: mpsc::UnboundedSender<Message>,
+        sender: mpsc::Sender<Message>,
         channel_manager: Arc<ChannelManager>,
         connection_id: uuid::Uuid,
         remote_addr: Option<SocketAddr>,
+        config: Arc<super::WebSocketConfig>,
     ) -> WebSocket<T> {
         // Call the private constructor directly since we're in the same module
-        super::connection::WebSocket::new(data, sender, channel_manager, connection_id, remote_addr)
+        super::connection::WebSocket::new(
+            data,
+            sender,
+            channel_manager,
+            connection_id,
+            remote_addr,
+            config,
+        )
     }
 }
 

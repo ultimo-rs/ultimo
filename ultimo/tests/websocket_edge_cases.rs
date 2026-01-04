@@ -456,7 +456,7 @@ mod timeout_tests {
     async fn test_subscribe_with_timeout() {
         let manager = ChannelManager::new();
         let conn_id = uuid::Uuid::new_v4();
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, _rx) = tokio::sync::mpsc::channel(1000);
 
         let result = timeout(
             Duration::from_millis(100),
@@ -470,7 +470,7 @@ mod timeout_tests {
     #[tokio::test]
     async fn test_publish_with_timeout() {
         let manager = ChannelManager::new();
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, _rx) = tokio::sync::mpsc::channel(1000);
         let conn_id = uuid::Uuid::new_v4();
 
         manager.subscribe(conn_id, "test_topic", tx).await.unwrap();
