@@ -14,7 +14,7 @@ export function HeroSection() {
       <div className="container px-4 md:px-6 mx-auto flex flex-col items-center text-center relative z-10">
         <div className="inline-flex items-center rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-sm font-medium text-orange-400 mb-8 backdrop-blur-sm">
           <span className="flex h-2 w-2 rounded-full bg-orange-500 mr-2 animate-pulse"></span>
-          v0.1.2 Now Available
+          v0.2.0 Now Available
         </div>
 
         <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl text-balance">
