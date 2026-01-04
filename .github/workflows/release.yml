@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v0.2.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: Release to crates.io and GitHub
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify version matches
+        run: |
+          chmod +x scripts/check-versions.sh
+          ./scripts/check-versions.sh
+
+      - name: Verify on main branch
+        run: |
+          BRANCH=$(git branch --show-current)
+          if [ "$BRANCH" != "main" ]; then
+            echo "❌ Must be on main branch (currently on $BRANCH)"
+            exit 1
+          fi
+
+      - name: Verify clean working directory
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "❌ Working directory is not clean"
+            git status --short
+            exit 1
+          fi
+
+      - name: Run core library tests
+        run: cargo test -p ultimo --lib
+
+      - name: Run CLI tests
+        run: cargo test -p ultimo-cli
+
+      - name: Run clippy
+        run: cargo clippy -p ultimo -p ultimo-cli -- -D warnings
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Dry run publish ultimo
+        run: cargo publish -p ultimo --dry-run
+
+      - name: Dry run publish ultimo-cli
+        run: cargo publish -p ultimo-cli --dry-run --allow-dirty
+
+      - name: Publish ultimo to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p ultimo
+
+      - name: Wait for crates.io to update
+        run: sleep 10
+
+      - name: Publish ultimo-cli to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p ultimo-cli
+
+      - name: Create and push git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ github.event.inputs.version }}" -m "Release ${{ github.event.inputs.version }}"
+          git push origin "${{ github.event.inputs.version }}"
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          VERSION_NUM="${VERSION#v}"
+          
+          # Extract changelog section for this version
+          CHANGELOG=$(sed -n "/## \[$VERSION_NUM\]/,/## \[/p" CHANGELOG.md | sed '$d')
+          
+          # Save to file for GitHub release
+          echo "$CHANGELOG" > release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Successfully released ${{ github.event.inputs.version }}!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "📦 Published to crates.io:"
+          echo "   - https://crates.io/crates/ultimo"
+          echo "   - https://crates.io/crates/ultimo-cli"
+          echo ""
+          echo "🏷️  GitHub Release:"
+          echo "   - https://github.com/${{ github.repository }}/releases/tag/${{ github.event.inputs.version }}"
+          echo ""
+          echo "📚 Next steps:"
+          echo "   - Verify crates.io shows new version"
+          echo "   - Check website auto-deployed"
+          echo "   - Update project board"
+          echo "   - Close related issues"

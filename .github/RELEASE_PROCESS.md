@@ -28,59 +28,74 @@ This document outlines the release process for Ultimo to ensure version consiste
 - [ ] Examples updated and tested
 - [ ] PR created and reviewed
 
-### 2. Merge & Version Update (on main branch)
+### 2. Prepare Version Update (on feature branch or separate PR)
 
-- [ ] Merge feature PR to main
 - [ ] Update version in `Cargo.toml` (workspace.package.version)
 - [ ] Update `CHANGELOG.md` with new version and date
 - [ ] Update `docs-site/docs/pages/changelog.mdx` with full release notes
 - [ ] Update `docs-site/docs/pages/roadmap.mdx` (move features from Next to Current)
 - [ ] Update `website/package.json` version
-- [ ] Commit with message: `chore: Bump version to vX.Y.Z`
-- [ ] Push to main
+- [ ] Run `./scripts/check-versions.sh` to verify all versions match
+- [ ] Commit with message: `chore: Prepare vX.Y.Z release`
+- [ ] Push changes
 
-### 3. Release to crates.io
+### 3. Merge to Main
 
-```bash
-./scripts/release.sh vX.Y.Z
-```
+- [ ] Merge feature/version PR to main
+- [ ] Wait for CI to pass
+- [ ] Pull latest main locally
 
-This script will:
-- Verify on main branch
-- Check clean working directory
-- Run core tests
-- Run CLI tests
-- Run clippy
-- Check formatting
-- Dry-run publish
-- Publish `ultimo` to crates.io
-- Wait 10 seconds
-- Publish `ultimo-cli` to crates.io
-- Create git tag
-- Push tag to GitHub
+### 4. Automated Release (GitHub Actions)
 
-### 4. GitHub Release
+**Trigger the release workflow:**
 
-- [ ] Go to https://github.com/ultimo-rs/ultimo/releases/new
-- [ ] Select the tag created by release script
-- [ ] Title: `vX.Y.Z - Feature Name`
-- [ ] Copy content from `CHANGELOG.md` for this version
-- [ ] Mark as "latest release"
-- [ ] Publish release
+1. Go to https://github.com/ultimo-rs/ultimo/actions/workflows/release.yml
+2. Click "Run workflow"
+3. Select branch: `main`
+4. Enter version: `vX.Y.Z` (e.g., `v0.2.0`)
+5. Click "Run workflow"
+
+**The workflow will automatically:**
+- ✅ Verify all versions are in sync
+- ✅ Verify on main branch
+- ✅ Run core tests
+- ✅ Run CLI tests
+- ✅ Run clippy checks
+- ✅ Check code formatting
+- ✅ Dry-run publish for both crates
+- ✅ Publish `ultimo` to crates.io
+- ✅ Publish `ultimo-cli` to crates.io
+- ✅ Create git tag
+- ✅ Push tag to GitHub
+- ✅ Create GitHub release with changelog notes
 
 ### 5. Update Project Board
 
 - [ ] Go to https://github.com/orgs/ultimo-rs/projects/1
 - [ ] Move completed issues from "In Review" to "Done"
-- [ ] Close completed issues
+- [ ] Close related issues with "Closes #XX" comment
 
 ### 6. Verify Deployments
 
 - [ ] Check https://crates.io/crates/ultimo shows new version
 - [ ] Check https://crates.io/crates/ultimo-cli shows new version
+- [ ] Check https://github.com/ultimo-rs/ultimo/releases shows new release
 - [ ] Check https://ultimo.dev reflects new version (auto-deploy from main)
 - [ ] Check https://docs.ultimo.dev/changelog shows new release (auto-deploy from main)
 - [ ] Test installation: `cargo install ultimo-cli`
+
+## Manual Release (Fallback)
+
+If GitHub Actions is unavailable, use the manual script:
+
+```bash
+./scripts/release.sh vX.Y.Z
+```
+
+This requires:
+- CARGO_REGISTRY_TOKEN environment variable set
+- Write access to GitHub repository
+- Clean main branch checked out
 
 ## Version Numbering (Semantic Versioning)
 
@@ -124,6 +139,25 @@ Add to `.git/hooks/pre-commit`:
 ./scripts/check-versions.sh || exit 1
 ```
 
+## Setup Requirements
+
+### One-Time Setup
+
+**For automated releases to work, add these secrets to GitHub:**
+
+1. Go to: https://github.com/ultimo-rs/ultimo/settings/secrets/actions
+2. Add secret: `CARGO_REGISTRY_TOKEN`
+   - Get token from: https://crates.io/me
+   - Click "New Token" → Name it "GitHub Actions" → Copy token
+   - Paste into GitHub secret
+
+**Verify GitHub Actions permissions:**
+
+1. Go to: https://github.com/ultimo-rs/ultimo/settings/actions
+2. Under "Workflow permissions", ensure:
+   - ✅ "Read and write permissions" is enabled
+   - ✅ "Allow GitHub Actions to create and approve pull requests" is enabled
+
 ## Emergency Hotfix Process
 
 If a critical bug is found in production:
@@ -132,9 +166,9 @@ If a critical bug is found in production:
 2. Fix the issue with tests
 3. Update CHANGELOG with `[X.Y.Z]` section
 4. Bump PATCH version in `Cargo.toml`
-5. Sync versions across files
-6. Create PR, review, merge
-7. Follow release process from step 3
+5. Sync versions across files with `./scripts/check-versions.sh`
+6. Create PR, review, merge to main
+7. Trigger release workflow with new version
 
 ## Rolling Back a Release
 
