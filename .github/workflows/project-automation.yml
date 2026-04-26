@@ -8,6 +8,10 @@ on:
 jobs:
   project-automation:
     runs-on: ubuntu-latest
+    permissions:
+      repository-projects: write
+      issues: write
+      pull-requests: write
     steps:
       - name: Move issue to Ready when labeled with priority
         if: github.event_name == 'issues' && github.event.action == 'labeled'
