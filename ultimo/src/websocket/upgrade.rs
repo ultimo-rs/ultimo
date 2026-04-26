@@ -122,12 +122,12 @@ where
         let config = Arc::new(self.config);
 
         tokio::spawn(async move {
+            let remote_addr = self.request.extensions().get::<std::net::SocketAddr>().cloned();
             match hyper::upgrade::on(self.request).await {
                 Ok(upgraded) => {
                     let (handler, sender, mut incoming_rx, mut _drain_rx) =
                         ConnectionHandler::new(upgraded, channel_manager.clone(), config.clone());
                     let connection_id = uuid::Uuid::new_v4();
-                    let remote_addr = None; // TODO: Get from request
 
                     let ws = WebSocket::new(
                         data,
@@ -223,12 +223,12 @@ where
         let config = Arc::new(self.config);
 
         tokio::spawn(async move {
+            let remote_addr = self.request.extensions().get::<std::net::SocketAddr>().cloned();
             match hyper::upgrade::on(self.request).await {
                 Ok(upgraded) => {
                     let (handler, sender, incoming_rx, drain_rx) =
                         ConnectionHandler::new(upgraded, channel_manager.clone(), config.clone());
                     let connection_id = uuid::Uuid::new_v4();
-                    let remote_addr = None; // TODO: Get from request
 
                     let ws = WebSocket::new(
                         data,

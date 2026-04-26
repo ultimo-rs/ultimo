@@ -25,11 +25,13 @@ pub struct Request {
     headers: hyper::HeaderMap,
     params: Params,
     body: Arc<RwLock<Option<Bytes>>>,
+    remote_addr: Option<std::net::SocketAddr>,
 }
 
 impl Request {
     /// Create a new Request from a Hyper request and path parameters
     pub async fn new(req: HyperRequest<Incoming>, params: Params) -> Result<Self> {
+        let remote_addr = req.extensions().get::<std::net::SocketAddr>().cloned();
         let (parts, body) = req.into_parts();
 
         // Collect the full body
@@ -45,6 +47,7 @@ impl Request {
             headers: parts.headers,
             params,
             body: Arc::new(RwLock::new(Some(body_bytes))),
+            remote_addr,
         })
     }
 
@@ -144,6 +147,11 @@ impl Request {
         body.as_ref()
             .cloned()
             .ok_or_else(|| UltimoError::BadRequest("Body already consumed".to_string()))
+    }
+
+    /// Get the remote address of the client
+    pub fn remote_addr(&self) -> Option<std::net::SocketAddr> {
+        self.remote_addr
     }
 }
 
@@ -468,5 +476,20 @@ mod tests {
 
         assert_eq!(bytes, Bytes::from("binary data"));
         assert_eq!(bytes.len(), 11);
+    }
+
+    #[tokio::test]
+    async fn test_request_remote_addr_getter() {
+        let addr: std::net::SocketAddr = "127.0.0.1:8080".parse().unwrap();
+        let request = Request {
+            method: hyper::Method::GET,
+            uri: "/".parse().unwrap(),
+            headers: hyper::HeaderMap::new(),
+            params: Params::new(),
+            body: Arc::new(RwLock::new(Some(Bytes::new()))),
+            remote_addr: Some(addr),
+        };
+
+        assert_eq!(request.remote_addr(), Some(addr));
     }
 }

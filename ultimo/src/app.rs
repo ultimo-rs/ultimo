@@ -395,12 +395,13 @@ impl Ultimo {
         let app = Arc::new(self);
 
         loop {
-            let (stream, _) = listener.accept().await?;
+            let (stream, remote_addr) = listener.accept().await?;
             let io = TokioIo::new(stream);
             let app = app.clone();
 
             tokio::task::spawn(async move {
-                let service = service_fn(move |req| {
+                let service = service_fn(move |mut req| {
+                    req.extensions_mut().insert(remote_addr);
                     let app = app.clone();
                     async move { Ok::<_, hyper::Error>(app.handle_request(req).await) }
                 });

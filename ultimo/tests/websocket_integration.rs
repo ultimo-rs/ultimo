@@ -327,4 +327,22 @@ mod websocket_tests {
 
         assert!(!ws.is_writable());
     }
+
+    #[tokio::test]
+    async fn test_websocket_remote_addr() {
+        let channel_manager = std::sync::Arc::new(ChannelManager::new());
+        let (tx, _rx) = tokio::sync::mpsc::channel(1000);
+        let addr: std::net::SocketAddr = "127.0.0.1:8080".parse().unwrap();
+
+        let ws: WebSocket<()> = create_websocket(
+            (),
+            tx,
+            channel_manager,
+            uuid::Uuid::new_v4(),
+            Some(addr),
+            default_config(),
+        );
+
+        assert_eq!(ws.remote_addr(), Some(addr));
+    }
 }
