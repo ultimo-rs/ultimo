@@ -33,7 +33,7 @@ async-trait = "0.1"
 
 # Database support (optional)
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls"], optional = true }
-diesel = { version = "2.1", optional = true }
+diesel = { version = "2.3.8", optional = true }  # >=2.3.8: RUSTSEC fix for COPY command injection + unaligned access
 r2d2 = { version = "0.8", optional = true }
 
 [dev-dependencies]

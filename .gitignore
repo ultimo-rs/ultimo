@@ -1,7 +1,8 @@
 # Rust
 /target/
 **/target/
-Cargo.lock
+# Cargo.lock IS committed: this workspace ships a binary (ultimo-cli), so a
+# tracked lockfile gives reproducible builds and a stable target for cargo-audit.
 *.rs.bk
 *.pdb
 
