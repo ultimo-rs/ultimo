@@ -99,8 +99,11 @@ jobs:
       - name: clippy (all features)
         run: cargo clippy -p ultimo --all-targets --all-features -- -D warnings
 
+      # --lib: the database tests live in src/database/tests.rs (unit tests).
+      # Without --lib this also compiles the websocket integration test targets,
+      # which need the websocket+test-helpers features (covered by the `test` job).
       - name: Database tests (sqlite — no server required)
-        run: cargo test -p ultimo --features "sqlx-sqlite,diesel-sqlite"
+        run: cargo test -p ultimo --lib --features "sqlx-sqlite,diesel-sqlite"
 
   # ── Minimum Supported Rust Version ────────────────────────────────────
   # Verifies the rust-version declared in Cargo.toml (single source of truth).
