@@ -103,14 +103,22 @@ jobs:
         run: cargo test -p ultimo --features "sqlx-sqlite,diesel-sqlite"
 
   # ── Minimum Supported Rust Version ────────────────────────────────────
-  # Cargo.toml declares rust-version = "1.75.0". This job verifies that claim.
-  # If it fails, either bump the declared MSRV or pin dependency versions.
+  # Verifies the rust-version declared in Cargo.toml (single source of truth).
+  # If this fails, bump rust-version in Cargo.toml to the floor the error names.
   msrv:
-    name: MSRV (1.75.0)
+    name: MSRV
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.75.0
+      - name: Read MSRV from Cargo.toml
+        id: msrv
+        run: |
+          VERSION=$(grep '^rust-version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Declared MSRV: $VERSION"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
       - uses: Swatinem/rust-cache@v2
       - name: cargo check (default + websocket)
         run: cargo check -p ultimo -p ultimo-cli --features "websocket"
