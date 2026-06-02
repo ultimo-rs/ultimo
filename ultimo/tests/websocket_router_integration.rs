@@ -104,26 +104,46 @@ async fn test_websocket_echo() {
         .await
         .expect("Failed to connect");
 
-    use futures_util::{SinkExt, StreamExt};
+    use futures_util::SinkExt;
     use tokio_tungstenite::tungstenite::Message as TungsteniteMessage;
 
-    // Skip connection message
-    ws.next().await;
+    let timeout = tokio::time::Duration::from_millis(500);
+
+    // Wait for the "connected" message, skipping any heartbeat control frames.
+    next_text_frame(&mut ws, timeout).await;
 
     // Send message
     ws.send(TungsteniteMessage::Text("hello".to_string()))
         .await
         .unwrap();
 
-    // Receive echo with timeout
-    match tokio::time::timeout(tokio::time::Duration::from_millis(500), ws.next()).await {
-        Ok(Some(Ok(TungsteniteMessage::Text(text)))) => {
-            assert_eq!(text, "echo: hello");
+    // Receive echo, skipping any Ping/Pong heartbeat frames that may interleave.
+    let text = next_text_frame(&mut ws, timeout).await;
+    assert_eq!(text, "echo: hello");
+}
+
+/// Reads the next text frame from the socket within `timeout`, transparently
+/// skipping Ping/Pong control frames (the server sends periodic heartbeats).
+async fn next_text_frame<S>(ws: &mut S, timeout: tokio::time::Duration) -> String
+where
+    S: futures_util::Stream<
+            Item = std::result::Result<
+                tokio_tungstenite::tungstenite::Message,
+                tokio_tungstenite::tungstenite::Error,
+            >,
+        > + Unpin,
+{
+    use futures_util::StreamExt;
+    use tokio_tungstenite::tungstenite::Message as TungsteniteMessage;
+    loop {
+        match tokio::time::timeout(timeout, ws.next()).await {
+            Ok(Some(Ok(TungsteniteMessage::Text(text)))) => return text,
+            Ok(Some(Ok(TungsteniteMessage::Ping(_) | TungsteniteMessage::Pong(_)))) => continue,
+            Ok(None) => panic!("Connection closed unexpectedly"),
+            Ok(Some(Err(e))) => panic!("WebSocket error: {}", e),
+            Ok(Some(Ok(msg))) => panic!("Unexpected message type: {:?}", msg),
+            Err(_) => panic!("Timeout waiting for text frame"),
         }
-        Ok(None) => panic!("Connection closed unexpectedly"),
-        Ok(Some(Err(e))) => panic!("WebSocket error: {}", e),
-        Ok(Some(Ok(msg))) => panic!("Unexpected message type: {:?}", msg),
-        Err(_) => panic!("Timeout waiting for echo response"),
     }
 }
 

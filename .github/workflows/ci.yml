@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same ref (saves CI minutes on rapid pushes)
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ── Formatting + linting ──────────────────────────────────────────────
+  lint:
+    name: fmt + clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: rustfmt
+        run: cargo fmt --all --check
+
+      # Default-feature lib (the integration test targets in tests/*.rs need
+      # the websocket+test-helpers features, so --all-targets is applied only
+      # to the feature-enabled invocation below — not here).
+      - name: clippy (ultimo lib, default features)
+        run: cargo clippy -p ultimo --lib -- -D warnings
+
+      - name: clippy (ultimo-cli)
+        run: cargo clippy -p ultimo-cli --all-targets -- -D warnings
+
+      # --all-targets here lints lib, integration tests and benches together,
+      # all of which compile once websocket+test-helpers are enabled.
+      # Database features are linted in the `test-db` job (needs system libs).
+      - name: clippy (websocket + test-helpers, all targets)
+        run: cargo clippy -p ultimo --all-targets --features "websocket,test-helpers" -- -D warnings
+
+  # ── Unit + integration tests (no DB system deps) ──────────────────────
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Library unit tests
+        run: cargo test -p ultimo --lib
+
+      # The integration tests in ultimo/tests/*.rs are NOT covered by `--lib`
+      # and require BOTH the `websocket` and `test-helpers` features to compile.
+      # This is the gap that previously let them rot silently.
+      - name: Integration tests (websocket + test-helpers)
+        run: cargo test -p ultimo --features "websocket,test-helpers" --tests
+
+      - name: CLI tests
+        run: cargo test -p ultimo-cli
+
+      # websocket_pubsub_bench uses test_helpers::ChannelManager, so benches
+      # need test-helpers in addition to websocket.
+      - name: Benches compile (don't run)
+        run: cargo build -p ultimo --benches --features "websocket,test-helpers"
+
+  # ── Database-backed features (need system libraries) ──────────────────
+  test-db:
+    name: test (database features)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      # diesel-mysql / sqlx-mysql link libmysqlclient; postgres backends need libpq.
+      - name: Install DB client libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev default-libmysqlclient-dev pkg-config
+
+      - name: Build all features
+        run: cargo build -p ultimo --all-features
+
+      - name: clippy (all features)
+        run: cargo clippy -p ultimo --all-targets --all-features -- -D warnings
+
+      - name: Database tests (sqlite — no server required)
+        run: cargo test -p ultimo --features "sqlx-sqlite,diesel-sqlite"
+
+  # ── Minimum Supported Rust Version ────────────────────────────────────
+  # Cargo.toml declares rust-version = "1.75.0". This job verifies that claim.
+  # If it fails, either bump the declared MSRV or pin dependency versions.
+  msrv:
+    name: MSRV (1.75.0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.75.0
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check (default + websocket)
+        run: cargo check -p ultimo -p ultimo-cli --features "websocket"
+
+  # ── Public-API breaking-change detection ──────────────────────────────
+  # Guards the pre-1.0 public API against accidental SemVer breakage by
+  # diffing against the version published on crates.io. Pairs with CHANGELOG.md.
+  semver:
+    name: semver-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install DB client libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev default-libmysqlclient-dev pkg-config
+      - uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: ultimo
+          feature-group: all-features

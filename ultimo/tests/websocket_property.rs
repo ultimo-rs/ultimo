@@ -11,7 +11,7 @@ use ultimo::websocket::test_helpers::{Frame, OpCode};
 
 /// Strategy for generating random payloads
 fn payload_strategy() -> impl Strategy<Value = Bytes> {
-    prop::collection::vec(any::<u8>(), 0..1000).prop_map(|v| Bytes::from(v))
+    prop::collection::vec(any::<u8>(), 0..1000).prop_map(Bytes::from)
 }
 
 /// Strategy for generating valid UTF-8 text

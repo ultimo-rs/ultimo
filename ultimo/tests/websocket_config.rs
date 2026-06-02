@@ -14,7 +14,7 @@ mod websocket_config_tests {
         assert_eq!(config.max_frame_size, 16 * 1024 * 1024); // 16MB
         assert_eq!(config.ping_interval, Some(30)); // 30 seconds
         assert_eq!(config.ping_timeout, 10); // 10 seconds
-        assert_eq!(config.compression, false);
+        assert!(!config.compression);
         assert_eq!(config.write_buffer_size, 128 * 1024); // 128KB
         assert_eq!(config.max_write_queue_size, 1024);
         assert_eq!(config.subprotocols, Vec::<String>::new());

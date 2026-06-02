@@ -11,7 +11,7 @@ mod websocket_shutdown_tests {
         let close_frame = Frame::close(Some(1000), Some("Normal closure"));
         assert_eq!(close_frame.opcode, OpCode::Close);
         assert!(close_frame.fin);
-        assert!(close_frame.payload.len() > 0);
+        assert!(!close_frame.payload.is_empty());
     }
 
     #[tokio::test]
