@@ -530,7 +530,9 @@ mod tests {
         assert_eq!(app.handlers.len(), 2);
     }
 
-    #[cfg(feature = "database")]
+    // Gated on `sqlx` (not just `database`) because it constructs the
+    // Database::Sqlx variant, which only exists with the sqlx backend.
+    #[cfg(feature = "sqlx")]
     #[test]
     fn test_database_attachment() {
         use std::sync::Arc;

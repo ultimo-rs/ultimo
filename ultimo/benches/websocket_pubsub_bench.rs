@@ -71,7 +71,7 @@ fn bench_publish(c: &mut Criterion) {
 
                 b.iter(|| {
                     rt.block_on(async {
-                        black_box(manager.publish(&topic, message.clone()).await.unwrap())
+                        black_box(manager.publish(topic, message.clone()).await.unwrap())
                     });
                 });
             },
@@ -112,7 +112,7 @@ fn bench_publish_message_sizes(c: &mut Criterion) {
 
                 b.iter(|| {
                     rt.block_on(async {
-                        black_box(manager.publish(&topic, message.clone()).await.unwrap())
+                        black_box(manager.publish(topic, message.clone()).await.unwrap())
                     });
                 });
             },

@@ -5,7 +5,7 @@
 
 #[cfg(feature = "database")]
 #[cfg(test)]
-mod tests {
+mod error_tests {
     use crate::database::DatabaseError;
 
     #[test]
@@ -268,11 +268,13 @@ mod context_tests {
         // Actual integration tested in examples
 
         // Just verify the API compiles
-        fn _check_context_api(ctx: &crate::Context) {
+        // `_ctx` is only referenced under the postgres backend features; the
+        // underscore keeps it warning-free under any other feature combo.
+        fn _check_context_api(_ctx: &crate::Context) {
             #[cfg(feature = "sqlx-postgres")]
             {
                 let _result: Result<&sqlx::Pool<sqlx::Postgres>, crate::UltimoError> =
-                    ctx.sqlx::<sqlx::Postgres>();
+                    _ctx.sqlx::<sqlx::Postgres>();
             }
 
             #[cfg(feature = "diesel-postgres")]
@@ -281,7 +283,7 @@ mod context_tests {
                 let _result: Result<
                     PooledConnection<ConnectionManager<diesel::PgConnection>>,
                     crate::UltimoError,
-                > = ctx.diesel::<diesel::PgConnection>();
+                > = _ctx.diesel::<diesel::PgConnection>();
             }
         }
     }

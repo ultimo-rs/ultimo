@@ -388,7 +388,7 @@ mod tests {
         let mut buf = BytesMut::from(encoded.as_ref());
         let decoded = Frame::parse(&mut buf).unwrap().unwrap();
 
-        assert_eq!(decoded.fin, true);
+        assert!(decoded.fin);
         assert_eq!(decoded.opcode, OpCode::Text);
         assert_eq!(decoded.payload, Bytes::from("Hello, WebSocket!"));
     }
