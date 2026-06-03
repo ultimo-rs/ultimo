@@ -43,6 +43,9 @@ pub mod database;
 #[cfg(feature = "websocket")]
 pub mod websocket;
 
+#[cfg(feature = "testing")]
+pub mod testing;
+
 // Re-exports for convenience
 pub use app::Ultimo;
 pub use context::Context;

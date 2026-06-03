@@ -28,24 +28,29 @@ pub struct Request {
 }
 
 impl Request {
-    /// Create a new Request from a Hyper request and path parameters
-    pub async fn new(req: HyperRequest<Incoming>, params: Params) -> Result<Self> {
-        let (parts, body) = req.into_parts();
-
-        // Collect the full body
-        let collected = body
-            .collect()
-            .await
-            .map_err(|e| UltimoError::Internal(format!("Failed to read body: {}", e)))?;
-        let body_bytes = collected.to_bytes();
-
-        Ok(Self {
+    /// Build a Request from already-parsed parts and a buffered body.
+    pub(crate) fn from_parts(
+        parts: hyper::http::request::Parts,
+        body: Bytes,
+        params: Params,
+    ) -> Self {
+        Self {
             method: parts.method,
             uri: parts.uri,
             headers: parts.headers,
             params,
-            body: Arc::new(RwLock::new(Some(body_bytes))),
-        })
+            body: Arc::new(RwLock::new(Some(body))),
+        }
+    }
+
+    /// Create a new Request from a Hyper request and path parameters
+    pub async fn new(req: HyperRequest<Incoming>, params: Params) -> Result<Self> {
+        let (parts, body) = req.into_parts();
+        let collected = body
+            .collect()
+            .await
+            .map_err(|e| UltimoError::Internal(format!("Failed to read body: {}", e)))?;
+        Ok(Self::from_parts(parts, collected.to_bytes(), params))
     }
 
     /// Get a path parameter by name
@@ -159,18 +164,30 @@ pub struct Context {
 }
 
 impl Context {
-    /// Create a new context from a request and params
-    pub async fn new(req: HyperRequest<Incoming>, params: Params) -> Result<Self> {
-        let request = Request::new(req, params).await?;
-
-        Ok(Self {
-            req: request,
+    /// Build a Context from already-parsed parts and a buffered body.
+    pub(crate) fn from_parts(
+        parts: hyper::http::request::Parts,
+        body: Bytes,
+        params: Params,
+    ) -> Self {
+        Self {
+            req: Request::from_parts(parts, body, params),
             state: Arc::new(RwLock::new(HashMap::new())),
             response_status: Arc::new(RwLock::new(None)),
             response_headers: Arc::new(RwLock::new(HashMap::new())),
             #[cfg(feature = "database")]
             database: None,
-        })
+        }
+    }
+
+    /// Create a new context from a request and params
+    pub async fn new(req: HyperRequest<Incoming>, params: Params) -> Result<Self> {
+        let (parts, body) = req.into_parts();
+        let collected = body
+            .collect()
+            .await
+            .map_err(|e| UltimoError::Internal(format!("Failed to read body: {}", e)))?;
+        Ok(Self::from_parts(parts, collected.to_bytes(), params))
     }
 
     /// Attach a database to this context (internal use)
@@ -468,5 +485,28 @@ mod tests {
 
         assert_eq!(bytes, Bytes::from("binary data"));
         assert_eq!(bytes.len(), 11);
+    }
+}
+
+#[cfg(test)]
+mod from_parts_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn request_from_parts_exposes_method_path_query_body() {
+        let req = HyperRequest::builder()
+            .method("POST")
+            .uri("/users?team=core")
+            .body(())
+            .unwrap();
+        let (parts, ()) = req.into_parts();
+        let body = Bytes::from_static(br#"{"name":"ada"}"#);
+
+        let r = Request::from_parts(parts, body, Params::new());
+
+        assert_eq!(r.method(), &hyper::Method::POST);
+        assert_eq!(r.path(), "/users");
+        assert_eq!(r.query("team").as_deref(), Some("core"));
+        assert_eq!(r.text().await.unwrap(), r#"{"name":"ada"}"#);
     }
 }

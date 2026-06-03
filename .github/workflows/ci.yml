@@ -43,8 +43,8 @@ jobs:
       # --all-targets here lints lib, integration tests and benches together,
       # all of which compile once websocket+test-helpers are enabled.
       # Database features are linted in the `test-db` job (needs system libs).
-      - name: clippy (websocket + test-helpers, all targets)
-        run: cargo clippy -p ultimo --all-targets --features "websocket,test-helpers" -- -D warnings
+      - name: clippy (websocket + test-helpers + testing, all targets)
+        run: cargo clippy -p ultimo --all-targets --features "websocket,test-helpers,testing" -- -D warnings
 
   # ── Unit + integration tests (no DB system deps) ──────────────────────
   test:
@@ -70,6 +70,13 @@ jobs:
 
       - name: CLI tests
         run: cargo test -p ultimo-cli
+
+      # Testing-utilities (the `testing` feature): in-process TestClient,
+      # assertions, macros, middleware helpers, fixtures + their doctests.
+      - name: Testing-utilities tests
+        run: |
+          cargo test -p ultimo --features "testing" --test testing_utils
+          cargo test -p ultimo --features "testing" --doc
 
       # websocket_pubsub_bench uses test_helpers::ChannelManager, so benches
       # need test-helpers in addition to websocket.
@@ -104,6 +111,10 @@ jobs:
       # which need the websocket+test-helpers features (covered by the `test` job).
       - name: Database tests (sqlite — no server required)
         run: cargo test -p ultimo --lib --features "sqlx-sqlite,diesel-sqlite"
+
+      # Testing-utilities DB rollback helper (with_test_transaction) against sqlite.
+      - name: Testing-utilities DB tests (sqlite)
+        run: cargo test -p ultimo --features "testing,sqlx-sqlite" --test testing_db
 
   # ── Minimum Supported Rust Version ────────────────────────────────────
   # Verifies the rust-version declared in Cargo.toml (single source of truth).

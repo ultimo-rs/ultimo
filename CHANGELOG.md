@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Testing utilities** (`testing` feature, #4): in-process `TestClient`, fluent
+  request builder, `TestResponse` with assertion helpers, `assert_json_eq!` /
+  `assert_status!` macros, middleware test helpers (`test_context`,
+  `run_middleware`), a database transaction/rollback helper
+  (`with_test_transaction`), and `load_fixture` / `Fixture`. See
+  `docs/testing-utilities.md`.
+- `Ultimo::oneshot` — dispatch a fully-buffered request through the app
+  in-process (no socket); the seam the testing utilities build on.
+- CI: a `cargo-audit` (RUSTSEC) job and an MSRV job; `Cargo.lock` is now
+  committed.
+
+### Changed
+
+- **MSRV raised to 1.86.0** (a transitive dependency requires `edition2024`).
+  This is a breaking change for consumers on older Rust — the next release is
+  planned as **0.3.0**.
+- Hardened dependency floors (`bytes >= 1.11.1`, `diesel >= 2.3.8`) to exclude
+  versions with known RUSTSEC advisories.
+
 ## [0.2.1] - 2026-01-04
 
 ### Fixed
