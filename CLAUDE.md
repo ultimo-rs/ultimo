@@ -6,7 +6,40 @@ WebSocket support with built-in pub/sub. Built on **Hyper 1.0 + Tokio**.
 
 - Homepage: https://ultimo.dev · Docs: https://docs.ultimo.dev · Roadmap: https://docs.ultimo.dev/roadmap
 - Repo: https://github.com/ultimo-rs/ultimo · Issues: https://github.com/ultimo-rs/ultimo/issues · Board: https://github.com/orgs/ultimo-rs/projects/1
-- Current version: **0.2.1** · Edition 2021 · MSRV **1.75.0** · License MIT
+- Current version: **0.2.1** · Edition 2021 · MSRV **1.86.0** · License MIT
+
+## ⚠️ THESE ARE PUBLISHED CRATES — read before changing any public code
+
+Ultimo ships two crates to crates.io that real users depend on:
+- **`ultimo`** — https://crates.io/crates/ultimo (the library)
+- **`ultimo-cli`** — https://crates.io/crates/ultimo-cli (the binary; depends on `ultimo`)
+
+Every change is a potential breaking change for downstream users. **The following
+is part of the public API contract** — changing any of it can break consumers and
+requires a deliberate version bump + CHANGELOG entry:
+
+- Any `pub` item (types, fns, traits, enum variants, fields) and the `prelude`
+- **Cargo feature names** (`websocket`, `database`, `sqlx-*`, `diesel-*`, `test-helpers`) — renaming/removing one breaks `features = [...]` downstream
+- **MSRV** (`rust-version`) — raising it is a breaking change for users on older Rust (we are at 1.86.0)
+- **Direct dependency version requirements** — raising a floor (e.g. `bytes`, `diesel`) constrains downstream resolution; types re-exported from a dep (e.g. `bytes::Bytes` in WebSocket messages) make that dep's version part of *our* API
+- CLI subcommands / flags of `ultimo-cli`
+
+### Always do, on EVERY change
+1. **Decide the SemVer impact.** Pre-1.0 (0.x) rule: breaking change → bump **minor** (0.2.x → 0.3.0); additive/fix → bump **patch** (0.2.1 → 0.2.2). CI's `semver-checks` job will catch unintended breakage — respect its verdict, don't override it.
+2. **Update `CHANGELOG.md`** in the same PR (Keep-a-Changelog style; the release workflow extracts the section).
+3. **Keep `README.md` accurate** — it's the crates.io landing page.
+4. **Don't break docs.rs** — public items need doc comments; doctests must compile (`cargo test --doc`). Gate doc-only feature needs via `[package.metadata.docs.rs]` if added.
+
+### Always do, on a RELEASE
+1. Bump `version` in root `Cargo.toml` (`[workspace.package]`) — both crates share it.
+2. Finalize the `CHANGELOG.md` section for that version.
+3. `cargo publish -p ultimo --dry-run` **and** `cargo publish -p ultimo-cli --dry-run` (the packaged tarball must build standalone — no path-dep leakage).
+4. Publish order: **`ultimo` first, then `ultimo-cli`** (cli depends on the library). `release.yml` automates this on a version change to `main`.
+5. If a published version ships a vulnerability or a serious bug → **`cargo yank`** that version and release a fixed patch.
+
+> Heads-up: `main` currently carries an unreleased MSRV bump (1.75 → 1.86) and raised
+> dep floors (`bytes`, `diesel`). These are breaking for old-Rust users, so the **next
+> release should be `0.3.0`**, not a `0.2.x` patch.
 
 ## Workspace layout
 
@@ -95,12 +128,17 @@ cargo run -p ultimo-cli -- build --profile <debug|release>
 `ultimo/benches/`: `websocket_bench.rs`, `websocket_pubsub_bench.rs` (criterion, `harness = false`).
 Perf claims (158k+ req/s) live or die by these — guard against regressions before changing hot paths.
 
-## CI / repo state (as of revival, June 2026 — last commit was 2026-01-04)
-- `.github/workflows/`: `label-pr.yml`, `project-automation.yml`, `release.yml` only.
-  **There is NO build/test/clippy/fmt CI workflow** — biggest guardrail gap. Nothing
-  blocks a regression on PR. Adding one is a priority (build + `--lib` tests +
-  feature-gated integration tests + clippy + fmt + ideally `cargo-semver-checks`).
-- Release automation lives in `release.yml` + `scripts/release.sh` (runs `cargo test -p ultimo --lib` only).
+## CI / repo state (June 2026)
+- **`ci.yml`** is the guardrail (push + PR to `main`): jobs `fmt + clippy`, `test`
+  (ubuntu + macOS: lib + feature-gated integration + CLI tests + benches), `test-db`
+  (`--all-features` + sqlite db tests), `MSRV` (reads `rust-version` from Cargo.toml),
+  `semver-checks` (public-API breakage vs the published crate), and `cargo-audit`
+  (RUSTSEC; fails on new advisories, ignores 6 known sqlx-0.8 ones).
+- Other workflows: `release.yml` (auto-publish on version bump to `main`),
+  `project-automation.yml` (org-project board; `continue-on-error` — needs a
+  project-scoped PAT to actually function), `label-pr.yml`.
+- **`Cargo.lock` is committed** (workspace ships a binary). `main` branch protection
+  requires 1 review; solo merges use admin override.
 - `.moon/` present (moonrepo config) and `node_modules/` (for TS-client / website tooling).
 
 ## Roadmap (next milestone = v0.3.0)
@@ -111,9 +149,11 @@ Perf claims (158k+ req/s) live or die by these — guard against regressions bef
 - v1.0.0: stable API + complete docs
 
 ## Conventions
+- **These are published crates — see the "PUBLISHED CRATES" section at the top before
+  changing any public code, features, MSRV, or dep floors.**
 - Use the Makefile targets, not raw cargo, where one exists.
 - `default = []` means: when adding code under a feature, gate it with `#[cfg(feature = "...")]`
   and remember integration tests must enable the feature combo explicitly.
-- Pre-1.0: breaking public-API changes are allowed but should be deliberate and changelogged
-  (`CHANGELOG.md`). Once `cargo-semver-checks` is wired into CI, respect its verdict.
+- Breaking public-API changes must be deliberate, changelogged (`CHANGELOG.md`), and
+  version-bumped. `cargo-semver-checks` runs in CI — respect its verdict.
 - Always run `cargo fmt --all` and `cargo clippy` before committing (`.githooks/` may enforce this).
