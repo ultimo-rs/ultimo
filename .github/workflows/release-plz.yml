@@ -1,0 +1,61 @@
+name: release-plz
+
+# Automated releases for the ultimo + ultimo-cli crates.
+#
+# On every push to main, release-plz keeps a "release PR" up to date that bumps
+# the workspace version and updates CHANGELOG.md from Conventional Commits.
+# Merging that PR publishes both crates to crates.io (dependency-ordered),
+# creates the git tag(s), and opens a GitHub Release. See RELEASING.md.
+#
+# Required secrets:
+#   CARGO_REGISTRY_TOKEN  — crates.io API token (Publish scope)
+#   RELEASE_PLZ_TOKEN     — a PAT or GitHub App token (recommended) so the
+#                           release PR triggers CI; falls back to GITHUB_TOKEN
+#                           (in which case CI will NOT run on the release PR).
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # Publish + tag + GitHub Release when a release commit lands on main
+  # (i.e. when the release PR is merged).
+  release-plz-release:
+    name: release-plz release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run release-plz (release)
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  # Maintain the release PR (version bump + changelog) on each push to main.
+  release-plz-pr:
+    name: release-plz pr
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run release-plz (release-pr)
+        uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

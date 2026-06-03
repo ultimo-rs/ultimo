@@ -1,0 +1,29 @@
+# release-plz configuration — see https://release-plz.dev/docs/config
+#
+# The two crates (`ultimo`, `ultimo-cli`) share one workspace version and are
+# released together. release-plz resolves the publish order from the dependency
+# graph (ultimo before ultimo-cli).
+
+[workspace]
+# Keep CHANGELOG.md updated from Conventional Commits.
+changelog_update = true
+# Create a GitHub Release (with notes) when publishing.
+git_release_enable = true
+# Tag as vX.Y.Z to match the existing tag history.
+git_tag_name = "v{{ version }}"
+# Both crates move together on the shared workspace version.
+dependencies_update = false
+
+[changelog]
+# Conventional-commit groups, most useful first.
+commit_parsers = [
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^chore", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^test", skip = true },
+  { message = "^style", skip = true },
+]

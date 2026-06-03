@@ -177,3 +177,16 @@ jobs:
             --ignore RUSTSEC-2026-0104 \
             --ignore RUSTSEC-2026-0098 \
             --ignore RUSTSEC-2026-0099
+
+  # ── Version sync across Cargo.toml + both sites + changelogs ───────────
+  # Cargo.toml is the single source of truth; this fails if any site or
+  # changelog has drifted. Fix with `scripts/sync-versions.sh`. Especially
+  # relevant on the release-plz release PR (it bumps Cargo.toml + CHANGELOG;
+  # run sync-versions to update the sites before merging).
+  version-sync:
+    name: version-sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check versions are in sync
+        run: bash scripts/check-versions.sh
