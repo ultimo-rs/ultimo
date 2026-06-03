@@ -8,13 +8,16 @@ use crate::{
     handler::{BoxedHandler, IntoHandler},
     middleware::{BoxedMiddleware, MiddlewareChain},
     response::{self, Response},
-    router::{Method, Router},
+    router::{Method, Params, Router},
 };
+use bytes::Bytes;
+use http_body_util::BodyExt;
 use hyper::body::Incoming;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::Request as HyperRequest;
 use hyper_util::rt::TokioIo;
+#[cfg(feature = "websocket")]
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -257,12 +260,10 @@ impl Ultimo {
 
     /// Handle an incoming HTTP request
     async fn handle_request(&self, req: HyperRequest<Incoming>) -> Response {
-        let method_str = req.method().clone();
-        let path = req.uri().path().to_string();
-
-        // Check for WebSocket upgrade request
+        // Check for WebSocket upgrade request (needs the live `Incoming` body)
         #[cfg(feature = "websocket")]
         {
+            let path = req.uri().path().to_string();
             if let Some(ws_handler) = self.websocket_routes.get(&path) {
                 // Check if this is a WebSocket upgrade request
                 if req
@@ -277,6 +278,23 @@ impl Ultimo {
                 }
             }
         }
+
+        // Buffer the body, then dispatch through the body-agnostic core.
+        let (parts, body) = req.into_parts();
+        let bytes = match body.collect().await {
+            Ok(c) => c.to_bytes(),
+            Err(e) => {
+                error!("Failed to read body: {}", e);
+                return response::helpers::text("Internal Error").unwrap();
+            }
+        };
+        self.dispatch_parts(parts, bytes).await
+    }
+
+    /// Run routing + middleware + handler against an already-buffered request.
+    async fn dispatch_parts(&self, parts: hyper::http::request::Parts, body: Bytes) -> Response {
+        let method_str = parts.method.clone();
+        let path = parts.uri.path().to_string();
 
         // Parse method
         let method = match Method::from_hyper(&method_str) {
@@ -294,14 +312,7 @@ impl Ultimo {
         // This allows CORS middleware to respond to preflight requests
         if method_str == hyper::Method::OPTIONS {
             // Create context for OPTIONS request
-            let ctx = match Context::new(req, HashMap::new()).await {
-                Ok(ctx) => ctx,
-                Err(err) => {
-                    error!("Failed to create context: {}", err);
-                    return response::helpers::error_response(&err)
-                        .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap());
-                }
-            };
+            let ctx = Context::from_parts(parts, body, Params::new());
 
             // Build and execute middleware chain
             let mut chain = MiddlewareChain::new();
@@ -342,14 +353,7 @@ impl Ultimo {
 
         // Create context
         #[cfg_attr(not(feature = "database"), allow(unused_mut))]
-        let mut ctx = match Context::new(req, params).await {
-            Ok(ctx) => ctx,
-            Err(err) => {
-                error!("Failed to create context: {}", err);
-                return response::helpers::error_response(&err)
-                    .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap());
-            }
-        };
+        let mut ctx = Context::from_parts(parts, body, params);
 
         // Attach database if configured
         #[cfg(feature = "database")]
@@ -380,6 +384,17 @@ impl Ultimo {
                     .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap())
             }
         }
+    }
+
+    /// Dispatch a fully-buffered request through the app in-process (no socket).
+    pub async fn oneshot(&self, req: HyperRequest<http_body_util::Full<Bytes>>) -> Response {
+        let (parts, body) = req.into_parts();
+        let bytes = body
+            .collect()
+            .await
+            .map(|c| c.to_bytes())
+            .unwrap_or_default();
+        self.dispatch_parts(parts, bytes).await
     }
 
     /// Start the HTTP server
@@ -557,5 +572,46 @@ mod tests {
         assert_send::<Ultimo>();
         // Note: Ultimo is not Sync because it contains non-Sync types
         // This is OK since we Arc it in listen()
+    }
+}
+
+#[cfg(test)]
+mod oneshot_tests {
+    use super::*;
+    use http_body_util::{BodyExt, Full};
+    use hyper::Request as HyperRequest;
+
+    async fn body_string(resp: Response) -> String {
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn oneshot_routes_and_returns_response() {
+        let mut app = Ultimo::new_without_defaults();
+        app.get(
+            "/ping",
+            |ctx: Context| async move { ctx.text("pong").await },
+        );
+
+        let req = HyperRequest::builder()
+            .method("GET")
+            .uri("/ping")
+            .body(Full::new(bytes::Bytes::new()))
+            .unwrap();
+
+        let resp = app.oneshot(req).await;
+        assert_eq!(resp.status(), 200);
+        assert_eq!(body_string(resp).await, "pong");
+    }
+
+    #[tokio::test]
+    async fn oneshot_unknown_route_is_404() {
+        let app = Ultimo::new_without_defaults();
+        let req = HyperRequest::builder()
+            .uri("/nope")
+            .body(Full::new(bytes::Bytes::new()))
+            .unwrap();
+        assert_eq!(app.oneshot(req).await.status(), 404);
     }
 }
