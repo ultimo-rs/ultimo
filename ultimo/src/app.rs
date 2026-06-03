@@ -285,7 +285,11 @@ impl Ultimo {
             Ok(c) => c.to_bytes(),
             Err(e) => {
                 error!("Failed to read body: {}", e);
-                return response::helpers::text("Internal Error").unwrap();
+                return response::helpers::error_response(&UltimoError::Internal(format!(
+                    "Failed to read body: {}",
+                    e
+                )))
+                .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap());
             }
         };
         self.dispatch_parts(parts, bytes).await
