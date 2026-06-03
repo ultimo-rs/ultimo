@@ -142,3 +142,27 @@ jobs:
         with:
           package: ultimo
           feature-group: all-features
+
+  # ── Dependency security advisories (RUSTSEC) ──────────────────────────
+  # Fails on NEW vulnerabilities. The --ignore list holds known advisories that
+  # all require the sqlx 0.7 -> 0.8 upgrade (tracked separately); revisit/remove
+  # these once sqlx is bumped. rsa (RUSTSEC-2023-0071) has no upstream fix and is
+  # only reachable via the optional sqlx-mysql backend.
+  audit:
+    name: cargo-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - name: cargo audit (committed Cargo.lock)
+        run: |
+          cargo audit \
+            --ignore RUSTSEC-2024-0363 \
+            --ignore RUSTSEC-2024-0421 \
+            --ignore RUSTSEC-2023-0071 \
+            --ignore RUSTSEC-2026-0104 \
+            --ignore RUSTSEC-2026-0098 \
+            --ignore RUSTSEC-2026-0099
