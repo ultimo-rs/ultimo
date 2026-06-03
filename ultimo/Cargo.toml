@@ -54,6 +54,9 @@ websocket = []
 # Test helpers (for integration tests)
 test-helpers = []
 
+# Testing utilities for Ultimo apps (TestClient, assertions, fixtures)
+testing = []
+
 # Database features
 database = []
 sqlx-postgres = ["database", "sqlx", "sqlx/postgres"]
