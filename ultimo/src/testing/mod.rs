@@ -5,3 +5,9 @@
 //! in-process — no socket, fully deterministic.
 //!
 //! See the per-type docs and the testing guide for usage examples.
+
+mod client;
+mod response;
+
+pub use client::{TestClient, TestRequest};
+pub use response::TestResponse;
