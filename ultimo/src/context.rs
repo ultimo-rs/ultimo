@@ -158,6 +158,9 @@ pub struct Context {
     state: Arc<RwLock<HashMap<String, String>>>,
     response_status: Arc<RwLock<Option<u16>>>,
     response_headers: Arc<RwLock<HashMap<String, String>>>,
+    set_cookies: Arc<RwLock<Vec<String>>>,
+    #[cfg(feature = "session")]
+    session: Arc<RwLock<Option<crate::session::Session>>>,
 
     #[cfg(feature = "database")]
     database: Option<Database>,
@@ -175,6 +178,9 @@ impl Context {
             state: Arc::new(RwLock::new(HashMap::new())),
             response_status: Arc::new(RwLock::new(None)),
             response_headers: Arc::new(RwLock::new(HashMap::new())),
+            set_cookies: Arc::new(RwLock::new(Vec::new())),
+            #[cfg(feature = "session")]
+            session: Arc::new(RwLock::new(None)),
             #[cfg(feature = "database")]
             database: None,
         }
@@ -243,6 +249,55 @@ impl Context {
     pub async fn get(&self, key: &str) -> Option<String> {
         let state = self.state.read().await;
         state.get(key).cloned()
+    }
+
+    /// Read a request cookie by name.
+    pub fn cookie(&self, name: &str) -> Option<String> {
+        self.req
+            .header("cookie")
+            .and_then(|h| crate::cookie::parse_cookie_header(&h).remove(name))
+    }
+
+    /// All request cookies.
+    pub fn cookies(&self) -> HashMap<String, String> {
+        self.req
+            .header("cookie")
+            .map(|h| crate::cookie::parse_cookie_header(&h))
+            .unwrap_or_default()
+    }
+
+    /// Queue a `Set-Cookie` for the response. Errors if the cookie is invalid.
+    pub async fn set_cookie(&self, cookie: crate::cookie::Cookie) -> Result<()> {
+        let s = cookie.to_set_cookie_string()?;
+        self.set_cookies.write().await.push(s);
+        Ok(())
+    }
+
+    /// Queue a deletion of the named cookie (`Max-Age=0`).
+    pub async fn remove_cookie(&self, name: &str) -> Result<()> {
+        let c = crate::cookie::Cookie::new(name, "").max_age(0).path("/");
+        self.set_cookie(c).await
+    }
+
+    /// Shared handle to the queued Set-Cookie values (drained by the dispatcher).
+    pub(crate) fn set_cookies_handle(&self) -> Arc<RwLock<Vec<String>>> {
+        self.set_cookies.clone()
+    }
+
+    /// The current session. Panics if the session middleware isn't installed.
+    #[cfg(feature = "session")]
+    pub async fn session(&self) -> crate::session::Session {
+        self.session
+            .read()
+            .await
+            .clone()
+            .expect("session middleware not installed (add `session(store, config)`)")
+    }
+
+    /// Attach a session to this context (used by the session middleware).
+    #[cfg(feature = "session")]
+    pub(crate) async fn set_session(&self, s: crate::session::Session) {
+        *self.session.write().await = Some(s);
     }
 
     /// Set the response status code
