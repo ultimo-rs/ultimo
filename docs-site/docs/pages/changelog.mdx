@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-04
+
+### Added
+
+- **Sessions** (`session` feature): cookie-based session management — `SessionStore` + `MemoryStore`, `ctx.session()`, secure middleware (256-bit ids, HttpOnly/Secure/SameSite, anti-fixation/DoS), `SessionConfig`. See the session-auth example.
+- **Cookie helper** (`ultimo::cookie`): parsing + `Set-Cookie` formatting and `ctx.cookie`/`set_cookie`/`remove_cookie`.
+- **Testing utilities** (`testing` feature): in-process `TestClient`, request builder, response assertions, macros, middleware/DB/fixture helpers.
+- `Ultimo::oneshot` for in-process dispatch; `Request::raw_body()`.
+
+### Fixed
+
+- Router precedence: static routes win over parameterized ones regardless of registration order.
+
+### Changed
+
+- **MSRV raised to 1.86.0** (breaking). Dependency floors hardened for RUSTSEC advisories.
+
 ## [0.2.1] - 2026-01-04
 
 ### Fixed
