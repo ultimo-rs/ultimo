@@ -81,12 +81,11 @@ where
                 push_cookie(&cookie_sink, expiry_cookie(&config)).await;
             } else if session.is_dirty() && !session.is_empty().await {
                 // Only persist dirty, non-empty sessions (anti unbounded-DoS).
-                let final_id = match session.take_new_id().await {
-                    Some(new_id) => {
-                        store.destroy(&id).await; // fixation: drop the old entry
-                        new_id
-                    }
-                    None => id.clone(),
+                let final_id = if session.wants_regenerate() {
+                    store.destroy(&id).await; // fixation: drop the old entry
+                    generate_id()
+                } else {
+                    id.clone()
                 };
                 store
                     .store(&final_id, &session.snapshot().await, config.ttl)

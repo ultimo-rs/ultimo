@@ -50,7 +50,8 @@ Defaults are secure:
 - **Server-side data** — only the id is in the cookie, so there's no tampering or
   confidentiality risk on the client.
 - **Anti session-fixation** — a client-supplied id is never adopted; unknown ids
-  get a fresh server id. Call **`regenerate(new_id)`** on login/privilege change.
+  get a fresh server id. Call **`ctx.session().await.regenerate()`** on
+  login/privilege change — the middleware issues a new id and drops the old one.
 - **Anti-DoS** — empty/untouched sessions are not persisted and get no cookie.
 - **Expiration** — enforced server-side (store TTL) *and* via the cookie `Max-Age`.
 

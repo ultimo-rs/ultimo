@@ -48,7 +48,7 @@ struct SessionInner {
     data: RwLock<SessionData>,
     dirty: AtomicBool,
     destroyed: AtomicBool,
-    new_id: RwLock<Option<String>>,
+    regenerate: AtomicBool,
 }
 
 impl Session {
@@ -59,7 +59,7 @@ impl Session {
                 data: RwLock::new(data),
                 dirty: AtomicBool::new(false),
                 destroyed: AtomicBool::new(false),
-                new_id: RwLock::new(None),
+                regenerate: AtomicBool::new(false),
             }),
         }
     }
@@ -98,10 +98,11 @@ impl Session {
         self.inner.dirty.store(true, Ordering::SeqCst);
     }
 
-    /// Issue a new id on the next persist (session-fixation defense). The old
-    /// store entry is destroyed by the middleware.
-    pub async fn regenerate(&self, new_id: String) {
-        *self.inner.new_id.write().await = Some(new_id);
+    /// Request a fresh session id on the next persist (session-fixation
+    /// defense — call this on login / privilege change). The middleware
+    /// generates the new id and destroys the old store entry.
+    pub fn regenerate(&self) {
+        self.inner.regenerate.store(true, Ordering::SeqCst);
         self.inner.dirty.store(true, Ordering::SeqCst);
     }
 
@@ -120,8 +121,8 @@ impl Session {
     pub(crate) async fn snapshot(&self) -> SessionData {
         self.inner.data.read().await.clone()
     }
-    pub(crate) async fn take_new_id(&self) -> Option<String> {
-        self.inner.new_id.write().await.take()
+    pub(crate) fn wants_regenerate(&self) -> bool {
+        self.inner.regenerate.load(Ordering::SeqCst)
     }
     pub(crate) async fn is_empty(&self) -> bool {
         self.inner.data.read().await.is_empty()
@@ -143,10 +144,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn regenerate_queues_new_id() {
+    async fn regenerate_sets_flag() {
         let s = Session::new("old".into(), SessionData::new());
-        s.regenerate("new".into()).await;
-        assert_eq!(s.take_new_id().await, Some("new".to_string()));
+        assert!(!s.wants_regenerate());
+        s.regenerate();
+        assert!(s.wants_regenerate());
         assert!(s.is_dirty());
     }
 }

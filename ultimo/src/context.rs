@@ -604,3 +604,86 @@ mod from_parts_tests {
         assert_eq!(r.text().await.unwrap(), r#"{"name":"ada"}"#);
     }
 }
+
+#[cfg(test)]
+mod context_response_tests {
+    use super::*;
+    use http_body_util::BodyExt;
+
+    fn ctx() -> Context {
+        let req = HyperRequest::builder()
+            .method("GET")
+            .uri("/x?a=1&a=2&b=3")
+            .header("cookie", "t=v; u=w")
+            .body(())
+            .unwrap();
+        let (parts, ()) = req.into_parts();
+        Context::from_parts(parts, Bytes::from_static(b"{\"k\":1}"), Params::new())
+    }
+
+    async fn body(resp: Response) -> String {
+        let b = resp.into_body().collect().await.unwrap().to_bytes();
+        String::from_utf8(b.to_vec()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn state_set_get() {
+        let c = ctx();
+        c.set("k", "v").await;
+        assert_eq!(c.get("k").await, Some("v".to_string()));
+        assert_eq!(c.get("missing").await, None);
+    }
+
+    #[tokio::test]
+    async fn json_text_html_responses() {
+        let c = ctx();
+        let r = c.json(serde_json::json!({ "x": 1 })).await.unwrap();
+        assert_eq!(r.status(), 200);
+        assert_eq!(body(r).await, "{\"x\":1}");
+
+        let c = ctx();
+        assert_eq!(body(c.text("hi").await.unwrap()).await, "hi");
+
+        let c = ctx();
+        assert_eq!(body(c.html("<p>").await.unwrap()).await, "<p>");
+    }
+
+    #[tokio::test]
+    async fn status_and_header_applied_to_response() {
+        let c = ctx();
+        c.status(201).await;
+        c.header("x-test", "1").await;
+        let r = c.text("ok").await.unwrap();
+        assert_eq!(r.status(), 201);
+        assert_eq!(r.headers().get("x-test").unwrap(), "1");
+    }
+
+    #[tokio::test]
+    async fn redirect_and_not_found() {
+        let r = ctx().redirect("/login").await.unwrap();
+        assert_eq!(r.status(), 302);
+        assert_eq!(r.headers().get("location").unwrap(), "/login");
+
+        let r = ctx().not_found().await.unwrap();
+        assert_eq!(r.status(), 404);
+    }
+
+    #[tokio::test]
+    async fn cookies_query_and_body() {
+        let c = ctx();
+        assert_eq!(c.cookie("t"), Some("v".to_string()));
+        assert_eq!(c.cookie("u"), Some("w".to_string()));
+        assert_eq!(c.cookies().len(), 2);
+
+        c.set_cookie(crate::cookie::Cookie::new("s", "1"))
+            .await
+            .unwrap();
+        c.remove_cookie("old").await.unwrap();
+        assert_eq!(c.set_cookies_handle().read().await.len(), 2);
+
+        assert_eq!(c.req.query("b"), Some("3".to_string()));
+        assert_eq!(c.req.queries().get("a").unwrap().len(), 2);
+        assert_eq!(c.req.path(), "/x");
+        assert_eq!(c.req.method(), &hyper::Method::GET);
+    }
+}

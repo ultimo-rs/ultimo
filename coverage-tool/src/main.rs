@@ -3,12 +3,15 @@
 //! Uses Rust's built-in LLVM instrumentation to generate coverage reports.
 //! Minimal dependencies, easy to audit, fully transparent.
 
-use chrono;
-use serde_json;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use walkdir::WalkDir;
+
+/// Features enabled when measuring coverage so feature-gated code AND its tests
+/// are exercised. SQLite backends are used (no system DB libs needed); mysql/
+/// postgres backends are excluded to avoid requiring libmysqlclient/libpq.
+const COVERAGE_FEATURES: &str = "websocket,test-helpers,testing,session,sqlx-sqlite,diesel-sqlite";
 
 fn main() {
     println!("🧪 Ultimo Coverage Tool");
@@ -31,10 +34,19 @@ fn main() {
     std::env::set_var("RUSTFLAGS", "-C instrument-coverage");
     std::env::set_var("LLVM_PROFILE_FILE", profile_file.to_str().unwrap());
 
-    // Step 3: Run tests with instrumentation
+    // Step 3: Run tests with instrumentation. Run ALL ultimo test targets
+    // (lib + integration) with the coverage feature set so feature-gated code
+    // and its integration tests count toward coverage.
     println!("🧪 Running tests with coverage...\n");
     let test_status = Command::new("cargo")
-        .args(&["test", "--lib", "--no-fail-fast"])
+        .args([
+            "test",
+            "-p",
+            "ultimo",
+            "--features",
+            COVERAGE_FEATURES,
+            "--no-fail-fast",
+        ])
         .env("CARGO_INCREMENTAL", "0")
         .env("RUSTFLAGS", "-C instrument-coverage")
         .env("LLVM_PROFILE_FILE", profile_file.to_str().unwrap())
@@ -54,7 +66,7 @@ fn main() {
         .follow_links(false)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "profraw"))
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "profraw"))
         .map(|e| e.path().to_path_buf())
         .collect();
 
@@ -91,9 +103,14 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Step 6: Find the test binary
-    println!("🔍 Finding test binary...");
-    let test_binary = find_test_binary(&workspace_root);
+    // Step 6: Find all instrumented ultimo test binaries (lib + integration).
+    println!("🔍 Finding test binaries...");
+    let test_binaries = find_test_binaries(&workspace_root, &profile_file);
+    if test_binaries.is_empty() {
+        eprintln!("❌ No test binaries found!");
+        std::process::exit(1);
+    }
+    println!("   Found {} test binaries", test_binaries.len());
 
     // Step 7: Generate JSON data for custom HTML report
     println!("📈 Generating coverage data...");
@@ -101,22 +118,25 @@ fn main() {
     fs::create_dir_all(&html_dir).expect("Failed to create HTML directory");
 
     let llvm_cov = llvm_tools_path.join("llvm-cov");
+    let instr_arg = format!("-instr-profile={}", merged_file.display());
 
     // Generate JSON export for parsing
+    let mut export_args = vec!["export".to_string()];
+    export_args.extend(object_args(&test_binaries));
+    export_args.push(instr_arg.clone());
+    export_args.push("--ignore-filename-regex=.cargo/registry".to_string());
+    export_args.push("--ignore-filename-regex=.rustup/toolchains".to_string());
+    // Exclude the integration test files themselves — we measure source coverage.
+    export_args.push("--ignore-filename-regex=/tests/".to_string());
+    export_args.push("--format=text".to_string());
     let json_output = Command::new(&llvm_cov)
-        .args(&[
-            "export",
-            &test_binary.to_string_lossy(),
-            &format!("-instr-profile={}", merged_file.display()),
-            "--ignore-filename-regex=.cargo/registry",
-            "--ignore-filename-regex=.rustup/toolchains",
-            "--format=text",
-        ])
+        .args(&export_args)
         .output()
         .expect("Failed to run llvm-cov export");
 
     if !json_output.status.success() {
         eprintln!("❌ Failed to generate coverage data!");
+        eprintln!("{}", String::from_utf8_lossy(&json_output.stderr));
         std::process::exit(1);
     }
 
@@ -125,14 +145,14 @@ fn main() {
 
     // Step 8: Generate text summary
     println!("📊 Generating summary...");
+    let mut report_args = vec!["report".to_string()];
+    report_args.extend(object_args(&test_binaries));
+    report_args.push(instr_arg.clone());
+    report_args.push("--ignore-filename-regex=.cargo/registry".to_string());
+    report_args.push("--ignore-filename-regex=.rustup/toolchains".to_string());
+    report_args.push("--ignore-filename-regex=/tests/".to_string());
     let summary_output = Command::new(&llvm_cov)
-        .args(&[
-            "report",
-            &test_binary.to_string_lossy(),
-            &format!("-instr-profile={}", merged_file.display()),
-            "--ignore-filename-regex=.cargo/registry",
-            "--ignore-filename-regex=.rustup/toolchains",
-        ])
+        .args(&report_args)
         .output()
         .expect("Failed to run llvm-cov report");
 
@@ -167,8 +187,9 @@ fn main() {
     println!("📄 HTML Report: {}", html_dir.join("index.html").display());
     println!("📊 Coverage: {:.1}%", coverage);
 
-    // Check threshold
-    let threshold = 60.0;
+    // Check threshold. Raised to 75% after #5 (coverage measured with features +
+    // all test binaries now sits ~80%); 75 leaves a small regression buffer.
+    let threshold = 75.0;
     if coverage < threshold {
         eprintln!(
             "\n⚠️  Coverage ({:.1}%) is below minimum threshold ({:.1}%)",
@@ -183,7 +204,7 @@ fn main() {
 fn find_llvm_tools() -> PathBuf {
     // Get the Rust sysroot
     let output = Command::new("rustc")
-        .args(&["--print", "sysroot"])
+        .args(["--print", "sysroot"])
         .output()
         .expect("Failed to get Rust sysroot");
 
@@ -222,30 +243,54 @@ fn clean_coverage_data(workspace_root: &Path) {
     let _ = fs::remove_dir_all(workspace_root.join("target/coverage"));
 }
 
-fn find_test_binary(workspace_root: &Path) -> PathBuf {
-    let debug_dir = workspace_root.join("target/debug/deps");
+/// Build the llvm-cov `-object` arguments for multiple binaries (first is
+/// positional, the rest are passed as `-object <path>`).
+fn object_args(bins: &[PathBuf]) -> Vec<String> {
+    let mut args = Vec::new();
+    for (i, b) in bins.iter().enumerate() {
+        if i > 0 {
+            args.push("-object".to_string());
+        }
+        args.push(b.to_string_lossy().to_string());
+    }
+    args
+}
 
-    // Find the most recent ultimo test binary
-    let mut binaries: Vec<_> = WalkDir::new(&debug_dir)
-        .max_depth(1)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            let name = e.file_name().to_string_lossy();
-            name.starts_with("ultimo-") && !name.ends_with(".d")
-        })
-        .collect();
+/// Find all instrumented ultimo test binaries (the lib test binary plus every
+/// integration test in `tests/`). Uses `cargo test --no-run --message-format=json`
+/// scoped to `-p ultimo`, so only ultimo's test/lib executables are returned
+/// (dependency crates produce libraries, which have no `executable` field).
+fn find_test_binaries(workspace_root: &Path, profile_file: &Path) -> Vec<PathBuf> {
+    let output = Command::new("cargo")
+        .args([
+            "test",
+            "--no-run",
+            "-p",
+            "ultimo",
+            "--features",
+            COVERAGE_FEATURES,
+            "--message-format=json",
+        ])
+        .env("CARGO_INCREMENTAL", "0")
+        .env("RUSTFLAGS", "-C instrument-coverage")
+        .env("LLVM_PROFILE_FILE", profile_file.to_str().unwrap())
+        .current_dir(workspace_root)
+        .output()
+        .expect("Failed to enumerate test binaries");
 
-    binaries.sort_by_key(|e| {
-        fs::metadata(e.path())
-            .and_then(|m| m.modified())
-            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
-    });
-
-    binaries
-        .last()
-        .map(|e| e.path().to_path_buf())
-        .expect("No test binary found")
+    let mut bins = Vec::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        if v.get("reason").and_then(|r| r.as_str()) != Some("compiler-artifact") {
+            continue;
+        }
+        if let Some(exe) = v.get("executable").and_then(|e| e.as_str()) {
+            bins.push(PathBuf::from(exe));
+        }
+    }
+    bins
 }
 
 fn extract_coverage_percentage(summary: &str) -> f64 {
@@ -277,7 +322,7 @@ fn extract_coverage_percentage(summary: &str) -> f64 {
 fn count_tests(workspace_root: &Path) -> usize {
     // Count test functions
     let output = Command::new("cargo")
-        .args(&["test", "--lib", "--", "--list"])
+        .args(["test", "--lib", "--", "--list"])
         .current_dir(workspace_root)
         .output()
         .expect("Failed to list tests");
