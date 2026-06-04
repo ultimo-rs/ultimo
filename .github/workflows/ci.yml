@@ -43,8 +43,8 @@ jobs:
       # --all-targets here lints lib, integration tests and benches together,
       # all of which compile once websocket+test-helpers are enabled.
       # Database features are linted in the `test-db` job (needs system libs).
-      - name: clippy (websocket + test-helpers + testing, all targets)
-        run: cargo clippy -p ultimo --all-targets --features "websocket,test-helpers,testing" -- -D warnings
+      - name: clippy (websocket + test-helpers + testing + session, all targets)
+        run: cargo clippy -p ultimo --all-targets --features "websocket,test-helpers,testing,session" -- -D warnings
 
   # ── Unit + integration tests (no DB system deps) ──────────────────────
   test:
@@ -77,6 +77,14 @@ jobs:
         run: |
           cargo test -p ultimo --features "testing" --test testing_utils
           cargo test -p ultimo --features "testing" --doc
+
+      # Cookie (core) + session feature: unit, integration, security, and doctests.
+      - name: Cookie + session tests
+        run: |
+          cargo test -p ultimo --features "testing" --test cookie
+          cargo test -p ultimo --features "session" --lib session
+          cargo test -p ultimo --features "session,testing" --test session
+          cargo test -p ultimo --features "session" --doc
 
       # websocket_pubsub_bench uses test_helpers::ChannelManager, so benches
       # need test-helpers in addition to websocket.
