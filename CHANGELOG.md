@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cookie helper** (`ultimo::cookie`, core): `Cookie`/`CookieOptions`/`SameSite`,
+  RFC 6265 parsing + `Set-Cookie` formatting (with header-injection guards), and
+  `ctx.cookie`/`cookies`/`set_cookie`/`remove_cookie`.
+- **Session management** (`session` feature, #3): `SessionStore` trait +
+  `MemoryStore`, `Session` via `ctx.session()`, and secure session middleware
+  (256-bit ids, HttpOnly/Secure/SameSite defaults, anti session-fixation,
+  anti-DoS, server-side expiry), configurable via `SessionConfig`. Redis/SQL
+  stores and CSRF are planned follow-ups. See `docs/sessions.md`.
+
 - **Testing utilities** (`testing` feature, #4): in-process `TestClient`, fluent
   request builder, `TestResponse` with assertion helpers, `assert_json_eq!` /
   `assert_status!` macros, middleware test helpers (`test_context`,

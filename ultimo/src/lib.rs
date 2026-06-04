@@ -28,6 +28,7 @@
 
 pub mod app;
 pub mod context;
+pub mod cookie;
 pub mod error;
 pub mod handler;
 pub mod middleware;
@@ -45,6 +46,9 @@ pub mod websocket;
 
 #[cfg(feature = "testing")]
 pub mod testing;
+
+#[cfg(feature = "session")]
+pub mod session;
 
 // Re-exports for convenience
 pub use app::Ultimo;

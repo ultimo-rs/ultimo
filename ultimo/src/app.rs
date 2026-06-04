@@ -317,6 +317,7 @@ impl Ultimo {
         if method_str == hyper::Method::OPTIONS {
             // Create context for OPTIONS request
             let ctx = Context::from_parts(parts, body, Params::new());
+            let cookie_sink = ctx.set_cookies_handle();
 
             // Build and execute middleware chain
             let mut chain = MiddlewareChain::new();
@@ -333,7 +334,7 @@ impl Ultimo {
                 })
                 .await;
 
-            return match result {
+            let response = match result {
                 Ok(response) => response,
                 Err(err) => {
                     error!("Middleware error: {}", err);
@@ -341,6 +342,7 @@ impl Ultimo {
                         .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap())
                 }
             };
+            return flush_set_cookies(response, cookie_sink).await;
         }
 
         // Find matching route
@@ -358,6 +360,7 @@ impl Ultimo {
         // Create context
         #[cfg_attr(not(feature = "database"), allow(unused_mut))]
         let mut ctx = Context::from_parts(parts, body, params);
+        let cookie_sink = ctx.set_cookies_handle();
 
         // Attach database if configured
         #[cfg(feature = "database")]
@@ -380,14 +383,15 @@ impl Ultimo {
             .await;
 
         // Handle result
-        match result {
+        let response = match result {
             Ok(response) => response,
             Err(err) => {
                 error!("Handler error: {}", err);
                 response::helpers::error_response(&err)
                     .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap())
             }
-        }
+        };
+        flush_set_cookies(response, cookie_sink).await
     }
 
     /// Dispatch a fully-buffered request through the app in-process (no socket).
@@ -434,6 +438,21 @@ impl Ultimo {
             });
         }
     }
+}
+
+/// Append queued `Set-Cookie` header values (from `ctx.set_cookie`) onto the
+/// response. Uses `append` so multiple cookies become multiple headers.
+async fn flush_set_cookies(
+    mut response: Response,
+    sink: Arc<tokio::sync::RwLock<Vec<String>>>,
+) -> Response {
+    let cookies = std::mem::take(&mut *sink.write().await);
+    for value in cookies {
+        if let Ok(hv) = hyper::header::HeaderValue::from_str(&value) {
+            response.headers_mut().append(hyper::header::SET_COOKIE, hv);
+        }
+    }
+    response
 }
 
 impl Default for Ultimo {

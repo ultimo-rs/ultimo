@@ -31,6 +31,9 @@ sha1 = "0.10"
 base64 = "0.21"
 async-trait = "0.1"
 
+# Session support (optional) — getrandom for secure session ids
+getrandom = { version = "0.3", optional = true }
+
 # Database support (optional)
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls"], optional = true }
 diesel = { version = "2.3.8", optional = true }  # >=2.3.8: RUSTSEC fix for COPY command injection + unaligned access
@@ -56,6 +59,9 @@ test-helpers = []
 
 # Testing utilities for Ultimo apps (TestClient, assertions, fixtures)
 testing = []
+
+# Session management (cookie-based, pluggable store)
+session = ["dep:getrandom"]
 
 # Database features
 database = []
