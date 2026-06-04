@@ -66,7 +66,12 @@ ultimo/src/
 - `struct CookieOptions { http_only: bool, secure: bool, same_site: Option<SameSite>, max_age: Option<i64> /*seconds*/, path: Option<String>, domain: Option<String>, expires: Option<…> }` with a builder.
 - `enum SameSite { Strict, Lax, None }`.
 - Parsing: `parse_cookie_header(&str) -> HashMap<String, String>`.
-- Formatting: `Cookie::to_set_cookie_string() -> String` (RFC 6265 attributes).
+- Formatting: `Cookie::to_set_cookie_string() -> Result<String>` (RFC 6265
+  attributes). **Header-injection defense:** reject cookie names/values
+  containing control characters (CR, LF, NUL) or other characters illegal per
+  RFC 6265 — never emit unvalidated, attacker-influenced bytes into a response
+  header. (Generated session ids are already safe; this guards `ctx.set_cookie`
+  with app-supplied values.)
 - Context API (additive):
   - `ctx.cookie(name) -> Option<String>` — read a request cookie.
   - `ctx.cookies() -> HashMap<String, String>` — all request cookies.
@@ -97,27 +102,41 @@ data + a dirty flag.
 - `get::<T: DeserializeOwned>(&self, key) -> Result<Option<T>>`
 - `set::<T: Serialize>(&self, key, &T) -> Result<()>` (marks dirty)
 - `remove(&self, key)` / `clear(&self)` (mark dirty)
-- `regenerate(&self)` — issue a new id (session fixation defense), keep data
-- `destroy(&self)` — drop the session + expire the cookie
+- `regenerate(&self)` — issue a **new** secure id and **destroy the old store
+  entry** (session-fixation defense), keeping the data
+- `destroy(&self)` — drop the session server-side + expire the cookie
 
 ### 4. Session middleware (`session/middleware.rs`)
 `session(store, config) -> BoxedMiddleware`. Flow per request:
 1. Read the session-id cookie (`config.cookie_name`).
-2. If present, `store.load(id)`; else (or on miss) create a fresh session with a
-   new secure id.
+2. If a cookie id is present **and found in the store**, load it. **If the id is
+   absent OR not found in the store, generate a fresh server-side id — never
+   adopt a client-supplied id** (anti session-fixation). Do not yet persist.
 3. Attach the `Session` to the Context (typed slot; `ctx.session()` returns it).
 4. `next(ctx).await` → response.
-5. If the session is dirty/new: `store.store(id, data, ttl)` and queue the
-   `Set-Cookie` (HttpOnly/Secure/SameSite/Max-Age per config). If destroyed:
-   `store.destroy(id)` + queue an expiry cookie.
+5. Persistence (security-critical rules):
+   - **Only persist when the session is dirty AND non-empty.** An untouched /
+     empty session is **not** stored and **gets no cookie** — this prevents an
+     unbounded-session DoS (one stored entry + Set-Cookie per anonymous hit) and
+     avoids needless cookies.
+   - On dirty+non-empty: `store.store(id, data, ttl)` and queue the `Set-Cookie`
+     (HttpOnly/Secure/SameSite/Max-Age per config).
+   - On `destroy()`: `store.destroy(id)` + queue an expiry cookie (`Max-Age=0`).
+   - On `regenerate()`: `store.destroy(old_id)`, `store.store(new_id, …)`, cookie
+     carries the new id.
 6. Flush queued cookies onto the response.
 
 ### 5. `SessionConfig` (`session/config.rs`)
-`{ cookie_name: String = "ultimo_sid", ttl: Duration = 24h, http_only: bool = true, secure: bool = true, same_site: SameSite = Lax, path: String = "/" }`, with a builder. Secure defaults.
+`{ cookie_name: String = "ultimo_sid", ttl: Duration = 24h, http_only: bool = true, secure: bool = true, same_site: SameSite = Lax, path: String = "/" }`, with a builder. **Secure-by-default.**
+Validation: if `same_site == None`, `secure` **must** be `true` (browsers reject
+`SameSite=None` without `Secure`) — enforce at construction. The `secure` default
+is `true`; document that local HTTP dev needs `.secure(false)` explicitly (a
+deliberate opt-out, not a silent default).
 
 ### 6. Secure IDs
-`getrandom` → 32 random bytes → URL-safe encoding (hex or base64url). No
-predictable IDs.
+`getrandom` → 32 random bytes (256 bits) → URL-safe base64 (no padding). IDs are
+unguessable. **`getrandom` failure is a hard error** — never fall back to a
+weaker RNG. The high entropy also makes store-lookup timing irrelevant.
 
 ## Context integration
 
@@ -130,6 +149,32 @@ predictable IDs.
 `ctx.session()` returning a guard vs a cloneable handle is settled in the plan;
 the data lives in the store, the handle mediates access.
 
+## Security (threat model + mitigations)
+
+Sessions are security-critical; these are designed in, not bolted on.
+
+| Threat | Mitigation (in this design) |
+|---|---|
+| **Session prediction/brute force** | 256-bit CSPRNG ids (`getrandom`); hard error on RNG failure (no weak fallback). |
+| **Session fixation** | Never adopt a client-supplied id — unknown/absent id → fresh server id. `regenerate()` (apps must call it on login/privilege change) issues a new id and **destroys the old store entry**. |
+| **XSS cookie theft** | `HttpOnly` default `true` — JS can't read the session cookie. |
+| **Cookie interception (MITM)** | `Secure` default `true` — cookie only sent over HTTPS. |
+| **CSRF** | `SameSite=Lax` default gives partial protection. **Full CSRF protection is a deferred follow-up (known gap)** — documented clearly so users don't assume coverage. `SameSite=None` requires `Secure` (enforced). |
+| **Header injection via cookies** | Cookie name/value validated; control chars (CR/LF/NUL) rejected before emitting `Set-Cookie`. |
+| **Session-store DoS (unbounded growth)** | Empty/untouched sessions are never persisted and get no cookie; only dirty, non-empty sessions are stored, with TTL eviction. |
+| **Stale session reuse** | Server-side TTL eviction in the store **and** cookie `Max-Age` — expiry enforced server-side, not just client-side. |
+| **Data tampering/confidentiality** | Session data lives **server-side** (store); only the opaque id is in the cookie — no signed/encrypted-cookie attack surface. |
+| **Logout not ending the session** | `destroy()` removes the entry server-side (not just the cookie) + expires the cookie. |
+
+**Known limitations (documented, acceptable for this slice):**
+- Concurrent requests sharing a session are last-write-wins (read-modify-write
+  race) — acceptable for v1; revisit if atomic updates are needed.
+- No CSRF tokens yet (see deferred follow-ups); `SameSite=Lax` is the interim
+  defense.
+
+**Future hardening (deferred):** `__Host-`/`__Secure-` cookie name prefixes,
+signed/encrypted cookies, sliding-expiration option, idle vs absolute timeout.
+
 ## Testing strategy
 - Cookie unit tests: parse round-trips, Set-Cookie formatting (all attributes,
   SameSite, Max-Age=0 deletion).
@@ -137,6 +182,15 @@ the data lives in the store, the handle mediates access.
 - Integration (via the `testing` feature's `TestClient`): login sets a cookie →
   subsequent request with that cookie sees the session value; destroy clears it;
   regenerate changes the id; expired session is not loaded.
+- **Security tests (required):**
+  - A client-supplied unknown id is **not** adopted — the server issues a
+    different id (anti-fixation).
+  - `regenerate()` changes the id AND the old id no longer resolves in the store.
+  - An empty/untouched session is **not** persisted and **no** `Set-Cookie` is
+    emitted (anti-DoS).
+  - Default cookie carries `HttpOnly`, `Secure`, and `SameSite=Lax`.
+  - A cookie value with `\r`/`\n` is rejected (header-injection guard).
+  - `SameSite=None` without `Secure` is rejected at config construction.
 - All under CI with the `session` feature added to the relevant jobs.
 
 ## Published-crate impact
