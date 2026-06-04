@@ -28,6 +28,7 @@
 
 pub mod app;
 pub mod context;
+pub mod cookie;
 pub mod error;
 pub mod handler;
 pub mod middleware;
