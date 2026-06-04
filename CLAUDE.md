@@ -148,6 +148,17 @@ Perf claims (158k+ req/s) live or die by these — guard against regressions bef
 - v0.6.0: **MCP server for AI-assisted development** (worth dogfooding once built)
 - v1.0.0: stable API + complete docs
 
+## Frontend examples (MUST follow)
+**When a feature can be used from the frontend, ship a frontend example for it.**
+Ultimo's whole pitch is full-stack DX (typed TS clients, etc.), so any
+frontend-relevant feature (routes/RPC, cookies, sessions, WebSocket, auth, SSE,
+file upload…) must **create or update an example under `examples/`** that
+demonstrates it from a client. Prefer a self-contained example (a Rust backend
+serving an HTML+JS page, runnable with `cargo run -p <example>`, added to the
+workspace `members` so CI builds it) unless a React example is the better fit.
+The session feature's example is `examples/session-auth`. Update the relevant
+example in the same PR as the feature — don't defer it.
+
 ## Conventions
 - **These are published crates — see the "PUBLISHED CRATES" section at the top before
   changing any public code, features, MSRV, or dep floors.**

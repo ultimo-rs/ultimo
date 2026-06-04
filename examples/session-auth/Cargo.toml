@@ -1,0 +1,12 @@
+[package]
+name = "session-auth-example"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+ultimo = { path = "../../ultimo", features = ["session"] }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing-subscriber = { workspace = true }
