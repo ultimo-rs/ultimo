@@ -26,6 +26,9 @@
 //! }
 //! ```
 
+// Ultimo is 100% safe Rust — no `unsafe` anywhere in the framework.
+#![forbid(unsafe_code)]
+
 pub mod app;
 pub mod context;
 pub mod cookie;
