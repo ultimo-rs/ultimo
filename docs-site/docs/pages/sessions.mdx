@@ -1,0 +1,133 @@
+# Sessions
+
+Ultimo ships cookie-based session management behind the `session` feature.
+Cookies are a core helper; sessions are middleware over a pluggable store.
+
+## Enable
+
+```toml
+[dependencies]
+ultimo = { version = "0.3", features = ["session"] }
+```
+
+## Register the middleware
+
+```rust
+use ultimo::session::{session, MemoryStore, SessionConfig};
+
+let mut app = Ultimo::new_without_defaults();
+app.use_middleware(session(MemoryStore::new(), SessionConfig::default()));
+```
+
+## Read & write
+
+Access the session from any handler with `ctx.session()`. Values are typed
+(serde):
+
+```rust
+// write
+app.post("/login", |ctx: Context| async move {
+    let s = ctx.session().await;
+    s.set("user_id", &42u64).await?;
+    s.regenerate(); // rotate the id on login (session-fixation defense)
+    ctx.text("logged in").await
+});
+
+// read
+app.get("/me", |ctx: Context| async move {
+    let id: Option<u64> = ctx.session().await.get("user_id").await?;
+    ctx.json(serde_json::json!({ "user_id": id })).await
+});
+
+// log out
+app.post("/logout", |ctx: Context| async move {
+    ctx.session().await.destroy();
+    ctx.text("bye").await
+});
+```
+
+Other methods: `remove(key)`, `clear()`, `id()`.
+
+## Security
+
+Defaults are secure-by-default:
+
+- **256-bit random ids** (`getrandom`) — opaque and unguessable.
+- **`HttpOnly` + `Secure` + `SameSite=Lax`** cookie by default.
+- **Server-side data** — only the id is in the cookie (no tampering surface).
+- **Anti session-fixation** — client-supplied ids are never adopted; call
+  `regenerate()` on login/privilege change (the middleware issues a fresh id and
+  drops the old one).
+- **Anti-DoS** — empty/untouched sessions are never persisted and get no cookie.
+- **Expiry** — enforced server-side (store TTL) *and* via the cookie `Max-Age`.
+
+:::warning CSRF
+`SameSite=Lax` is partial CSRF protection. Full CSRF tokens are a planned
+follow-up — don't rely on sessions alone for CSRF defense yet.
+:::
+
+### Local development
+
+The `Secure` cookie isn't sent over plain HTTP. For local dev:
+
+```rust
+SessionConfig::default().secure(false) // dev only
+```
+
+## Configuration
+
+```rust
+use std::time::Duration;
+use ultimo::cookie::SameSite;
+
+SessionConfig::default()
+    .cookie_name("my_sid")
+    .ttl(Duration::from_secs(3600))
+    .same_site(SameSite::Strict)
+    .secure(true)
+```
+
+`SameSite::None` requires `secure(true)` (enforced at construction).
+
+## Cookies
+
+The session feature builds on the core cookie helper, which you can use directly:
+
+```rust
+use ultimo::cookie::{Cookie, SameSite};
+
+// set
+ctx.set_cookie(
+    Cookie::new("theme", "dark")
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .max_age(86_400),
+).await?;
+
+// read
+let theme = ctx.cookie("theme"); // Option<String>
+
+// delete
+ctx.remove_cookie("theme").await?;
+```
+
+## Custom stores
+
+`MemoryStore` (single-process) is built in. Implement `SessionStore` for other
+backends:
+
+```rust
+#[async_trait::async_trait]
+impl SessionStore for MyStore {
+    async fn load(&self, id: &str) -> Option<SessionData> { /* ... */ }
+    async fn store(&self, id: &str, data: &SessionData, ttl: Duration) { /* ... */ }
+    async fn destroy(&self, id: &str) { /* ... */ }
+}
+```
+
+Redis and SQL stores are planned follow-ups.
+
+## Full example
+
+See [`examples/session-auth`](https://github.com/ultimo-rs/ultimo/tree/main/examples/session-auth)
+— a runnable backend serving an HTML+JS login/logout page.
