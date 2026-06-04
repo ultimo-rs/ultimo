@@ -20,6 +20,15 @@ fn app() -> Ultimo {
         ctx.json(serde_json::json!({ "uid": uid })).await
     });
     app.get("/anon", |ctx: Context| async move { ctx.text("hi").await });
+    app.get("/logout", |ctx: Context| async move {
+        ctx.session().await.destroy();
+        ctx.text("bye").await
+    });
+    app.get("/rotate", |ctx: Context| async move {
+        // session already carries data from the cookie; just rotate its id
+        ctx.session().await.regenerate();
+        ctx.text("rotated").await
+    });
     app
 }
 
@@ -69,4 +78,47 @@ async fn default_cookie_is_httponly_lax() {
     let sc = res.header("set-cookie").expect("login sets a cookie");
     assert!(sc.contains("HttpOnly"));
     assert!(sc.contains("SameSite=Lax"));
+}
+
+#[tokio::test]
+async fn destroy_logs_out() {
+    let client = TestClient::new(app());
+    let login = client.get("/login").send().await;
+    let cookie = sid(login.header("set-cookie").expect("login sets a cookie"));
+
+    let logout = client.get("/logout").header("cookie", &cookie).send().await;
+    assert!(logout
+        .header("set-cookie")
+        .expect("logout expires the cookie")
+        .contains("Max-Age=0"));
+
+    let me = client.get("/me").header("cookie", &cookie).send().await;
+    assert_eq!(
+        me.json::<serde_json::Value>(),
+        serde_json::json!({ "uid": null })
+    );
+}
+
+#[tokio::test]
+async fn regenerate_changes_id_and_invalidates_old() {
+    let client = TestClient::new(app());
+    let login = client.get("/login").send().await;
+    let old = sid(login.header("set-cookie").expect("login sets a cookie"));
+
+    let rot = client.get("/rotate").header("cookie", &old).send().await;
+    let new = sid(rot.header("set-cookie").expect("rotate sets a new cookie"));
+    assert_ne!(new, old, "regenerate must change the session id");
+
+    // The new id carries the data forward...
+    let me_new = client.get("/me").header("cookie", &new).send().await;
+    assert_eq!(
+        me_new.json::<serde_json::Value>(),
+        serde_json::json!({ "uid": 42 })
+    );
+    // ...and the old id no longer resolves.
+    let me_old = client.get("/me").header("cookie", &old).send().await;
+    assert_eq!(
+        me_old.json::<serde_json::Value>(),
+        serde_json::json!({ "uid": null })
+    );
 }
