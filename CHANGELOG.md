@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (256-bit ids, HttpOnly/Secure/SameSite defaults, anti session-fixation,
   anti-DoS, server-side expiry), configurable via `SessionConfig`. Redis/SQL
   stores and CSRF are planned follow-ups. See `docs/sessions.md`.
+- `examples/session-auth` — a full-stack login/logout demo of the session
+  feature (Rust backend serving an HTML+JS frontend).
 
 - **Testing utilities** (`testing` feature, #4): in-process `TestClient`, fluent
   request builder, `TestResponse` with assertion helpers, `assert_json_eq!` /
