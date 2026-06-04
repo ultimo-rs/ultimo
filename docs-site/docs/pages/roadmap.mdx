@@ -18,14 +18,14 @@ Upcoming features and improvements planned for Ultimo.
 
 ### Session & Auth
 
-- 🎫 **Session Management** - Cookie-based sessions
 - 🎫 **Redis Sessions** - Distributed session storage
 - 🔐 **JWT Support** - Built-in JWT middleware
 - 🔐 **OAuth2** - OAuth provider integration
 
+(Cookie-based session management shipped in 0.3.0 — see [Sessions](/sessions).)
+
 ### Testing & Development
 
-- 🧪 **Test Client** - Built-in HTTP test client
 - 🧪 **Mock Server** - Testing utilities
 - 🔄 **Hot Reload** - Development mode with automatic restart
 - 📊 **Request Logging** - Structured request/response logging
@@ -71,8 +71,8 @@ Upcoming features and improvements planned for Ultimo.
 | **Rate Limiting**         | ✅ Available     | 0.1.0   |
 | **Database Integration**  | ✅ Available     | 0.1.0   |
 | **WebSocket Support**     | ✅ Available     | 0.2.1   |
-| Sessions                  | 🔥 High Priority | 0.3.0   |
-| Test Client               | 📋 Planned       | 0.3.0   |
+| **Sessions & Cookies**    | ✅ Available     | 0.3.0   |
+| **Testing Utilities**     | ✅ Available     | 0.3.0   |
 | Static Files              | 📋 Planned       | 0.4.0   |
 | Compression               | 📋 Planned       | 0.4.0   |
 | Hot Reload                | 📋 Planned       | 0.4.0   |
@@ -82,7 +82,7 @@ Upcoming features and improvements planned for Ultimo.
 
 ## Version Timeline
 
-### v0.1.0 (Current)
+### v0.1.0
 
 - Core framework features
 - RPC system with TypeScript generation
@@ -90,7 +90,7 @@ Upcoming features and improvements planned for Ultimo.
 - CLI tools
 - Database integration (SQLx & Diesel)
 
-### v0.2.1 (Current)
+### v0.2.1
 
 - ✅ **WebSocket Support (Complete)** - Production-ready RFC 6455 implementation
 - ✅ **Configuration System** - WebSocketConfig with size limits, timeouts, and buffer sizes
@@ -104,11 +104,13 @@ Upcoming features and improvements planned for Ultimo.
 - ✅ **279 Comprehensive Tests** - Production-ready with extensive test coverage
 - ✅ **Two Working Examples** - Simple chat + React chat
 
-### v0.3.0 (Next)
+### v0.3.0 (Current)
 
-- Session management
-- Test utilities
-- Enhanced error handling
+- ✅ **Session management** — cookie-based sessions, `SessionStore` + in-memory store, secure middleware
+- ✅ **Cookie helper** — parsing + `Set-Cookie` with security guards
+- ✅ **Testing utilities** — in-process `TestClient`, assertions, middleware/DB/fixture helpers
+- ✅ **Router precedence fix**, `Ultimo::oneshot`, `Request::raw_body()`
+- ✅ MSRV 1.86, hardened dependency floors, automated releases + CI guardrails
 
 ### v0.4.0
 
