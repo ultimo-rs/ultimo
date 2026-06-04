@@ -277,6 +277,140 @@ pub mod builtin {
             })
         })
     }
+
+    /// Secure-by-default HTTP security headers.
+    ///
+    /// Sets HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy and a
+    /// restrictive Permissions-Policy. Content-Security-Policy is opt-in (a wrong
+    /// CSP breaks more than it protects) — set it with [`SecurityHeaders::csp`].
+    /// Headers are applied to the response **only if the handler didn't already
+    /// set them**, so per-route overrides win.
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// let mut app = Ultimo::new_without_defaults();
+    /// app.use_middleware(ultimo::middleware::builtin::security_headers());
+    /// // or customized:
+    /// app.use_middleware(
+    ///     ultimo::middleware::builtin::SecurityHeaders::new()
+    ///         .csp("default-src 'self'")
+    ///         .frame_options("SAMEORIGIN")
+    ///         .build(),
+    /// );
+    /// ```
+    #[derive(Debug, Clone)]
+    pub struct SecurityHeaders {
+        hsts: Option<String>,
+        csp: Option<String>,
+        frame_options: Option<String>,
+        content_type_options: bool,
+        referrer_policy: Option<String>,
+        permissions_policy: Option<String>,
+    }
+
+    impl Default for SecurityHeaders {
+        fn default() -> Self {
+            Self {
+                hsts: Some("max-age=31536000; includeSubDomains".to_string()),
+                csp: None,
+                frame_options: Some("DENY".to_string()),
+                content_type_options: true,
+                referrer_policy: Some("strict-origin-when-cross-origin".to_string()),
+                permissions_policy: Some("geolocation=(), microphone=(), camera=()".to_string()),
+            }
+        }
+    }
+
+    impl SecurityHeaders {
+        /// Secure defaults.
+        pub fn new() -> Self {
+            Self::default()
+        }
+        /// Set the `Strict-Transport-Security` value.
+        pub fn hsts(mut self, value: impl Into<String>) -> Self {
+            self.hsts = Some(value.into());
+            self
+        }
+        /// Disable HSTS (e.g. for non-HTTPS environments).
+        pub fn no_hsts(mut self) -> Self {
+            self.hsts = None;
+            self
+        }
+        /// Set the `Content-Security-Policy` (off by default).
+        pub fn csp(mut self, value: impl Into<String>) -> Self {
+            self.csp = Some(value.into());
+            self
+        }
+        /// Set the `X-Frame-Options` value (default `DENY`).
+        pub fn frame_options(mut self, value: impl Into<String>) -> Self {
+            self.frame_options = Some(value.into());
+            self
+        }
+        /// Set the `Referrer-Policy` value.
+        pub fn referrer_policy(mut self, value: impl Into<String>) -> Self {
+            self.referrer_policy = Some(value.into());
+            self
+        }
+        /// Set the `Permissions-Policy` value.
+        pub fn permissions_policy(mut self, value: impl Into<String>) -> Self {
+            self.permissions_policy = Some(value.into());
+            self
+        }
+        /// Disable the `X-Content-Type-Options: nosniff` header.
+        pub fn no_content_type_options(mut self) -> Self {
+            self.content_type_options = false;
+            self
+        }
+
+        fn pairs(&self) -> Vec<(&'static str, String)> {
+            let mut out = Vec::new();
+            if let Some(v) = &self.hsts {
+                out.push(("strict-transport-security", v.clone()));
+            }
+            if let Some(v) = &self.csp {
+                out.push(("content-security-policy", v.clone()));
+            }
+            if let Some(v) = &self.frame_options {
+                out.push(("x-frame-options", v.clone()));
+            }
+            if self.content_type_options {
+                out.push(("x-content-type-options", "nosniff".to_string()));
+            }
+            if let Some(v) = &self.referrer_policy {
+                out.push(("referrer-policy", v.clone()));
+            }
+            if let Some(v) = &self.permissions_policy {
+                out.push(("permissions-policy", v.clone()));
+            }
+            out
+        }
+
+        /// Build the middleware.
+        pub fn build(self) -> BoxedMiddleware {
+            let pairs = Arc::new(self.pairs());
+            Arc::new(move |ctx, next| {
+                let pairs = pairs.clone();
+                Box::pin(async move {
+                    let mut response = next(ctx).await?;
+                    let headers = response.headers_mut();
+                    for (name, value) in pairs.iter() {
+                        let header_name = hyper::header::HeaderName::from_static(name);
+                        if !headers.contains_key(&header_name) {
+                            if let Ok(hv) = hyper::header::HeaderValue::from_str(value) {
+                                headers.insert(header_name, hv);
+                            }
+                        }
+                    }
+                    Ok(response)
+                })
+            })
+        }
+    }
+
+    /// Security headers middleware with secure defaults.
+    pub fn security_headers() -> BoxedMiddleware {
+        SecurityHeaders::new().build()
+    }
 }
 
 #[cfg(test)]
