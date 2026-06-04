@@ -102,6 +102,11 @@ and commit the result to the release PR branch. The `version-sync` CI gate will
 **fail the release PR** until these match, so drift can't be merged. Update the
 docs-site changelog (`changelog.mdx`) to mirror the `CHANGELOG.md` entry.
 
+**On a MINOR release** (e.g. 0.3 → 0.4), also bump the floating install-version
+snippets in the docs-site pages — `getting-started.mdx`, `diesel.mdx`,
+`sqlx.mdx`, `api-reference.mdx`, `cli.mdx` (they pin `ultimo = "0.3"`, so patch
+releases need no change) — and refresh `roadmap.mdx`'s "(Current)" markers.
+
 > Future enhancement: have the sites read the version at build time from a single
 > generated file so even this step is automatic. Until then, `sync-versions.sh`
 > + the CI gate keep it correct.
