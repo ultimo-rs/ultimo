@@ -32,7 +32,8 @@ commit_parsers = [
   { message = "^fix", group = "Fixed" },
   { message = "^perf", group = "Performance" },
   { message = "^refactor", group = "Changed" },
-  { message = "^docs", group = "Documentation" },
+  # docs/chore/ci/test/style do NOT warrant a crate release on their own.
+  { message = "^docs", skip = true },
   { message = "^chore", skip = true },
   { message = "^ci", skip = true },
   { message = "^test", skip = true },
