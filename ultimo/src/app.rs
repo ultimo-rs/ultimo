@@ -43,6 +43,7 @@ pub struct Ultimo {
     router: Router,
     handlers: Vec<BoxedHandler>,
     middleware: Vec<BoxedMiddleware>,
+    max_body_size: Option<usize>,
 
     #[cfg(feature = "database")]
     database: Option<Database>,
@@ -64,6 +65,7 @@ impl Ultimo {
             router: Router::new(),
             handlers: Vec::new(),
             middleware: Vec::new(),
+            max_body_size: None,
             #[cfg(feature = "database")]
             database: None,
             #[cfg(feature = "websocket")]
@@ -88,6 +90,7 @@ impl Ultimo {
             router: Router::new(),
             handlers: Vec::new(),
             middleware: Vec::new(),
+            max_body_size: None,
             #[cfg(feature = "database")]
             database: None,
             #[cfg(feature = "websocket")]
@@ -95,6 +98,16 @@ impl Ultimo {
             #[cfg(feature = "websocket")]
             channel_manager: Arc::new(ChannelManager::new()),
         }
+    }
+
+    /// Set the maximum request body size in bytes.
+    ///
+    /// Requests whose body exceeds this are rejected with **413 Payload Too
+    /// Large** (and, on the live server, the oversized body is not buffered).
+    /// Defaults to no limit — setting one is recommended for production.
+    pub fn max_body_size(&mut self, bytes: usize) -> &mut Self {
+        self.max_body_size = Some(bytes);
+        self
     }
 
     /// Attach a SQLx database pool to the application
@@ -279,18 +292,29 @@ impl Ultimo {
             }
         }
 
-        // Buffer the body, then dispatch through the body-agnostic core.
+        // Buffer the body (capped if a max is configured, so an oversized body
+        // is never fully buffered), then dispatch through the body-agnostic core.
         let (parts, body) = req.into_parts();
-        let bytes = match body.collect().await {
-            Ok(c) => c.to_bytes(),
-            Err(e) => {
-                error!("Failed to read body: {}", e);
-                return response::helpers::error_response(&UltimoError::Internal(format!(
-                    "Failed to read body: {}",
-                    e
-                )))
-                .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap());
-            }
+        let bytes = match self.max_body_size {
+            Some(max) => match http_body_util::Limited::new(body, max).collect().await {
+                Ok(c) => c.to_bytes(),
+                Err(e) => {
+                    if e.downcast_ref::<http_body_util::LengthLimitError>()
+                        .is_some()
+                    {
+                        return body_too_large();
+                    }
+                    error!("Failed to read body: {}", e);
+                    return internal_error();
+                }
+            },
+            None => match body.collect().await {
+                Ok(c) => c.to_bytes(),
+                Err(e) => {
+                    error!("Failed to read body: {}", e);
+                    return internal_error();
+                }
+            },
         };
         self.dispatch_parts(parts, bytes).await
     }
@@ -299,6 +323,14 @@ impl Ultimo {
     async fn dispatch_parts(&self, parts: hyper::http::request::Parts, body: Bytes) -> Response {
         let method_str = parts.method.clone();
         let path = parts.uri.path().to_string();
+
+        // Enforce the body-size limit (covers in-process dispatch + a backstop
+        // for the live path).
+        if let Some(max) = self.max_body_size {
+            if body.len() > max {
+                return body_too_large();
+            }
+        }
 
         // Parse method
         let method = match Method::from_hyper(&method_str) {
@@ -438,6 +470,21 @@ impl Ultimo {
             });
         }
     }
+}
+
+/// 413 Payload Too Large response (body exceeded `max_body_size`).
+fn body_too_large() -> Response {
+    response::ResponseBuilder::new()
+        .status(413)
+        .text("Payload Too Large")
+        .build()
+        .unwrap_or_else(|_| response::helpers::text("Payload Too Large").unwrap())
+}
+
+/// 500 response for a genuine body-read failure (preserves the JSON error shape).
+fn internal_error() -> Response {
+    response::helpers::error_response(&UltimoError::Internal("Failed to read body".to_string()))
+        .unwrap_or_else(|_| response::helpers::text("Internal Error").unwrap())
 }
 
 /// Append queued `Set-Cookie` header values (from `ctx.set_cookie`) onto the
