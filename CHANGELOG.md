@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in-process (no socket); the seam the testing utilities build on.
 - CI: a `cargo-audit` (RUSTSEC) job and an MSRV job; `Cargo.lock` is now
   committed.
+- `Request::raw_body()` — raw request body bytes; the body is buffered and
+  cached so `json`/`text`/`bytes`/`raw_body` can be called repeatedly. (#21)
+
+### Fixed
+
+- Router precedence: static routes now take priority over parameterized ones
+  regardless of registration order (most-specific match wins), so e.g.
+  `/users/me` is no longer shadowed by a `/users/:id` registered before it. (#22)
 
 ### Changed
 

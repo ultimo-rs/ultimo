@@ -143,12 +143,51 @@ impl Request {
             .map_err(|e| UltimoError::BadRequest(format!("Invalid UTF-8: {}", e)))
     }
 
-    /// Get request body as bytes
+    /// Get request body as bytes.
+    ///
+    /// The body is buffered and cached, so this (and [`json`](Self::json) /
+    /// [`text`](Self::text)) may be called any number of times.
     pub async fn bytes(&self) -> Result<Bytes> {
         let body = self.body.read().await;
         body.as_ref()
             .cloned()
             .ok_or_else(|| UltimoError::BadRequest("Body already consumed".to_string()))
+    }
+
+    /// Raw request body bytes (alias for [`bytes`](Self::bytes)). Repeatable.
+    pub async fn raw_body(&self) -> Result<Bytes> {
+        self.bytes().await
+    }
+}
+
+#[cfg(test)]
+mod request_body_tests {
+    use super::*;
+
+    fn req_with_body(body: &'static [u8]) -> Request {
+        let r = HyperRequest::builder()
+            .method("POST")
+            .uri("/")
+            .body(())
+            .unwrap();
+        let (parts, ()) = r.into_parts();
+        Request::from_parts(parts, Bytes::from_static(body), Params::new())
+    }
+
+    #[tokio::test]
+    async fn body_is_readable_multiple_times() {
+        let req = req_with_body(br#"{"n":1}"#);
+        // json twice
+        let a: serde_json::Value = req.json().await.unwrap();
+        let b: serde_json::Value = req.json().await.unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a, serde_json::json!({ "n": 1 }));
+        // then text + raw_body still work
+        assert_eq!(req.text().await.unwrap(), r#"{"n":1}"#);
+        assert_eq!(
+            req.raw_body().await.unwrap(),
+            Bytes::from_static(br#"{"n":1}"#)
+        );
     }
 }
 

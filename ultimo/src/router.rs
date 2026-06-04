@@ -110,6 +110,15 @@ impl Route {
     pub fn path(&self) -> &str {
         &self.raw_path
     }
+
+    /// Route specificity: the number of static segments. Higher is more
+    /// specific, so a fully-static route outranks one with parameters.
+    fn specificity(&self) -> usize {
+        self.segments
+            .iter()
+            .filter(|s| matches!(s, Segment::Static(_)))
+            .count()
+    }
 }
 
 /// Router entry combining method, route, and handler index
@@ -142,16 +151,28 @@ impl Router {
         });
     }
 
-    /// Find a matching route for the given method and path
+    /// Find the best-matching route for the given method and path.
+    ///
+    /// Among all matching routes, the most specific wins (most static segments),
+    /// so static routes take precedence over parameterized ones regardless of
+    /// registration order. Ties are broken by registration order (first wins).
     pub fn find_route(&self, method: Method, path: &str) -> Option<(usize, Params)> {
+        let mut best: Option<(usize, Params, usize)> = None;
         for entry in &self.routes {
             if entry.method == method {
                 if let Some(params) = entry.route.matches(path) {
-                    return Some((entry.handler_id, params));
+                    let spec = entry.route.specificity();
+                    let better = match &best {
+                        Some((_, _, best_spec)) => spec > *best_spec,
+                        None => true,
+                    };
+                    if better {
+                        best = Some((entry.handler_id, params, spec));
+                    }
                 }
             }
         }
-        None
+        best.map(|(id, params, _)| (id, params))
     }
 
     /// Get all registered routes (useful for debugging)
@@ -245,5 +266,35 @@ mod tests {
         let params = params.unwrap();
         assert_eq!(params.get("id"), Some(&"123".to_string()));
         assert_eq!(params.len(), 1);
+    }
+
+    #[test]
+    fn static_route_beats_param_regardless_of_order() {
+        // Param registered FIRST, static SECOND — static must still win.
+        let mut r = Router::new();
+        r.add_route(Method::GET, "/users/:id", 1);
+        r.add_route(Method::GET, "/users/me", 2);
+        let (id, _) = r.find_route(Method::GET, "/users/me").unwrap();
+        assert_eq!(id, 2, "static /users/me should win over /users/:id");
+        // and the param route still matches other values
+        let (id, params) = r.find_route(Method::GET, "/users/42").unwrap();
+        assert_eq!(id, 1);
+        assert_eq!(params.get("id"), Some(&"42".to_string()));
+    }
+
+    #[test]
+    fn trailing_slash_is_ignored() {
+        let mut r = Router::new();
+        r.add_route(Method::GET, "/users", 1);
+        assert!(r.find_route(Method::GET, "/users/").is_some());
+        assert!(r.find_route(Method::GET, "/users").is_some());
+    }
+
+    #[test]
+    fn no_match_returns_none() {
+        let mut r = Router::new();
+        r.add_route(Method::GET, "/users/me", 1);
+        assert!(r.find_route(Method::GET, "/posts").is_none());
+        assert!(r.find_route(Method::POST, "/users/me").is_none());
     }
 }
