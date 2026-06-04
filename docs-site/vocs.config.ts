@@ -56,6 +56,10 @@ export default defineConfig({
       text: "Features",
       items: [
         {
+          text: "Sessions",
+          link: "/sessions",
+        },
+        {
           text: "WebSocket",
           link: "/websocket",
         },

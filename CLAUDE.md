@@ -159,6 +159,14 @@ workspace `members` so CI builds it) unless a React example is the better fit.
 The session feature's example is `examples/session-auth`. Update the relevant
 example in the same PR as the feature — don't defer it.
 
+**User-facing docs go to the docs SITE, not just `docs/`.** The published site
+(docs.ultimo.dev) is **Vocs** under `docs-site/`: feature pages live in
+`docs-site/docs/pages/*.mdx` and the sidebar is in `docs-site/vocs.config.ts`.
+A new user-facing feature must add/update its `docs-site` page **and** the
+sidebar entry in the same PR. The repo's top-level `docs/` is internal notes;
+writing only there does NOT surface a feature to users. (Vercel auto-deploys the
+site on merge to `main`.)
+
 ## Conventions
 - **These are published crates — see the "PUBLISHED CRATES" section at the top before
   changing any public code, features, MSRV, or dep floors.**
