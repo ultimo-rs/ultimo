@@ -8,6 +8,8 @@
     <a href="https://docs.rs/ultimo"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square" alt="Documentation" /></a>
     <a href="https://github.com/ultimo-rs/ultimo/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License" /></a>
     <a href="https://github.com/ultimo-rs/ultimo/actions"><img src="https://img.shields.io/github/actions/workflow/status/ultimo-rs/ultimo/ci.yml?branch=main&style=flat-square" alt="Build Status" /></a>
+    <a href="https://github.com/ultimo-rs/ultimo/blob/main/SECURITY.md"><img src="https://img.shields.io/badge/unsafe-forbidden-success.svg?style=flat-square" alt="Unsafe forbidden" /></a>
+    <img src="https://img.shields.io/badge/MSRV-1.86-blue.svg?style=flat-square" alt="MSRV 1.86" />
   </p>
 
   <p>
@@ -39,6 +41,10 @@
 - 🔧 **CLI Tools** - Build, develop, and generate clients with the `ultimo` CLI
 - 🎯 **Hybrid API Design** - Support both REST endpoints and type-safe RPC procedures
 - 🛡️ **Type Safety Everywhere** - From Rust backend to TypeScript frontend
+- 🔒 **100% Safe Rust** - The framework enforces `#![forbid(unsafe_code)]` — zero `unsafe`
+- 🎫 **Sessions & Cookies** - Secure-by-default cookie sessions (HttpOnly/Secure/SameSite, 256-bit ids, anti session-fixation) over a pluggable store
+- 🧱 **Security Hardening** - Security-headers middleware (HSTS/CSP/…), request body-size limits, and supply-chain CI (`cargo-audit` + `cargo-deny`)
+- 🧪 **Testing Utilities** - In-process `TestClient`, response assertions, middleware/DB/fixture helpers
 - 🔥 **Developer Experience First** - Ergonomic APIs, helpful errors, minimal boilerplate
 - 💪 **Production Ready** - Built-in validation, authentication, rate limiting, CORS
 
@@ -46,9 +52,8 @@
 
 See the [full roadmap](https://docs.ultimo.dev/roadmap) for upcoming features:
 
+- 🛡️ Auth middleware (JWT / API keys) & CSRF protection
 - 📡 Streaming & SSE
-- 🎫 Session Management
-- 🧪 Testing Utilities
 - 🌍 Multi-language Client Generation
 - And more...
 
@@ -165,9 +170,12 @@ curl -X POST http://localhost:3000/users \
 
 ```toml
 [dependencies]
-ultimo = { path = "./ultimo" }
-tokio = { version = "1.35", features = ["full"] }
+ultimo = "0.3"
+tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
+
+# Optional features:
+# ultimo = { version = "0.3", features = ["websocket", "session", "sqlx-postgres"] }
 ```
 
 ### 2. Create your API with RPC
