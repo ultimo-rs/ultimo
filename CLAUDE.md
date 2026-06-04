@@ -167,6 +167,13 @@ sidebar entry in the same PR. The repo's top-level `docs/` is internal notes;
 writing only there does NOT surface a feature to users. (Vercel auto-deploys the
 site on merge to `main`.)
 
+**Keep `README.md` current too.** It's the GitHub landing page **and** the
+crates.io front page. When a user-facing feature ships or status/version changes,
+update `README.md` in the same PR: move items from "Coming Soon" → "Available
+Now", add the feature to the list, and keep the install snippet (`ultimo = "0.x"`)
+and badges accurate. Don't let it advertise shipped features as "coming soon"
+(or unshipped ones as available).
+
 ## Conventions
 - **These are published crates — see the "PUBLISHED CRATES" section at the top before
   changing any public code, features, MSRV, or dep floors.**
