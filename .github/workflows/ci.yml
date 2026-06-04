@@ -188,6 +188,18 @@ jobs:
             --ignore RUSTSEC-2026-0098 \
             --ignore RUSTSEC-2026-0099
 
+  # ── Supply-chain checks (cargo-deny) ──────────────────────────────────
+  # Advisories (RUSTSEC), banned/duplicate deps, and source pinning. License
+  # gating is configured in deny.toml but not yet enforced here (follow-up).
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans sources
+
   # ── Version sync across Cargo.toml + both sites + changelogs ───────────
   # Cargo.toml is the single source of truth; this fails if any site or
   # changelog has drifted. Fix with `scripts/sync-versions.sh`. Especially
