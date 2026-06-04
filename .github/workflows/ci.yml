@@ -82,6 +82,7 @@ jobs:
       - name: Cookie + session tests
         run: |
           cargo test -p ultimo --features "testing" --test cookie
+          cargo test -p ultimo --features "testing" --test security_headers
           cargo test -p ultimo --features "session" --lib session
           cargo test -p ultimo --features "session,testing" --test session
           cargo test -p ultimo --features "session" --doc
