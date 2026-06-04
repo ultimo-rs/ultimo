@@ -73,10 +73,15 @@ Upcoming features and improvements planned for Ultimo.
 | **WebSocket Support**     | ✅ Available     | 0.2.1   |
 | **Sessions & Cookies**    | ✅ Available     | 0.3.0   |
 | **Testing Utilities**     | ✅ Available     | 0.3.0   |
-| Static Files              | 📋 Planned       | 0.4.0   |
-| Compression               | 📋 Planned       | 0.4.0   |
-| Hot Reload                | 📋 Planned       | 0.4.0   |
-| Development Dashboard     | 📋 Planned       | 0.4.0   |
+| **100% Safe Rust** (`forbid(unsafe)`) | ✅ Available | 0.3.0 |
+| Security Headers (HSTS/CSP/…) | 🔒 Planned    | 0.4.0   |
+| CSRF Protection           | 🔒 Planned       | 0.4.0   |
+| Auth (JWT / API keys)     | 🔒 Planned       | 0.4.0   |
+| Benchmark Suite + CI Guard | ⚡ Planned      | 0.4.0   |
+| Static Files              | 📋 Planned       | 0.5.0   |
+| Compression               | 📋 Planned       | 0.5.0   |
+| Hot Reload                | 📋 Planned       | 0.5.0   |
+| Development Dashboard     | 📋 Planned       | 0.5.0   |
 | Multi-language Clients    | 📋 Planned       | 0.5.0   |
 | MCP Server                | 📋 Planned       | 0.6.0   |
 
@@ -112,17 +117,32 @@ Upcoming features and improvements planned for Ultimo.
 - ✅ **Router precedence fix**, `Ultimo::oneshot`, `Request::raw_body()`
 - ✅ MSRV 1.86, hardened dependency floors, automated releases + CI guardrails
 
-### v0.4.0
+### v0.4.0 (Next) — Security & Performance
 
-- Static file serving
-- Response compression
-- Hot reload development mode
-- Development dashboard with live metrics and debugging tools
+Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
+
+**Security** (secure-by-default · defense-in-depth · provable)
+
+- 🔒 Security headers middleware (HSTS, CSP, X-Frame-Options, …)
+- 🔒 CSRF protection (integrates with sessions)
+- 🔒 Auth: JWT + API-key middleware, authorization guards
+- 🔒 Request body-size limits, request timeouts, enhanced rate limiting
+- 🔒 `#![forbid(unsafe_code)]` (100% safe Rust), `SECURITY.md` disclosure policy,
+  `cargo-deny` + fuzzing in CI, OpenSSF Best Practices
+
+**Performance** (proven · regression-guarded)
+
+- ⚡ Continuous benchmarking in CI (no perf regressions merge)
+- ⚡ Published comparison vs axum / actix / hono / express / fastapi
+- ⚡ `/performance` page with reproducible methodology
 
 ### v0.5.0
 
-- Multi-language client generation
-- Advanced security features
+- Static file serving + SPA fallback
+- Response compression
+- Hot reload development mode
+- Development dashboard with live metrics and debugging tools
+- Multi-language client generation (Python/Go/Dart/Swift)
 - Production-ready optimizations
 
 ### v0.6.0
