@@ -470,6 +470,16 @@ app.use_middleware(
 );
 ```
 
+#### `csrf()` / `Csrf` (requires `csrf` feature)
+
+Double-submit-cookie CSRF protection (constant-time compare; unsafe methods must
+echo the cookie token in a header). See [Security](/security).
+
+```rust
+app.use_middleware(ultimo::csrf::csrf());
+// or: ultimo::csrf::Csrf::new().header_name("x-csrf-token").build()
+```
+
 ### Custom Middleware
 
 Create custom middleware by implementing the middleware function signature:
@@ -723,6 +733,7 @@ All features are off by default (`default = []`).
 
 - `websocket` - RFC 6455 WebSocket support (zero extra dependencies)
 - `session` - Cookie-based session management ([Sessions](/sessions))
+- `csrf` - Double-submit-cookie CSRF protection ([Security](/security))
 - `testing` - Testing utilities: `TestClient`, assertions, helpers ([Testing](/testing))
 - `test-helpers` - WebSocket test helpers (for integration tests)
 - `sqlx-postgres` / `sqlx-mysql` / `sqlx-sqlite` - SQLx integration per backend

@@ -73,6 +73,38 @@ forge their IP.
 Cookie-based sessions are secure by default (HttpOnly, Secure, SameSite, 256-bit
 ids, anti session-fixation, server-side storage). See [Sessions](/sessions).
 
+## CSRF protection
+
+The `csrf` feature provides **double-submit cookie** CSRF protection. The
+middleware issues a random token in a (non-HttpOnly) cookie; on unsafe methods
+(POST/PUT/PATCH/DELETE) the request must echo that token in a header, and the two
+are compared in **constant time** (mismatch → 403). Safe methods are exempt.
+
+```rust
+// Cargo.toml: ultimo = { version = "0.3", features = ["csrf"] }
+app.use_middleware(ultimo::csrf::csrf());
+
+// or customized:
+app.use_middleware(
+    ultimo::csrf::Csrf::new()
+        .header_name("x-csrf-token")
+        .same_site(ultimo::cookie::SameSite::Strict)
+        .build(),
+);
+```
+
+The frontend reads the `csrf_token` cookie and sends it back as the
+`x-csrf-token` header:
+
+```js
+const token = document.cookie.split('; ')
+  .find((c) => c.startsWith('csrf_token='))?.split('=')[1];
+await fetch('/api/action', { method: 'POST', headers: { 'x-csrf-token': token } });
+```
+
+See the [`session-auth` example](https://github.com/ultimo-rs/ultimo/tree/main/examples/session-auth)
+for a working login flow with CSRF.
+
 ## Supply chain
 
 - **`cargo audit`** (RUSTSEC advisories) runs in CI on every PR.
@@ -94,6 +126,6 @@ Please report privately — see [SECURITY.md](https://github.com/ultimo-rs/ultim
 
 ## Roadmap
 
-Planned for v0.4.0: CSRF protection, auth middleware (JWT / API keys),
+Planned for v0.4.0: auth middleware (JWT / API keys),
 authorization guards, IP allow/deny, request guards, and geo-blocking hooks.
 See the [roadmap](/roadmap).

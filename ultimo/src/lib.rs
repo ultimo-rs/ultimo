@@ -53,6 +53,9 @@ pub mod testing;
 #[cfg(feature = "session")]
 pub mod session;
 
+#[cfg(feature = "csrf")]
+pub mod csrf;
+
 // Re-exports for convenience
 pub use app::Ultimo;
 pub use context::Context;

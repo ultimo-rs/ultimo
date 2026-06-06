@@ -43,8 +43,8 @@ jobs:
       # --all-targets here lints lib, integration tests and benches together,
       # all of which compile once websocket+test-helpers are enabled.
       # Database features are linted in the `test-db` job (needs system libs).
-      - name: clippy (websocket + test-helpers + testing + session, all targets)
-        run: cargo clippy -p ultimo --all-targets --features "websocket,test-helpers,testing,session" -- -D warnings
+      - name: clippy (websocket + test-helpers + testing + session + csrf, all targets)
+        run: cargo clippy -p ultimo --all-targets --features "websocket,test-helpers,testing,session,csrf" -- -D warnings
 
   # ── Unit + integration tests (no DB system deps) ──────────────────────
   test:
@@ -85,6 +85,8 @@ jobs:
           cargo test -p ultimo --features "testing" --test security_headers
           cargo test -p ultimo --features "testing" --test body_limit
           cargo test -p ultimo --features "testing" --test client_ip
+          cargo test -p ultimo --features "csrf" --lib csrf
+          cargo test -p ultimo --features "csrf,testing" --test csrf
           cargo test -p ultimo --features "session" --lib session
           cargo test -p ultimo --features "session,testing" --test session
           cargo test -p ultimo --features "session" --doc

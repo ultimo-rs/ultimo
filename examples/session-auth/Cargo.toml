@@ -5,7 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-ultimo = { path = "../../ultimo", features = ["session"] }
+ultimo = { path = "../../ultimo", features = ["session", "csrf"] }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
