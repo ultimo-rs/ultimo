@@ -167,6 +167,13 @@ sidebar entry in the same PR. The repo's top-level `docs/` is internal notes;
 writing only there does NOT surface a feature to users. (Vercel auto-deploys the
 site on merge to `main`.)
 
+**Keep `api-reference.mdx` current with the public API.** Any change to the
+public surface — a new/renamed/removed `pub` method or type, a new middleware,
+new `Context`/`Ultimo` methods, or a new/changed Cargo feature — must update
+`docs-site/docs/pages/api-reference.mdx` in the same PR (the relevant section:
+`Ultimo` methods, Context/Request, Middleware, Feature Flags, etc.). It's the
+canonical API list; don't let it drift behind the code.
+
 **Keep `README.md` current too.** It's the GitHub landing page **and** the
 crates.io front page. When a user-facing feature ships or status/version changes,
 update `README.md` in the same PR: move items from "Coming Soon" → "Available
