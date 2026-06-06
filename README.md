@@ -43,7 +43,7 @@
 - 🛡️ **Type Safety Everywhere** - From Rust backend to TypeScript frontend
 - 🔒 **100% Safe Rust** - The framework enforces `#![forbid(unsafe_code)]` — zero `unsafe`
 - 🎫 **Sessions & Cookies** - Secure-by-default cookie sessions (HttpOnly/Secure/SameSite, 256-bit ids, anti session-fixation) over a pluggable store
-- 🧱 **Security Hardening** - Security-headers middleware (HSTS/CSP/…), request body-size limits, and supply-chain CI (`cargo-audit` + `cargo-deny`)
+- 🧱 **Security Hardening** - Security-headers middleware (HSTS/CSP/…), CSRF protection, request body-size limits, and supply-chain CI (`cargo-audit` + `cargo-deny`)
 - 🧪 **Testing Utilities** - In-process `TestClient`, response assertions, middleware/DB/fixture helpers
 - 🔥 **Developer Experience First** - Ergonomic APIs, helpful errors, minimal boilerplate
 - 💪 **Production Ready** - Built-in validation, authentication, rate limiting, CORS
@@ -52,7 +52,7 @@
 
 See the [full roadmap](https://docs.ultimo.dev/roadmap) for upcoming features:
 
-- 🛡️ Auth middleware (JWT / API keys) & CSRF protection
+- 🛡️ Auth middleware (JWT / API keys)
 - 📡 Streaming & SSE
 - 🌍 Multi-language Client Generation
 - And more...

@@ -42,17 +42,21 @@ const PAGE: &str = r#"<!doctype html>
       const { user } = await res.json();
       statusEl.textContent = user ? `Logged in as ${user}` : 'Not logged in';
     }
+    // Read the CSRF token the server set in a (non-HttpOnly) cookie.
+    function csrfToken() {
+      return document.cookie.split('; ').find((c) => c.startsWith('csrf_token='))?.split('=')[1] || '';
+    }
     document.getElementById('login').onclick = async () => {
       const username = document.getElementById('username').value || 'guest';
       await fetch('/api/login', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-csrf-token': csrfToken() },
         body: JSON.stringify({ username }),
       });
       refresh();
     };
     document.getElementById('logout').onclick = async () => {
-      await fetch('/api/logout', { method: 'POST' });
+      await fetch('/api/logout', { method: 'POST', headers: { 'x-csrf-token': csrfToken() } });
       refresh();
     };
     refresh();
@@ -70,6 +74,9 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let mut app = Ultimo::new_without_defaults();
+
+    // CSRF protection (double-submit cookie). secure(false) for local HTTP dev.
+    app.use_middleware(ultimo::csrf::Csrf::new().secure(false).build());
 
     // Cookie-backed sessions. secure(false) so the cookie works over local HTTP;
     // in production keep the default secure(true) and serve over HTTPS.

@@ -63,6 +63,9 @@ testing = []
 # Session management (cookie-based, pluggable store)
 session = ["dep:getrandom"]
 
+# CSRF protection (double-submit cookie)
+csrf = ["dep:getrandom"]
+
 # Database features
 database = []
 sqlx-postgres = ["database", "sqlx", "sqlx/postgres"]
