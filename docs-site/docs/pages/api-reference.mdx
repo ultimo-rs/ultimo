@@ -70,6 +70,30 @@ Start the HTTP server on the specified address.
 app.listen("127.0.0.1:3000").await?;
 ```
 
+##### `max_body_size(&mut self, bytes: usize) -> &mut Self`
+
+Reject requests whose body exceeds `bytes` with **413 Payload Too Large** (the
+oversized body is never fully buffered). No limit by default.
+
+```rust
+app.max_body_size(2 * 1024 * 1024); // 2 MB
+```
+
+##### `trust_proxy(&mut self, trust: bool) -> &mut Self`
+
+Trust `X-Forwarded-For` / `Forwarded` headers for [`Context::client_ip`](#client-ip).
+**Only enable behind a trusted proxy** (these headers are client-spoofable).
+Defaults to `false`.
+
+```rust
+app.trust_proxy(true);
+```
+
+##### `oneshot(&self, req: hyper::Request<Full<Bytes>>) -> Response`
+
+Dispatch a fully-buffered request through the app **in-process** (no socket).
+The seam the [testing utilities](/testing) build on; handy for embedding.
+
 ##### Database Methods (requires feature flags)
 
 **With SQLx** (requires `sqlx` feature):
@@ -83,6 +107,15 @@ app.with_sqlx(pool);
 ```rust
 app.with_diesel(pool);
 ```
+
+##### Session middleware (requires `session` feature)
+
+```rust
+use ultimo::session::{session, MemoryStore, SessionConfig};
+app.use_middleware(session(MemoryStore::new(), SessionConfig::default()));
+```
+
+See [Sessions](/sessions).
 
 ---
 
@@ -151,6 +184,46 @@ Set a response header. Can be chained with other response methods.
 ctx.header("X-Custom", "value");
 ctx.json(data).await
 ```
+
+#### Cookies
+
+```rust
+use ultimo::cookie::{Cookie, SameSite};
+
+// Read a request cookie
+let theme = ctx.cookie("theme");          // Option<String>
+let all = ctx.cookies();                  // HashMap<String, String>
+
+// Set / remove a response cookie
+ctx.set_cookie(Cookie::new("theme", "dark").http_only(true).same_site(SameSite::Lax)).await?;
+ctx.remove_cookie("theme").await?;
+```
+
+#### Client IP
+
+##### `client_ip(&self) -> Option<IpAddr>` · `peer_addr(&self) -> Option<SocketAddr>`
+
+`client_ip()` is the best-effort originating client — honors `X-Forwarded-For` /
+`Forwarded` only when [`app.trust_proxy(true)`](#trust-proxy-mut-self-trust-bool---mut-self),
+else the connection peer. `peer_addr()` is the raw connection peer. See
+[Security](/security).
+
+```rust
+let ip = ctx.client_ip();
+```
+
+#### Session (requires `session` feature)
+
+##### `session(&self) -> Session`
+
+The current session (panics if the session middleware isn't installed).
+
+```rust
+ctx.session().await.set("user_id", &42u64).await?;
+let id: Option<u64> = ctx.session().await.get("user_id").await?;
+```
+
+See [Sessions](/sessions).
 
 ### `Request`
 
@@ -230,9 +303,10 @@ Get the request body as a string.
 let body = ctx.req.text().await?;
 ```
 
-##### `bytes(&self) -> Result<Bytes>`
+##### `bytes(&self) -> Result<Bytes>` · `raw_body(&self) -> Result<Bytes>`
 
-Get the request body as raw bytes.
+Get the request body as raw bytes. The body is buffered and cached, so
+`json`/`text`/`bytes`/`raw_body` may be called **multiple times**.
 
 ```rust
 let body = ctx.req.bytes().await?;
@@ -379,6 +453,21 @@ Add `X-Powered-By: Ultimo` header to all responses. Included by default in `Ulti
 
 ```rust
 app.use_middleware(ultimo::middleware::builtin::powered_by());
+```
+
+#### `security_headers()` / `SecurityHeaders`
+
+Secure-by-default response headers (HSTS, X-Content-Type-Options, X-Frame-Options,
+Referrer-Policy, Permissions-Policy; CSP opt-in). See [Security](/security).
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::security_headers());
+// or customized:
+app.use_middleware(
+    ultimo::middleware::builtin::SecurityHeaders::new()
+        .csp("default-src 'self'")
+        .build(),
+);
 ```
 
 ### Custom Middleware
@@ -630,12 +719,18 @@ ultimo = { version = "0.3", features = ["sqlx-postgres"] }
 
 ### Available Features
 
-- `database` - Enable database support (required for `sqlx` or `diesel`)
-- `sqlx` - Enable SQLx integration
-- `diesel` - Enable Diesel integration
-- `postgres` - PostgreSQL support (for SQLx)
-- `mysql` - MySQL support (for SQLx)
-- `sqlite` - SQLite support (for SQLx)
+All features are off by default (`default = []`).
+
+- `websocket` - RFC 6455 WebSocket support (zero extra dependencies)
+- `session` - Cookie-based session management ([Sessions](/sessions))
+- `testing` - Testing utilities: `TestClient`, assertions, helpers ([Testing](/testing))
+- `test-helpers` - WebSocket test helpers (for integration tests)
+- `sqlx-postgres` / `sqlx-mysql` / `sqlx-sqlite` - SQLx integration per backend
+- `diesel-postgres` / `diesel-mysql` / `diesel-sqlite` - Diesel integration per backend
+
+```toml
+ultimo = { version = "0.3", features = ["websocket", "session", "sqlx-postgres"] }
+```
 
 ---
 
