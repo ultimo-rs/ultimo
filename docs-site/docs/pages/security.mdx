@@ -1,0 +1,99 @@
+# Security
+
+Security is one of Ultimo's two core pillars (with performance). The framework
+is **secure by default**, follows **defense in depth**, and aims to be
+**provable** (audited, no `unsafe`, public disclosure policy).
+
+## 100% Safe Rust
+
+The framework enforces `#![forbid(unsafe_code)]` — there is **zero `unsafe`** in
+Ultimo. Combined with Rust's guarantees, that rules out memory-safety bugs
+(buffer overflows, use-after-free, data races) in the framework itself.
+
+## Security headers
+
+Add secure-by-default response headers with one line:
+
+```rust
+use ultimo::middleware::builtin::security_headers;
+
+app.use_middleware(security_headers());
+```
+
+Sets HSTS, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy`, and a restrictive `Permissions-Policy`. Content-Security-Policy
+is opt-in (a wrong CSP breaks more than it protects). Headers are applied only if
+the handler didn't already set them, so per-route overrides win. Customize:
+
+```rust
+use ultimo::middleware::builtin::SecurityHeaders;
+
+app.use_middleware(
+    SecurityHeaders::new()
+        .csp("default-src 'self'")
+        .frame_options("SAMEORIGIN")
+        .build(),
+);
+```
+
+## Request body-size limit
+
+Cap request bodies to reject oversized payloads (DoS protection) with **413**:
+
+```rust
+app.max_body_size(2 * 1024 * 1024); // 2 MB
+```
+
+On the live server an oversized body is never fully buffered. No limit by
+default — set one in production.
+
+## Client IP & trusted proxies
+
+```rust
+let ip = ctx.client_ip();   // Option<IpAddr> — best-effort originating client
+let peer = ctx.peer_addr(); // Option<SocketAddr> — direct connection peer
+```
+
+By default `client_ip()` returns the connection peer. Behind a trusted
+proxy/load balancer, enable header trust so it honors `X-Forwarded-For` (leftmost)
+then `Forwarded: for=`:
+
+```rust
+app.trust_proxy(true); // ONLY behind a trusted proxy
+```
+
+:::warning
+`X-Forwarded-For` / `Forwarded` are client-spoofable. Enable `trust_proxy` **only**
+when the app is actually behind a proxy that sets them — otherwise clients can
+forge their IP.
+:::
+
+## Sessions & cookies
+
+Cookie-based sessions are secure by default (HttpOnly, Secure, SameSite, 256-bit
+ids, anti session-fixation, server-side storage). See [Sessions](/sessions).
+
+## Supply chain
+
+- **`cargo audit`** (RUSTSEC advisories) runs in CI on every PR.
+- **`cargo deny`** gates advisories, banned/duplicate deps, and source pinning.
+- **`Cargo.lock` is committed** for reproducible builds.
+- **`cargo-semver-checks`** guards the public API against accidental breakage.
+- Minimal dependency surface (the WebSocket layer is zero-dependency).
+
+## Defense in depth
+
+For production, deploy Ultimo **behind a managed WAF/CDN** (Cloudflare, AWS WAF,
+…) for full WAF rules, DDoS mitigation, and geo controls. Ultimo provides the
+in-app building blocks; the edge handles volumetric and signature-based threats.
+
+## Reporting a vulnerability
+
+Please report privately — see [SECURITY.md](https://github.com/ultimo-rs/ultimo/blob/main/SECURITY.md)
+(GitHub Security Advisories). Do not open a public issue for vulnerabilities.
+
+## Roadmap
+
+Planned for v0.4.0: CSRF protection, auth middleware (JWT / API keys),
+authorization guards, IP allow/deny, request guards, and geo-blocking hooks.
+See the [roadmap](/roadmap).
