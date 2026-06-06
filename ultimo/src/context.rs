@@ -12,6 +12,7 @@ use http_body_util::BodyExt;
 use hyper::{body::Incoming, Request as HyperRequest};
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -191,6 +192,31 @@ mod request_body_tests {
     }
 }
 
+/// Extract the IP from the first `for=` element of an RFC 7239 `Forwarded` header.
+fn parse_forwarded_for(header: &str) -> Option<IpAddr> {
+    let first = header.split(',').next()?;
+    for part in first.split(';') {
+        let part = part.trim();
+        if part.len() >= 4 && part[..4].eq_ignore_ascii_case("for=") {
+            let v = part[4..].trim().trim_matches('"');
+            // IPv6 in brackets, optionally with port: [::1]:1234
+            if let Some(rest) = v.strip_prefix('[') {
+                if let Some(end) = rest.find(']') {
+                    return rest[..end].parse().ok();
+                }
+            }
+            // Bare IP, or IPv4 with :port
+            if let Ok(ip) = v.parse::<IpAddr>() {
+                return Some(ip);
+            }
+            if let Some((host, _)) = v.rsplit_once(':') {
+                return host.parse().ok();
+            }
+        }
+    }
+    None
+}
+
 /// Context holds request data and provides response building methods
 pub struct Context {
     pub req: Request,
@@ -198,6 +224,10 @@ pub struct Context {
     response_status: Arc<RwLock<Option<u16>>>,
     response_headers: Arc<RwLock<HashMap<String, String>>>,
     set_cookies: Arc<RwLock<Vec<String>>>,
+    /// Peer address of the connection (set by the server; None for in-process dispatch).
+    client_addr: Option<SocketAddr>,
+    /// Whether to trust `X-Forwarded-For` / `Forwarded` headers for `client_ip()`.
+    trust_proxy: bool,
     #[cfg(feature = "session")]
     session: Arc<RwLock<Option<crate::session::Session>>>,
 
@@ -218,6 +248,8 @@ impl Context {
             response_status: Arc::new(RwLock::new(None)),
             response_headers: Arc::new(RwLock::new(HashMap::new())),
             set_cookies: Arc::new(RwLock::new(Vec::new())),
+            client_addr: None,
+            trust_proxy: false,
             #[cfg(feature = "session")]
             session: Arc::new(RwLock::new(None)),
             #[cfg(feature = "database")]
@@ -321,6 +353,46 @@ impl Context {
     /// Shared handle to the queued Set-Cookie values (drained by the dispatcher).
     pub(crate) fn set_cookies_handle(&self) -> Arc<RwLock<Vec<String>>> {
         self.set_cookies.clone()
+    }
+
+    /// Set the connection peer address + proxy-trust (used by the server).
+    pub(crate) fn set_client(&mut self, addr: Option<SocketAddr>, trust_proxy: bool) {
+        self.client_addr = addr;
+        self.trust_proxy = trust_proxy;
+    }
+
+    /// The peer address of the underlying connection, if known. This is the
+    /// direct socket peer — for the originating client behind a proxy, use
+    /// [`client_ip`](Self::client_ip).
+    pub fn peer_addr(&self) -> Option<SocketAddr> {
+        self.client_addr
+    }
+
+    /// Best-effort originating client IP.
+    ///
+    /// When proxy trust is enabled (`app.trust_proxy(true)`) this honors the
+    /// left-most `X-Forwarded-For` entry, then `Forwarded: for=…`; otherwise (or
+    /// if no such header) it falls back to the connection peer. **Only enable
+    /// proxy trust when the app is actually behind a trusted proxy** — these
+    /// headers are client-spoofable.
+    pub fn client_ip(&self) -> Option<IpAddr> {
+        if self.trust_proxy {
+            if let Some(xff) = self.req.header("x-forwarded-for") {
+                if let Some(ip) = xff
+                    .split(',')
+                    .next()
+                    .and_then(|s| s.trim().parse::<IpAddr>().ok())
+                {
+                    return Some(ip);
+                }
+            }
+            if let Some(fwd) = self.req.header("forwarded") {
+                if let Some(ip) = parse_forwarded_for(&fwd) {
+                    return Some(ip);
+                }
+            }
+        }
+        self.client_addr.map(|a| a.ip())
     }
 
     /// The current session. Panics if the session middleware isn't installed.
@@ -685,5 +757,27 @@ mod context_response_tests {
         assert_eq!(c.req.queries().get("a").unwrap().len(), 2);
         assert_eq!(c.req.path(), "/x");
         assert_eq!(c.req.method(), &hyper::Method::GET);
+    }
+}
+
+#[cfg(test)]
+mod forwarded_tests {
+    use super::*;
+
+    #[test]
+    fn parses_forwarded_for_variants() {
+        assert_eq!(
+            parse_forwarded_for("for=192.0.2.1"),
+            Some("192.0.2.1".parse().unwrap())
+        );
+        assert_eq!(
+            parse_forwarded_for("For=\"[2001:db8::1]:4711\";proto=https"),
+            Some("2001:db8::1".parse().unwrap())
+        );
+        assert_eq!(
+            parse_forwarded_for("for=192.0.2.1:8080"),
+            Some("192.0.2.1".parse().unwrap())
+        );
+        assert_eq!(parse_forwarded_for("proto=https;by=10.0.0.1"), None);
     }
 }
