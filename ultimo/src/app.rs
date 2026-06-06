@@ -44,6 +44,7 @@ pub struct Ultimo {
     handlers: Vec<BoxedHandler>,
     middleware: Vec<BoxedMiddleware>,
     max_body_size: Option<usize>,
+    trust_proxy: bool,
 
     #[cfg(feature = "database")]
     database: Option<Database>,
@@ -66,6 +67,7 @@ impl Ultimo {
             handlers: Vec::new(),
             middleware: Vec::new(),
             max_body_size: None,
+            trust_proxy: false,
             #[cfg(feature = "database")]
             database: None,
             #[cfg(feature = "websocket")]
@@ -91,6 +93,7 @@ impl Ultimo {
             handlers: Vec::new(),
             middleware: Vec::new(),
             max_body_size: None,
+            trust_proxy: false,
             #[cfg(feature = "database")]
             database: None,
             #[cfg(feature = "websocket")]
@@ -107,6 +110,16 @@ impl Ultimo {
     /// Defaults to no limit — setting one is recommended for production.
     pub fn max_body_size(&mut self, bytes: usize) -> &mut Self {
         self.max_body_size = Some(bytes);
+        self
+    }
+
+    /// Trust `X-Forwarded-For` / `Forwarded` headers for [`Context::client_ip`].
+    ///
+    /// **Only enable when the app sits behind a trusted proxy/load balancer** —
+    /// these headers are client-spoofable, so trusting them on a directly-exposed
+    /// server lets clients forge their IP. Defaults to `false`.
+    pub fn trust_proxy(&mut self, trust: bool) -> &mut Self {
+        self.trust_proxy = trust;
         self
     }
 
@@ -272,7 +285,7 @@ impl Ultimo {
     }
 
     /// Handle an incoming HTTP request
-    async fn handle_request(&self, req: HyperRequest<Incoming>) -> Response {
+    async fn handle_request(&self, req: HyperRequest<Incoming>, peer_addr: SocketAddr) -> Response {
         // Check for WebSocket upgrade request (needs the live `Incoming` body)
         #[cfg(feature = "websocket")]
         {
@@ -316,11 +329,16 @@ impl Ultimo {
                 }
             },
         };
-        self.dispatch_parts(parts, bytes).await
+        self.dispatch_parts(parts, bytes, Some(peer_addr)).await
     }
 
     /// Run routing + middleware + handler against an already-buffered request.
-    async fn dispatch_parts(&self, parts: hyper::http::request::Parts, body: Bytes) -> Response {
+    async fn dispatch_parts(
+        &self,
+        parts: hyper::http::request::Parts,
+        body: Bytes,
+        client_addr: Option<SocketAddr>,
+    ) -> Response {
         let method_str = parts.method.clone();
         let path = parts.uri.path().to_string();
 
@@ -348,7 +366,8 @@ impl Ultimo {
         // This allows CORS middleware to respond to preflight requests
         if method_str == hyper::Method::OPTIONS {
             // Create context for OPTIONS request
-            let ctx = Context::from_parts(parts, body, Params::new());
+            let mut ctx = Context::from_parts(parts, body, Params::new());
+            ctx.set_client(client_addr, self.trust_proxy);
             let cookie_sink = ctx.set_cookies_handle();
 
             // Build and execute middleware chain
@@ -390,8 +409,8 @@ impl Ultimo {
         let _handler = &self.handlers[handler_id];
 
         // Create context
-        #[cfg_attr(not(feature = "database"), allow(unused_mut))]
         let mut ctx = Context::from_parts(parts, body, params);
+        ctx.set_client(client_addr, self.trust_proxy);
         let cookie_sink = ctx.set_cookies_handle();
 
         // Attach database if configured
@@ -434,7 +453,7 @@ impl Ultimo {
             .await
             .map(|c| c.to_bytes())
             .unwrap_or_default();
-        self.dispatch_parts(parts, bytes).await
+        self.dispatch_parts(parts, bytes, None).await
     }
 
     /// Start the HTTP server
@@ -450,14 +469,14 @@ impl Ultimo {
         let app = Arc::new(self);
 
         loop {
-            let (stream, _) = listener.accept().await?;
+            let (stream, peer_addr) = listener.accept().await?;
             let io = TokioIo::new(stream);
             let app = app.clone();
 
             tokio::task::spawn(async move {
                 let service = service_fn(move |req| {
                     let app = app.clone();
-                    async move { Ok::<_, hyper::Error>(app.handle_request(req).await) }
+                    async move { Ok::<_, hyper::Error>(app.handle_request(req, peer_addr).await) }
                 });
 
                 if let Err(err) = http1::Builder::new()
