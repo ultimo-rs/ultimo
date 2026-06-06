@@ -56,6 +56,10 @@ export default defineConfig({
       text: "Features",
       items: [
         {
+          text: "Security",
+          link: "/security",
+        },
+        {
           text: "Sessions",
           link: "/sessions",
         },
