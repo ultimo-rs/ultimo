@@ -42,9 +42,15 @@ cargo bench -p ultimo --bench http_bench -- --save-baseline main
 cargo bench -p ultimo --bench http_bench -- --baseline main
 ```
 
-A future CI job (#13) will save a baseline from the target branch and fail/flag
-when a change regresses beyond a threshold (~10%, advisory first to calibrate
-runner noise).
+### CI regression check (advisory)
+
+`.github/workflows/bench.yml` runs on PRs that touch `ultimo/src`, the benches, or
+`Cargo.toml`. It benchmarks the PR's **base commit** and the **PR head** on the
+same runner and publishes the `critcmp` delta to the job's Step Summary. It is
+**advisory** — it never fails the build, because shared CI runners are noisy
+(treat regressions beyond ~10% as worth a look). Once the real noise floor is
+known, flip it to enforcing by parsing `critcmp` output and failing the step
+above a calibrated threshold.
 
 ## Tier 2 — end-to-end load benchmarks (`oha`)
 
