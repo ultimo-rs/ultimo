@@ -18,6 +18,9 @@ test-watch: ## Run tests in watch mode
 test-summary: ## Show test statistics
 	@./scripts/test-summary.sh
 
+bench: ## Run performance benchmarks (criterion)
+	cargo bench -p ultimo --features "websocket,test-helpers"
+
 coverage: ## Generate coverage report
 	@cargo run --release -p ultimo-coverage
 

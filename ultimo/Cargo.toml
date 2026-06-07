@@ -91,3 +91,9 @@ diesel-sqlite = ["database", "diesel", "diesel/sqlite", "diesel/r2d2", "r2d2"]
 name = "websocket_bench"
 harness = false
 required-features = ["websocket", "test-helpers"]
+
+# Framework-overhead benchmarks (routing, dispatch, JSON, middleware). No feature
+# gate — runs on default features via in-process `Ultimo::oneshot`.
+[[bench]]
+name = "http_bench"
+harness = false
