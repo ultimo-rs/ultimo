@@ -141,6 +141,47 @@ fn extract_token(jwt: &Jwt, ctx: &Context) -> Option<String> {
     }
 }
 
+use crate::middleware::{BoxedMiddleware, Next};
+use crate::response::{Response, ResponseBuilder};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
+impl Jwt {
+    /// Build the verification middleware. On a valid token it attaches the
+    /// claims to the `Context` and continues; otherwise it returns 401 (unless
+    /// `optional()` was set, in which case it passes through unauthenticated).
+    pub fn build(self) -> BoxedMiddleware {
+        let cfg = Arc::new(self);
+        Arc::new(move |ctx: Context, next: Next| {
+            let cfg = cfg.clone();
+            Box::pin(async move {
+                match extract_token(&cfg, &ctx) {
+                    Some(token) => match cfg.decode::<serde_json::Value>(&token) {
+                        Ok(claims) => {
+                            ctx.set_jwt_claims(claims).await;
+                            next(ctx).await
+                        }
+                        Err(_) if cfg.optional => next(ctx).await,
+                        Err(_) => Ok(unauthorized()),
+                    },
+                    None if cfg.optional => next(ctx).await,
+                    None => Ok(unauthorized()),
+                }
+            }) as Pin<Box<dyn Future<Output = Result<Response>> + Send>>
+        })
+    }
+}
+
+fn unauthorized() -> Response {
+    ResponseBuilder::new()
+        .status(401)
+        .header("WWW-Authenticate", "Bearer")
+        .text("Unauthorized")
+        .build()
+        .unwrap_or_else(|_| crate::response::helpers::text("Unauthorized").unwrap())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,7 +200,7 @@ mod tests {
 
     #[test]
     fn sign_then_decode_roundtrip() {
-        let jwt = Jwt::hs256(b"test-secret".to_vec());
+        let jwt = Jwt::hs256(b"test-secret");
         let token = jwt
             .sign(&Claims {
                 sub: "ada".into(),
@@ -181,8 +222,8 @@ mod tests {
 
     #[test]
     fn decode_rejects_bad_signature() {
-        let signer = Jwt::hs256(b"secret-a".to_vec());
-        let verifier = Jwt::hs256(b"secret-b".to_vec());
+        let signer = Jwt::hs256(b"secret-a");
+        let verifier = Jwt::hs256(b"secret-b");
         let token = signer
             .sign(&Claims {
                 sub: "ada".into(),
@@ -194,7 +235,7 @@ mod tests {
 
     #[test]
     fn decode_rejects_expired() {
-        let jwt = Jwt::hs256(b"secret".to_vec());
+        let jwt = Jwt::hs256(b"secret");
         // exp in the past (epoch second 1) with zero leeway → expired.
         let token = jwt
             .sign(&Claims {
