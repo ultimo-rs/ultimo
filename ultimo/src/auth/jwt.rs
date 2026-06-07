@@ -4,12 +4,17 @@
 //! Verification is delegated to the audited `jsonwebtoken` crate, which pins the
 //! expected algorithm and rejects `alg: none` and HS/RS confusion attacks.
 //!
-//! ```no_run
-//! # use ultimo::Ultimo;
-//! # use ultimo::auth::jwt::Jwt;
-//! let mut app = Ultimo::new_without_defaults();
-//! let jwt = Jwt::hs256(b"super-secret-key".to_vec());
-//! app.use_middleware(jwt.clone().build());
+//! ```
+//! use ultimo::auth::jwt::Jwt;
+//!
+//! let jwt = Jwt::hs256(b"super-secret-key");
+//! // Issue a token (claims must include `exp`).
+//! let token = jwt
+//!     .sign(&serde_json::json!({ "sub": "ada", "exp": 4_102_444_800u64 }))
+//!     .unwrap();
+//! // Verify it and read the claims back.
+//! let claims: serde_json::Value = jwt.decode(&token).unwrap();
+//! assert_eq!(claims["sub"], "ada");
 //! ```
 
 use crate::error::{Result, UltimoError};
