@@ -24,8 +24,9 @@ export function HeroSection() {
         </h1>
 
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10 text-balance leading-relaxed">
-          Automatic TypeScript client generation. Built for speed, designed for
-          developers. The full-stack experience you've been waiting for.
+          Secure by default, fast on the Hyper + Tokio core, and type-safe end
+          to end — with automatic TypeScript clients generated from your Rust
+          API.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
@@ -43,6 +44,30 @@ export function HeroSection() {
             <Terminal className="mr-2 h-4 w-4" />
             cargo install ultimo
           </Button>
+        </div>
+
+        <div className="mt-8 flex flex-wrap items-center gap-2 justify-center">
+          {/* All verifiable — version, CI, license, MSRV, safe-Rust */}
+          <img
+            alt="crates.io version"
+            src="https://img.shields.io/crates/v/ultimo?color=orange"
+          />
+          <img
+            alt="CI status"
+            src="https://img.shields.io/github/actions/workflow/status/ultimo-rs/ultimo/ci.yml?branch=main&label=CI"
+          />
+          <img
+            alt="license"
+            src="https://img.shields.io/crates/l/ultimo"
+          />
+          <img
+            alt="MSRV"
+            src="https://img.shields.io/badge/MSRV-1.86-blue"
+          />
+          <img
+            alt="unsafe forbidden"
+            src="https://img.shields.io/badge/unsafe-forbidden-success"
+          />
         </div>
 
         <div className="mt-20 relative w-full max-w-5xl mx-auto rounded-xl border border-border bg-zinc-950 shadow-2xl overflow-hidden group">

@@ -29,14 +29,14 @@ const features = [
   {
     title: "Blazing Fast Performance",
     description:
-      "Ultimo matches Axum's performance with 152k+ requests per second and sub-millisecond latency. Built on proven foundations like Hyper and Tokio, you get raw Rust speed without compromise.",
+      "A thin layer over Hyper and Tokio — the same core behind the fastest Rust servers — so you get native speed with a higher-level developer experience. Route lookup is O(1), and every change is benchmarked in CI.",
     icon: Zap,
     highlights: [
-      "152k+ req/sec throughput",
-      "Sub-millisecond latency",
-      "Zero-copy parsing where possible",
-      "Efficient async runtime (Tokio)",
-      "Optimized for modern CPUs",
+      "O(1) constant-time routing",
+      "Built on Hyper + Tokio",
+      "Zero-cost abstractions, no GC",
+      "Regression-guarded benchmarks in CI",
+      "100% safe Rust (no unsafe)",
     ],
   },
   {

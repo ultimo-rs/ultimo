@@ -4,7 +4,6 @@ const frameworks = [
   {
     name: "Ultimo",
     features: {
-      performance: "158k+",
       typeScript: "auto",
       openAPI: "auto",
       rpc: true,
@@ -13,14 +12,13 @@ const frameworks = [
       auth: true,
       clientGen: "auto",
       cors: true,
-      rateLimit: true,
-      devServer: true,
+      rateLimit: "planned",
+      devServer: "planned",
     },
   },
   {
     name: "Axum",
     features: {
-      performance: "152k+",
       typeScript: "manual",
       openAPI: "manual",
       rpc: false,
@@ -36,7 +34,6 @@ const frameworks = [
   {
     name: "Actix Web",
     features: {
-      performance: "140k+",
       typeScript: "manual",
       openAPI: "manual",
       rpc: false,
@@ -52,7 +49,6 @@ const frameworks = [
   {
     name: "Rocket",
     features: {
-      performance: "130k+",
       typeScript: "manual",
       openAPI: "manual",
       rpc: false,
@@ -68,7 +64,6 @@ const frameworks = [
   {
     name: "Warp",
     features: {
-      performance: "145k+",
       typeScript: "manual",
       openAPI: "manual",
       rpc: false,
@@ -84,7 +79,6 @@ const frameworks = [
 ];
 
 const featureLabels = {
-  performance: "Performance",
   typeScript: "TypeScript Types",
   openAPI: "OpenAPI Generation",
   rpc: "JSON-RPC Support",
@@ -128,12 +122,17 @@ function FeatureCell({ value }: { value: string | boolean }) {
       </div>
     );
   }
-  // Performance values
-  return (
-    <div className="flex items-center justify-center">
-      <span className="text-sm font-medium text-green-500">{value} req/s</span>
-    </div>
-  );
+  if (value === "planned") {
+    return (
+      <div className="flex items-center justify-center gap-2">
+        <Minus className="h-5 w-5 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground font-medium">
+          Planned
+        </span>
+      </div>
+    );
+  }
+  return null;
 }
 
 export function ComparisonSection() {
@@ -149,8 +148,9 @@ export function ComparisonSection() {
             How Ultimo Compares
           </h2>
           <p className="text-muted-foreground text-lg">
-            Ultimo builds on the best of Rust web frameworks while adding
-            powerful full-stack features that save you time and reduce
+            Axum, Actix, and friends are excellent, minimal HTTP layers. Ultimo
+            builds on the same Rust core and adds the full-stack pieces — typed
+            clients, RPC, auth — so you ship features instead of wiring
             boilerplate.
           </p>
         </div>
@@ -256,6 +256,8 @@ export function ComparisonSection() {
             Built-in &nbsp;&nbsp;
             <Minus className="inline h-4 w-4 text-yellow-500 mr-1" />
             Requires manual setup/crates &nbsp;&nbsp;
+            <Minus className="inline h-4 w-4 text-muted-foreground mr-1" />
+            Planned &nbsp;&nbsp;
             <X className="inline h-4 w-4 text-red-500/50 mr-1" />
             Not available
           </p>
