@@ -119,6 +119,28 @@ impl Route {
             .filter(|s| matches!(s, Segment::Static(_)))
             .count()
     }
+
+    /// The normalized lookup key for a fully-static route (segments joined by
+    /// `/`), or `None` if the route has any parameter. Matches `normalize_path`.
+    fn static_key(&self) -> Option<String> {
+        let mut parts: Vec<&str> = Vec::with_capacity(self.segments.len());
+        for seg in &self.segments {
+            match seg {
+                Segment::Static(s) => parts.push(s),
+                Segment::Param(_) => return None,
+            }
+        }
+        Some(parts.join("/"))
+    }
+}
+
+/// Normalize a request path to a static-route key: non-empty segments joined by
+/// `/`. Trailing and duplicate slashes are ignored, matching `Route::matches`.
+fn normalize_path(path: &str) -> String {
+    path.split('/')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// Router entry combining method, route, and handler index
@@ -129,36 +151,66 @@ pub struct RouterEntry {
     pub handler_id: usize,
 }
 
-/// Main router struct
+/// Main router struct.
+///
+/// Lookup is split for speed: fully-static routes go in an O(1) hash index
+/// keyed by `(method, normalized-path)`, and only parameterized routes are
+/// scanned. Because a fully-static match is always the most specific possible
+/// for a path, a hit in the static index wins outright — so the precedence
+/// guarantee (static beats param, ties by registration order) is preserved
+/// while avoiding an O(N) scan over every registered route.
 #[derive(Debug)]
 pub struct Router {
+    /// All routes in registration order — for `routes()` / introspection.
     routes: Vec<RouterEntry>,
+    /// O(1) exact lookup for fully-static routes. First registration wins.
+    static_index: HashMap<(Method, String), usize>,
+    /// Parameterized routes only, scanned when there's no static match.
+    dynamic: Vec<RouterEntry>,
 }
 
 impl Router {
     /// Create a new empty router
     pub fn new() -> Self {
-        Self { routes: Vec::new() }
+        Self {
+            routes: Vec::new(),
+            static_index: HashMap::new(),
+            dynamic: Vec::new(),
+        }
     }
 
     /// Add a route to the router
     pub fn add_route(&mut self, method: Method, path: &str, handler_id: usize) {
         let route = Route::new(path);
-        self.routes.push(RouterEntry {
+        let entry = RouterEntry {
             method,
-            route,
+            route: route.clone(),
             handler_id,
-        });
+        };
+        match route.static_key() {
+            // First registration wins (preserves the prior tie-break semantics).
+            Some(key) => {
+                self.static_index.entry((method, key)).or_insert(handler_id);
+            }
+            None => self.dynamic.push(entry.clone()),
+        }
+        self.routes.push(entry);
     }
 
     /// Find the best-matching route for the given method and path.
     ///
-    /// Among all matching routes, the most specific wins (most static segments),
-    /// so static routes take precedence over parameterized ones regardless of
-    /// registration order. Ties are broken by registration order (first wins).
+    /// A fully-static match is the most specific possible for a path, so it wins
+    /// outright (O(1) via the static index). Otherwise only parameterized routes
+    /// are scanned; the most specific wins, ties broken by registration order.
     pub fn find_route(&self, method: Method, path: &str) -> Option<(usize, Params)> {
+        // Fast path: exact static match.
+        let key = normalize_path(path);
+        if let Some(&handler_id) = self.static_index.get(&(method, key)) {
+            return Some((handler_id, Params::new()));
+        }
+        // Slow path: scan only the parameterized routes.
         let mut best: Option<(usize, Params, usize)> = None;
-        for entry in &self.routes {
+        for entry in &self.dynamic {
             if entry.method == method {
                 if let Some(params) = entry.route.matches(path) {
                     let spec = entry.route.specificity();
@@ -296,5 +348,45 @@ mod tests {
         r.add_route(Method::GET, "/users/me", 1);
         assert!(r.find_route(Method::GET, "/posts").is_none());
         assert!(r.find_route(Method::POST, "/users/me").is_none());
+    }
+
+    #[test]
+    fn many_static_routes_resolve_correctly() {
+        // The static index must return the right handler regardless of table size.
+        let mut r = Router::new();
+        for i in 0..500 {
+            r.add_route(Method::GET, &format!("/route/{i}"), i);
+        }
+        let (id, params) = r.find_route(Method::GET, "/route/250").unwrap();
+        assert_eq!(id, 250);
+        assert!(params.is_empty());
+        assert!(r.find_route(Method::GET, "/route/999").is_none());
+    }
+
+    #[test]
+    fn duplicate_static_route_keeps_first_registration() {
+        // Two registrations of the same static path: the first wins.
+        let mut r = Router::new();
+        r.add_route(Method::GET, "/dup", 1);
+        r.add_route(Method::GET, "/dup", 2);
+        let (id, _) = r.find_route(Method::GET, "/dup").unwrap();
+        assert_eq!(id, 1);
+    }
+
+    #[test]
+    fn root_path_uses_static_index() {
+        let mut r = Router::new();
+        r.add_route(Method::GET, "/", 7);
+        let (id, _) = r.find_route(Method::GET, "/").unwrap();
+        assert_eq!(id, 7);
+    }
+
+    #[test]
+    fn method_is_part_of_the_static_key() {
+        let mut r = Router::new();
+        r.add_route(Method::GET, "/x", 1);
+        r.add_route(Method::POST, "/x", 2);
+        assert_eq!(r.find_route(Method::GET, "/x").unwrap().0, 1);
+        assert_eq!(r.find_route(Method::POST, "/x").unwrap().0, 2);
     }
 }
