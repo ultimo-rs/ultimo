@@ -169,7 +169,12 @@ impl<S: ApiKeyStore + 'static> ApiKey<S> {
                 match presented {
                     Some(key) => match cfg.store.validate(&key).await {
                         Some(identity) => {
+                            let principal = crate::auth::Principal {
+                                id: Some(identity.id.clone()),
+                                scopes: identity.scopes.clone(),
+                            };
                             ctx.set_api_key(identity).await;
+                            ctx.set_principal(principal).await;
                             next(ctx).await
                         }
                         None if cfg.optional => next(ctx).await,

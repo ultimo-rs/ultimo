@@ -97,6 +97,37 @@ async fn custom_header_name_is_honored() {
     assert_eq!(res.status(), 200);
 }
 
+#[tokio::test]
+async fn guarded_route_uses_api_key_scopes() {
+    // A route guarded by require_scope, behind the api-key middleware. The
+    // identity's scopes flow into the Principal the guard reads.
+    fn guarded() -> Ultimo {
+        let mut app = Ultimo::new_without_defaults();
+        app.use_middleware(ApiKey::new(store()).build());
+        app.get("/admin", |ctx: Context| async move {
+            ctx.require_scope("write").await?;
+            ctx.json(serde_json::json!({ "ok": true })).await
+        });
+        app
+    }
+
+    // key-def has scopes [read, write] → allowed.
+    let req = HyperRequest::builder()
+        .uri("/admin")
+        .header("x-api-key", "key-def")
+        .body(empty())
+        .unwrap();
+    assert_eq!(guarded().oneshot(req).await.status(), 200);
+
+    // key-abc has no scopes → 403.
+    let req = HyperRequest::builder()
+        .uri("/admin")
+        .header("x-api-key", "key-abc")
+        .body(empty())
+        .unwrap();
+    assert_eq!(guarded().oneshot(req).await.status(), 403);
+}
+
 async fn collect(res: ultimo::response::Response) -> String {
     use http_body_util::BodyExt;
     let bytes = res.into_body().collect().await.unwrap().to_bytes();
