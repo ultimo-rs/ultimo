@@ -1,378 +1,294 @@
 # Middleware
 
-Middleware in Ultimo allows you to execute code before and after your route handlers, enabling powerful cross-cutting concerns like logging, authentication, and CORS.
+Middleware runs around your route handlers — before and after — for cross-cutting
+concerns like logging, CORS, security headers, and auth.
 
-## Basic Middleware
-
-Middleware functions receive the context and a `next` function:
+A middleware is a `BoxedMiddleware`: a function of `(Context, Next)` that returns
+`Result<Response>`. It calls `next(ctx)` to invoke the rest of the chain (and the
+handler), or returns early to short-circuit. Middleware is **global** — it applies
+to every route, in the order it's added. (For per-route access control, use the
+[authorization guards](/authorization) inside the relevant handler.)
 
 ```rust
-use ultimo::prelude::*;
-
-app.use_middleware(|ctx, next| async move {
-    println!("Before handler");
-    next().await?;
-    println!("After handler");
-    Ok(())
-});
+app.use_middleware(ultimo::middleware::builtin::logger());
 ```
 
-## Built-in Middleware
+## Built-in middleware
+
+All built-ins live in `ultimo::middleware::builtin` and return a `BoxedMiddleware`.
 
 ### Logger
 
-Log requests and responses:
-
 ```rust
-use ultimo::middleware::logger;
+use ultimo::middleware::builtin::logger;
 
 app.use_middleware(logger());
 ```
 
-Output:
-
-```
-[INFO] GET /users/1 - 200 OK (2.3ms)
-[INFO] POST /users - 201 Created (5.1ms)
-```
+Logs each request and response (method, path, status, duration) via `tracing`.
 
 ### CORS
 
-Configure Cross-Origin Resource Sharing:
+Defaults (allow `*`, `GET`/`POST`, `Content-Type`):
 
 ```rust
-use ultimo::middleware::cors;
+use ultimo::middleware::builtin::cors;
+
+app.use_middleware(cors());
+```
+
+Configured, with the `Cors` builder:
+
+```rust
+use ultimo::middleware::builtin::Cors;
 
 app.use_middleware(
-    cors::new()
+    Cors::new()
         .allow_origin("https://example.com")
         .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
         .allow_headers(vec!["Content-Type", "Authorization"])
-        .allow_credentials(true)
+        .build(),
 );
 ```
 
-Allow all origins (development only):
+### Security headers
+
+Secure defaults (HSTS, `X-Content-Type-Options`, `X-Frame-Options`,
+`Referrer-Policy`, `Permissions-Policy`):
 
 ```rust
-app.use_middleware(
-    cors::new()
-        .allow_origin("*")
-        .allow_methods(vec!["GET", "POST"])
-);
+use ultimo::middleware::builtin::security_headers;
+
+app.use_middleware(security_headers());
 ```
 
-### Rate Limiting
-
-Limit requests per time window:
+Or customize with the `SecurityHeaders` builder (CSP is opt-in — it's off by
+default because a wrong policy breaks more than it protects):
 
 ```rust
-use ultimo::middleware::rate_limit;
-use std::time::Duration;
+use ultimo::middleware::builtin::SecurityHeaders;
 
-// Allow 100 requests per minute
 app.use_middleware(
-    rate_limit::new()
-        .limit(100)
-        .window(Duration::from_secs(60))
+    SecurityHeaders::new()
+        .csp("default-src 'self'")
+        .frame_options("DENY")
+        .referrer_policy("no-referrer")
+        .build(),
 );
 ```
 
-When limit is exceeded:
+See [Security](/security) for the full list and defaults.
 
-```json
-{
-  "error": "TooManyRequests",
-  "message": "Rate limit exceeded. Try again later."
+### Server identity headers
+
+```rust
+use ultimo::middleware::builtin::{powered_by, server_headers};
+
+app.use_middleware(powered_by());                 // X-Powered-By: Ultimo
+app.use_middleware(server_headers("MyApp", true)); // Server: MyApp/<version>
+```
+
+## Writing custom middleware
+
+A custom middleware is a function returning `BoxedMiddleware`. The closure takes
+`(Context, Next)` and returns a pinned, boxed future resolving to
+`Result<Response>`. Call `next(ctx).await` to continue the chain.
+
+```rust
+use std::sync::Arc;
+use std::time::Instant;
+use hyper::header::{HeaderName, HeaderValue};
+use ultimo::middleware::{BoxedMiddleware, Next};
+use ultimo::prelude::*;
+
+/// Add an `X-Response-Time` header measured around the handler.
+fn timing() -> BoxedMiddleware {
+    Arc::new(|ctx: Context, next: Next| {
+        Box::pin(async move {
+            let start = Instant::now();
+            // `next(ctx)` runs the rest of the chain and returns the Response.
+            let mut res = next(ctx).await?;
+            let ms = start.elapsed().as_millis();
+            res.headers_mut().insert(
+                HeaderName::from_static("x-response-time"),
+                HeaderValue::from_str(&format!("{ms}ms")).unwrap(),
+            );
+            Ok(res)
+        })
+    })
+}
+
+app.use_middleware(timing());
+```
+
+Key points:
+
+- The closure signature is `Fn(Context, Next) -> Pin<Box<dyn Future<Output = Result<Response>> + Send>>` — wrap the body in `Box::pin(async move { … })`.
+- `next` is called as `next(ctx)` (it consumes the context) and yields `Result<Response>`.
+- To modify the **response**, capture it from `next(ctx).await?` and mutate it
+  (e.g. `res.headers_mut()`), then return `Ok(res)`.
+
+## Short-circuiting
+
+Return without calling `next` to stop the chain early. Returning an `Err`
+short-circuits with the matching status (e.g. `Unauthorized` → 401); the
+framework turns it into a JSON error response.
+
+```rust
+use std::sync::Arc;
+use ultimo::middleware::{BoxedMiddleware, Next};
+use ultimo::prelude::*;
+
+/// Reject requests without a matching API key (illustrative — for real auth use
+/// the built-in JWT / API-key middleware below).
+fn require_api_key(expected: &'static str) -> BoxedMiddleware {
+    Arc::new(move |ctx: Context, next: Next| {
+        Box::pin(async move {
+            match ctx.req.header("x-api-key") {
+                Some(key) if key == expected => next(ctx).await,
+                _ => Err(UltimoError::Unauthorized("invalid API key".into())),
+            }
+        })
+    })
 }
 ```
 
-## Custom Middleware
+> `ctx.req.header(name)` returns `Option<String>` (lookup is case-insensitive).
 
-### Request Timing
+## Authentication & authorization
 
-Measure how long requests take:
-
-```rust
-use std::time::Instant;
-
-app.use_middleware(|ctx, next| async move {
-    let start = Instant::now();
-
-    next().await?;
-
-    let duration = start.elapsed();
-    ctx.res.header("X-Response-Time", format!("{}ms", duration.as_millis()));
-
-    Ok(())
-});
-```
-
-### Request ID
-
-Add unique IDs to each request:
+Don't hand-roll auth — Ultimo ships it. Mount one of the built-in auth
+middlewares and enforce access in your handlers with the guards:
 
 ```rust
-use uuid::Uuid;
-
-app.use_middleware(|ctx, next| async move {
-    let request_id = Uuid::new_v4().to_string();
-    ctx.set("request_id", request_id.clone());
-    ctx.res.header("X-Request-ID", request_id);
-
-    next().await
-});
-```
-
-### Authentication
-
-Check for valid tokens:
-
-```rust
-app.use_middleware(|ctx, next| async move {
-    let auth_header = ctx.req.header("Authorization")?;
-
-    if !auth_header.starts_with("Bearer ") {
-        return Err(UltimoError::Unauthorized(
-            "Invalid authorization header".to_string()
-        ));
-    }
-
-    let token = &auth_header[7..]; // Remove "Bearer "
-
-    if !is_valid_token(token) {
-        return Err(UltimoError::Unauthorized(
-            "Invalid token".to_string()
-        ));
-    }
-
-    // Store user info for handlers to use
-    let user = get_user_from_token(token)?;
-    ctx.set("user", user);
-
-    next().await
-});
-```
-
-### Content Type Validation
-
-Ensure requests have correct content type:
-
-```rust
-app.use_middleware(|ctx, next| async move {
-    if ctx.req.method() == "POST" || ctx.req.method() == "PUT" {
-        let content_type = ctx.req.header("Content-Type")?;
-
-        if content_type != "application/json" {
-            return Err(UltimoError::BadRequest(
-                "Content-Type must be application/json".to_string()
-            ));
-        }
-    }
-
-    next().await
-});
-```
-
-## Sharing Data Between Middleware
-
-Use `ctx.set()` and `ctx.get()` to pass data:
-
-```rust
-// Middleware 1: Authenticate and store user
-app.use_middleware(|ctx, next| async move {
-    let user = authenticate(&ctx).await?;
-    ctx.set("user", user);
-    next().await
-});
-
-// Middleware 2: Log user action
-app.use_middleware(|ctx, next| async move {
-    if let Some(user) = ctx.get::<User>("user") {
-        println!("User {} made a request", user.id);
-    }
-    next().await
-});
-
-// Handler: Access user
-app.get("/profile", |ctx| async move {
-    let user: User = ctx.get("user")?;
-    ctx.json(user).await
-});
-```
-
-## Conditional Middleware
-
-Apply middleware only to specific routes:
-
-```rust
-// Middleware for all routes
-app.use_middleware(logger());
-
-// Protected routes only
-let auth = bearer_auth(vec!["secret_token"]);
-
-app.get("/public", |ctx| async move {
-    ctx.json(json!({"public": true})).await
-});
-
-app.get("/protected", auth, |ctx| async move {
-    ctx.json(json!({"protected": true})).await
-});
-```
-
-## Middleware Order
-
-Middleware executes in the order it's added:
-
-```rust
-app.use_middleware(logger());           // 1. Log request
-app.use_middleware(auth_middleware());  // 2. Check authentication
-app.use_middleware(rate_limit());       // 3. Check rate limit
-
-// Request flow:
-// logger → auth → rate_limit → handler → rate_limit → auth → logger
-```
-
-## Short-Circuiting
-
-Return early without calling `next()`:
-
-```rust
-app.use_middleware(|ctx, next| async move {
-    if ctx.req.header("X-API-Key")? != "secret" {
-        // Don't call next(), return error immediately
-        return Err(UltimoError::Unauthorized(
-            "Invalid API key".to_string()
-        ));
-    }
-
-    next().await
-});
-```
-
-## Error Handling in Middleware
-
-Middleware can catch and transform errors:
-
-```rust
-app.use_middleware(|ctx, next| async move {
-    match next().await {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            // Log the error
-            eprintln!("Error: {:?}", e);
-
-            // Transform or wrap errors
-            Err(UltimoError::Internal(
-                "An error occurred processing your request".to_string()
-            ))
-        }
-    }
-});
-```
-
-## Complete Example
-
-Combining multiple middleware:
-
-```rust
+use ultimo::auth::jwt::Jwt;
 use ultimo::prelude::*;
-use ultimo::middleware::{logger, cors, rate_limit};
-use std::time::Duration;
+
+// Verify JWTs and attach the caller to the Context.
+app.use_middleware(Jwt::hs256(b"super-secret-key").build());
+
+app.get("/admin", |ctx: Context| async move {
+    ctx.require_scope("admin").await?;   // 401 if unauthenticated, 403 if missing
+    ctx.json(json!({ "ok": true })).await
+});
+```
+
+See [JWT](/jwt), [API Keys](/api-keys), and [Authorization](/authorization).
+
+## Sharing data between middleware and handlers
+
+The `Context` carries a small **string** key/value store, written and read with
+async `set`/`get`:
+
+```rust
+use std::sync::Arc;
+use ultimo::middleware::{BoxedMiddleware, Next};
+use ultimo::prelude::*;
+
+fn request_id() -> BoxedMiddleware {
+    Arc::new(|ctx: Context, next: Next| {
+        Box::pin(async move {
+            // (generate however you like; a counter/uuid/etc.)
+            ctx.set("request_id", "req-123").await;
+            next(ctx).await
+        })
+    })
+}
+
+app.get("/whoami", |ctx: Context| async move {
+    let id = ctx.get("request_id").await.unwrap_or_default();
+    ctx.json(json!({ "request_id": id })).await
+});
+```
+
+> The store holds `String` values. For structured data, serialize it (e.g. with
+> `serde_json::to_string`) before `set`, or attach it via a feature that owns its
+> own typed slot (the `jwt`/`api-key` features expose `ctx.jwt_claims()` /
+> `ctx.api_key()`).
+
+## Error handling in middleware
+
+Wrap `next(ctx)` to observe or transform errors:
+
+```rust
+use std::sync::Arc;
+use ultimo::middleware::{BoxedMiddleware, Next};
+use ultimo::prelude::*;
+
+fn catch_errors() -> BoxedMiddleware {
+    Arc::new(|ctx: Context, next: Next| {
+        Box::pin(async move {
+            match next(ctx).await {
+                Ok(res) => Ok(res),
+                Err(err) => {
+                    tracing::error!("request failed: {err}");
+                    Err(err) // or map to a different UltimoError
+                }
+            }
+        })
+    })
+}
+```
+
+## Order
+
+Middleware runs in registration order, wrapping the handler:
+
+```rust
+use ultimo::middleware::builtin::{logger, cors, security_headers};
+
+app.use_middleware(logger());           // outermost: logs everything
+app.use_middleware(security_headers()); // adds hardened headers
+app.use_middleware(cors());             // CORS handling
+
+// Flow: logger → security_headers → cors → handler → cors → security_headers → logger
+```
+
+## Complete example
+
+```rust
+use std::sync::Arc;
+use std::time::Instant;
+use hyper::header::{HeaderName, HeaderValue};
+use ultimo::middleware::builtin::{cors, logger, security_headers};
+use ultimo::middleware::{BoxedMiddleware, Next};
+use ultimo::prelude::*;
+
+fn timing() -> BoxedMiddleware {
+    Arc::new(|ctx: Context, next: Next| {
+        Box::pin(async move {
+            let start = Instant::now();
+            let mut res = next(ctx).await?;
+            res.headers_mut().insert(
+                HeaderName::from_static("x-response-time"),
+                HeaderValue::from_str(&format!("{}ms", start.elapsed().as_millis()))
+                    .unwrap(),
+            );
+            Ok(res)
+        })
+    })
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut app = Ultimo::new();
+    let mut app = Ultimo::new_without_defaults();
 
-    // 1. Logging
     app.use_middleware(logger());
+    app.use_middleware(security_headers());
+    app.use_middleware(cors());
+    app.use_middleware(timing());
 
-    // 2. CORS
-    app.use_middleware(
-        cors::new()
-            .allow_origin("https://myapp.com")
-            .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
-            .allow_credentials(true)
-    );
-
-    // 3. Rate limiting
-    app.use_middleware(
-        rate_limit::new()
-            .limit(100)
-            .window(Duration::from_secs(60))
-    );
-
-    // 4. Request ID
-    app.use_middleware(|ctx, next| async move {
-        ctx.set("request_id", uuid::Uuid::new_v4());
-        next().await
-    });
-
-    // 5. Timing
-    app.use_middleware(|ctx, next| async move {
-        let start = std::time::Instant::now();
-        next().await?;
-        let duration = start.elapsed();
-        ctx.res.header("X-Response-Time", format!("{}ms", duration.as_millis()));
-        Ok(())
-    });
-
-    // Routes
-    app.get("/", |ctx| async move {
-        ctx.json(json!({"message": "Hello!"})).await
+    app.get("/", |ctx: Context| async move {
+        ctx.json(json!({ "message": "Hello!" })).await
     });
 
     app.listen("127.0.0.1:3000").await
 }
 ```
 
-## Best Practices
+## Best practices
 
-### ✅ Order Matters
-
-Put essential middleware first:
-
-```rust
-app.use_middleware(logger());        // Log everything
-app.use_middleware(auth());          // Then authenticate
-app.use_middleware(rate_limit());    // Then rate limit
-```
-
-### ✅ Keep Middleware Focused
-
-Each middleware should do one thing:
-
-```rust
-// ✅ Good - focused
-app.use_middleware(auth_middleware());
-app.use_middleware(logging_middleware());
-
-// ❌ Bad - does too much
-app.use_middleware(auth_and_logging_middleware());
-```
-
-### ✅ Use Typed Context Storage
-
-```rust
-// ✅ Good - type-safe
-ctx.set("user", user);
-let user: User = ctx.get("user")?;
-
-// ❌ Bad - stringly-typed
-ctx.set("user_id_string", user.id.to_string());
-```
-
-### ✅ Handle Errors Gracefully
-
-```rust
-app.use_middleware(|ctx, next| async move {
-    match next().await {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            log_error(&e);
-            Err(e)
-        }
-    }
-});
-```
+- **Keep each middleware focused** — one concern per layer.
+- **Order matters** — put logging outermost, then security/CORS, then app-specific layers.
+- **Prefer the built-ins** for auth, CORS, and headers rather than re-implementing them.
+- **Return errors, don't panic** — an `Err(UltimoError::…)` becomes a proper HTTP error response.
