@@ -31,11 +31,14 @@ sha1 = "0.10"
 base64 = "0.21"
 async-trait = "0.1"
 
-# Session support (optional) — getrandom for secure session ids
+# Session support (optional) â getrandom for secure session ids
 getrandom = { version = "0.3", optional = true }
 
-# JWT auth (optional) — audited impl; pins algorithm, rejects `alg: none`
+# JWT auth (optional) â audited impl; pins algorithm, rejects `alg: none`
 jsonwebtoken = { version = "9", optional = true }
+
+# API-key auth (optional) — SHA-256 to hash keys (high-entropy secrets, not passwords)
+sha2 = { version = "0.10", optional = true }
 
 # Database support (optional)
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls"], optional = true }
@@ -71,6 +74,9 @@ csrf = ["dep:getrandom"]
 
 # JWT authentication middleware (HS256)
 jwt = ["dep:jsonwebtoken"]
+
+# API-key authentication middleware (pluggable store, SHA-256 hashed keys)
+api-key = ["dep:sha2"]
 
 # Database features
 database = []

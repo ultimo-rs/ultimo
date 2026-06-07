@@ -56,7 +56,7 @@ pub mod session;
 #[cfg(feature = "csrf")]
 pub mod csrf;
 
-#[cfg(feature = "jwt")]
+#[cfg(any(feature = "jwt", feature = "api-key"))]
 pub mod auth;
 
 // Re-exports for convenience

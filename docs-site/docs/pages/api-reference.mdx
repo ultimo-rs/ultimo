@@ -242,6 +242,19 @@ let mine: MyClaims = ctx.jwt::<MyClaims>().await?;
 
 See [JWT Authentication](/jwt).
 
+#### API-key identity (requires `api-key` feature)
+
+##### `api_key(&self) -> Option<ApiKeyIdentity>`
+
+The API-key identity for this request (`id` + `scopes`), or `None` if no valid
+key was presented. See [API-Key Authentication](/api-keys).
+
+```rust
+if let Some(identity) = ctx.api_key().await {
+    // identity.id, identity.scopes
+}
+```
+
 ### `Request`
 
 Access request data through `ctx.req`.
@@ -512,6 +525,20 @@ app.use_middleware(jwt.clone().build());
 let token = jwt.sign(&claims)?;
 ```
 
+#### `ApiKey` (requires `api-key` feature)
+
+API-key auth — validates a presented key against a pluggable **`ApiKeyStore`**,
+resolving it to an **`ApiKeyIdentity { id, scopes }`** attached to the `Context`;
+401 on missing/invalid. The built-in `StaticKeys` store hashes keys with SHA-256
+and compares in constant time. Builder: `new(store)`, `header_name(name)`,
+`from_query(name)`, `optional()`, `build()`. See [API-Key Authentication](/api-keys).
+
+```rust
+use ultimo::auth::api_key::{ApiKey, StaticKeys};
+let store = StaticKeys::new().insert("key-abc", "service-a");
+app.use_middleware(ApiKey::new(store).build()); // header "x-api-key"
+```
+
 ### Custom Middleware
 
 Create custom middleware by implementing the middleware function signature:
@@ -767,6 +794,7 @@ All features are off by default (`default = []`).
 - `session` - Cookie-based session management ([Sessions](/sessions))
 - `csrf` - Double-submit-cookie CSRF protection ([Security](/security))
 - `jwt` - HS256 JWT authentication middleware ([JWT Authentication](/jwt))
+- `api-key` - API-key authentication with a pluggable store ([API-Key Authentication](/api-keys))
 - `testing` - Testing utilities: `TestClient`, assertions, helpers ([Testing](/testing))
 - `test-helpers` - WebSocket test helpers (for integration tests)
 - `sqlx-postgres` / `sqlx-mysql` / `sqlx-sqlite` - SQLx integration per backend

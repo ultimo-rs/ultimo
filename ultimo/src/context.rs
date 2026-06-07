@@ -232,6 +232,8 @@ pub struct Context {
     session: Arc<RwLock<Option<crate::session::Session>>>,
     #[cfg(feature = "jwt")]
     jwt_claims: Arc<RwLock<Option<serde_json::Value>>>,
+    #[cfg(feature = "api-key")]
+    api_key: Arc<RwLock<Option<crate::auth::api_key::ApiKeyIdentity>>>,
 
     #[cfg(feature = "database")]
     database: Option<Database>,
@@ -256,6 +258,8 @@ impl Context {
             session: Arc::new(RwLock::new(None)),
             #[cfg(feature = "jwt")]
             jwt_claims: Arc::new(RwLock::new(None)),
+            #[cfg(feature = "api-key")]
+            api_key: Arc::new(RwLock::new(None)),
             #[cfg(feature = "database")]
             database: None,
         }
@@ -437,6 +441,19 @@ impl Context {
     #[cfg(feature = "jwt")]
     pub(crate) async fn set_jwt_claims(&self, claims: serde_json::Value) {
         *self.jwt_claims.write().await = Some(claims);
+    }
+
+    /// The API-key identity for this request, if the `api-key` middleware ran and
+    /// accepted a key. `None` if unauthenticated (or in optional mode).
+    #[cfg(feature = "api-key")]
+    pub async fn api_key(&self) -> Option<crate::auth::api_key::ApiKeyIdentity> {
+        self.api_key.read().await.clone()
+    }
+
+    /// Store the resolved API-key identity (used by the api-key middleware).
+    #[cfg(feature = "api-key")]
+    pub(crate) async fn set_api_key(&self, identity: crate::auth::api_key::ApiKeyIdentity) {
+        *self.api_key.write().await = Some(identity);
     }
 
     /// Set the response status code

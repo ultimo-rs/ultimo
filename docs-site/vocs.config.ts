@@ -71,6 +71,10 @@ export default defineConfig({
               text: "JWT",
               link: "/jwt",
             },
+            {
+              text: "API Keys",
+              link: "/api-keys",
+            },
           ],
         },
         {
