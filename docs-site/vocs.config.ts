@@ -75,6 +75,10 @@ export default defineConfig({
               text: "API Keys",
               link: "/api-keys",
             },
+            {
+              text: "Authorization (Guards)",
+              link: "/authorization",
+            },
           ],
         },
         {

@@ -159,7 +159,12 @@ impl Jwt {
                 match extract_token(&cfg, &ctx) {
                     Some(token) => match cfg.decode::<serde_json::Value>(&token) {
                         Ok(claims) => {
+                            let principal = crate::auth::Principal {
+                                id: claims.get("sub").and_then(|v| v.as_str()).map(String::from),
+                                scopes: extract_scopes(&claims),
+                            };
                             ctx.set_jwt_claims(claims).await;
+                            ctx.set_principal(principal).await;
                             next(ctx).await
                         }
                         Err(_) if cfg.optional => next(ctx).await,
@@ -180,6 +185,33 @@ fn unauthorized() -> Response {
         .text("Unauthorized")
         .build()
         .unwrap_or_else(|_| crate::response::helpers::text("Unauthorized").unwrap())
+}
+
+/// Extract scopes from JWT claims for the normalized [`Principal`](crate::auth::Principal).
+///
+/// Parses the OAuth2-standard `scope` (space-delimited string) plus `scopes` and
+/// `scp` (array of strings, or a space-delimited string), de-duplicated. Apps
+/// with a different claim shape can read [`Context::jwt_claims`](crate::Context::jwt_claims)
+/// directly instead.
+fn extract_scopes(claims: &serde_json::Value) -> Vec<String> {
+    let mut scopes: Vec<String> = Vec::new();
+    if let Some(s) = claims.get("scope").and_then(|v| v.as_str()) {
+        scopes.extend(s.split_whitespace().map(String::from));
+    }
+    for key in ["scopes", "scp"] {
+        match claims.get(key) {
+            Some(serde_json::Value::Array(arr)) => {
+                scopes.extend(arr.iter().filter_map(|v| v.as_str()).map(String::from));
+            }
+            Some(serde_json::Value::String(s)) => {
+                scopes.extend(s.split_whitespace().map(String::from));
+            }
+            _ => {}
+        }
+    }
+    scopes.sort();
+    scopes.dedup();
+    scopes
 }
 
 #[cfg(test)]
@@ -244,6 +276,24 @@ mod tests {
             })
             .unwrap();
         assert!(jwt.decode::<Claims>(&token).is_err());
+    }
+
+    #[test]
+    fn extract_scopes_parses_standard_claims() {
+        // OAuth2 `scope`: space-delimited string.
+        let s = extract_scopes(&serde_json::json!({ "scope": "read write" }));
+        assert_eq!(s, vec!["read".to_string(), "write".to_string()]);
+
+        // `scopes` array.
+        let s = extract_scopes(&serde_json::json!({ "scopes": ["admin", "read"] }));
+        assert_eq!(s, vec!["admin".to_string(), "read".to_string()]);
+
+        // `scp` string + `scope` combined, de-duplicated and sorted.
+        let s = extract_scopes(&serde_json::json!({ "scope": "read", "scp": "read admin" }));
+        assert_eq!(s, vec!["admin".to_string(), "read".to_string()]);
+
+        // No scope claims → empty.
+        assert!(extract_scopes(&serde_json::json!({ "sub": "ada" })).is_empty());
     }
 
     #[test]

@@ -234,6 +234,8 @@ pub struct Context {
     jwt_claims: Arc<RwLock<Option<serde_json::Value>>>,
     #[cfg(feature = "api-key")]
     api_key: Arc<RwLock<Option<crate::auth::api_key::ApiKeyIdentity>>>,
+    #[cfg(any(feature = "jwt", feature = "api-key"))]
+    principal: Arc<RwLock<Option<crate::auth::Principal>>>,
 
     #[cfg(feature = "database")]
     database: Option<Database>,
@@ -260,6 +262,8 @@ impl Context {
             jwt_claims: Arc::new(RwLock::new(None)),
             #[cfg(feature = "api-key")]
             api_key: Arc::new(RwLock::new(None)),
+            #[cfg(any(feature = "jwt", feature = "api-key"))]
+            principal: Arc::new(RwLock::new(None)),
             #[cfg(feature = "database")]
             database: None,
         }
@@ -454,6 +458,77 @@ impl Context {
     #[cfg(feature = "api-key")]
     pub(crate) async fn set_api_key(&self, identity: crate::auth::api_key::ApiKeyIdentity) {
         *self.api_key.write().await = Some(identity);
+    }
+
+    /// The normalized authenticated caller, if an auth middleware accepted the
+    /// request. Populated by the JWT / API-key middlewares; read by the guards.
+    #[cfg(any(feature = "jwt", feature = "api-key"))]
+    pub async fn principal(&self) -> Option<crate::auth::Principal> {
+        self.principal.read().await.clone()
+    }
+
+    /// Store the normalized caller (used by the auth middlewares).
+    #[cfg(any(feature = "jwt", feature = "api-key"))]
+    pub(crate) async fn set_principal(&self, principal: crate::auth::Principal) {
+        *self.principal.write().await = Some(principal);
+    }
+
+    /// Require an authenticated caller, returning the [`Principal`](crate::auth::Principal).
+    /// Errors with **401 Unauthorized** if no auth middleware accepted the request.
+    #[cfg(any(feature = "jwt", feature = "api-key"))]
+    pub async fn require_auth(&self) -> Result<crate::auth::Principal> {
+        self.principal().await.ok_or_else(|| {
+            crate::error::UltimoError::Unauthorized("authentication required".to_string())
+        })
+    }
+
+    /// Require the caller to have `scope`. **401** if unauthenticated, **403** if
+    /// authenticated but missing the scope.
+    #[cfg(any(feature = "jwt", feature = "api-key"))]
+    pub async fn require_scope(&self, scope: &str) -> Result<()> {
+        let principal = self.require_auth().await?;
+        if principal.has_scope(scope) {
+            Ok(())
+        } else {
+            Err(crate::error::UltimoError::Forbidden(format!(
+                "missing required scope: {scope}"
+            )))
+        }
+    }
+
+    /// Require the caller to have at least one of `scopes`. **401** if
+    /// unauthenticated, **403** if none of the scopes are present.
+    #[cfg(any(feature = "jwt", feature = "api-key"))]
+    pub async fn require_any_scope(&self, scopes: &[&str]) -> Result<()> {
+        let principal = self.require_auth().await?;
+        if scopes.iter().any(|s| principal.has_scope(s)) {
+            Ok(())
+        } else {
+            Err(crate::error::UltimoError::Forbidden(format!(
+                "missing any of required scopes: {}",
+                scopes.join(", ")
+            )))
+        }
+    }
+
+    /// Require the caller to have all of `scopes`. **401** if unauthenticated,
+    /// **403** if any scope is missing.
+    #[cfg(any(feature = "jwt", feature = "api-key"))]
+    pub async fn require_all_scopes(&self, scopes: &[&str]) -> Result<()> {
+        let principal = self.require_auth().await?;
+        let missing: Vec<&str> = scopes
+            .iter()
+            .copied()
+            .filter(|s| !principal.has_scope(s))
+            .collect();
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(crate::error::UltimoError::Forbidden(format!(
+                "missing required scopes: {}",
+                missing.join(", ")
+            )))
+        }
     }
 
     /// Set the response status code

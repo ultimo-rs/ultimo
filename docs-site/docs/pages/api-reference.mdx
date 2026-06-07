@@ -255,6 +255,36 @@ if let Some(identity) = ctx.api_key().await {
 }
 ```
 
+#### Authorization guards (requires `jwt` or `api-key` feature)
+
+Both auth middlewares populate a normalized `auth::Principal { id, scopes }`,
+which these guards read. They compose with `?` and short-circuit with 401/403.
+
+##### `principal(&self) -> Option<Principal>`
+
+The normalized authenticated caller, if any.
+
+##### `require_auth(&self) -> Result<Principal>`
+
+The `Principal`, or **401 Unauthorized**.
+
+##### `require_scope(&self, scope: &str) -> Result<()>`
+
+**401** if unauthenticated, **403 Forbidden** if the scope is missing.
+
+##### `require_any_scope(&self, scopes: &[&str]) -> Result<()>` · `require_all_scopes(&self, scopes: &[&str]) -> Result<()>`
+
+403 unless (respectively) at least one / all of the scopes are present.
+
+```rust
+app.get("/admin", |ctx: Context| async move {
+    ctx.require_scope("admin").await?;
+    ctx.json(json!({ "ok": true })).await
+});
+```
+
+See [Authorization (Guards)](/authorization).
+
 ### `Request`
 
 Access request data through `ctx.req`.

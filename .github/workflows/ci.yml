@@ -100,6 +100,7 @@ jobs:
           cargo test -p ultimo --features "api-key" --lib auth::api_key
           cargo test -p ultimo --features "api-key" --test api_key
           cargo test -p ultimo --features "api-key" --doc
+          cargo test -p ultimo --features "jwt" --test authz
           cargo test -p ultimo --features "session" --doc
 
       # websocket_pubsub_bench uses test_helpers::ChannelManager, so benches

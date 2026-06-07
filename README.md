@@ -45,6 +45,7 @@
 - 🎫 **Sessions & Cookies** - Secure-by-default cookie sessions (HttpOnly/Secure/SameSite, 256-bit ids, anti session-fixation) over a pluggable store
 - 🔑 **JWT Authentication** - HS256 JWT middleware (opt-in `jwt` feature): pins the algorithm (`alg: none` rejected), validates `exp`, attaches claims to the request — sign + verify
 - 🗝️ **API-Key Authentication** - API-key middleware (opt-in `api-key` feature) with a pluggable store; keys are SHA-256 hashed and compared in constant time, resolving to an identity (id + scopes)
+- 🛂 **Authorization Guards** - declare per-route access with `ctx.require_scope(…)` / `require_any_scope` / `require_all_scopes`; works uniformly across JWT and API-key auth via a normalized `Principal`
 - 🧱 **Security Hardening** - Security-headers middleware (HSTS/CSP/…), CSRF protection, request body-size limits, and supply-chain CI (`cargo-audit` + `cargo-deny`)
 - 🧪 **Testing Utilities** - In-process `TestClient`, response assertions, middleware/DB/fixture helpers
 - 🔥 **Developer Experience First** - Ergonomic APIs, helpful errors, minimal boilerplate
@@ -54,7 +55,7 @@
 
 See the [full roadmap](https://docs.ultimo.dev/roadmap) for upcoming features:
 
-- 🛡️ Authorization guards (roles/scopes) — JWT + API-key auth already shipped
+- ⚡ Performance suite + published benchmarks (the "fast" half of the pitch)
 - 📡 Streaming & SSE
 - 🌍 Multi-language Client Generation
 - And more...
