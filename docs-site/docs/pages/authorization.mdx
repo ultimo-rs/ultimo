@@ -1,0 +1,81 @@
+# Authorization (Guards)
+
+Authentication tells you *who* the caller is; authorization decides *what they
+may do*. Ultimo's guards let a handler declare its access requirements and enforce
+them uniformly — regardless of whether the caller was authenticated by
+[JWT](/jwt) or an [API key](/api-keys).
+
+## How it works: the `Principal`
+
+Each auth middleware normalizes its result into a single `auth::Principal` on the
+request `Context`:
+
+```rust
+pub struct Principal {
+    pub id: Option<String>,   // subject (JWT `sub`) or API-key id
+    pub scopes: Vec<String>,  // what the caller is allowed to do
+}
+```
+
+- The **API-key** middleware fills it from the matched `ApiKeyIdentity` (id + scopes).
+- The **JWT** middleware fills it from the token: `id` from `sub`, and `scopes`
+  parsed from the OAuth2-standard `scope` (space-delimited string) plus `scopes` /
+  `scp` (array or string).
+
+Because guards read only the `Principal`, your authorization logic doesn't care
+which method authenticated the request. Model **roles as scopes** if you prefer
+(e.g. `"role:admin"`) — scopes are the single concept.
+
+> If your JWT puts scopes/roles in a non-standard claim, read them yourself via
+> [`ctx.jwt_claims()`](/jwt) and apply your own check.
+
+## Guards
+
+All guards are `async` methods on `Context` that return `Result<()>` (or the
+`Principal`), so they compose with `?` at the top of a handler:
+
+| Guard | Behavior |
+|---|---|
+| `ctx.principal()` | `Option<Principal>` — the caller, if authenticated. |
+| `ctx.require_auth()` | The `Principal`, or **401 Unauthorized**. |
+| `ctx.require_scope("admin")` | **401** if unauthenticated, **403 Forbidden** if missing the scope. |
+| `ctx.require_any_scope(&["a", "b"])` | 403 unless at least one scope is present. |
+| `ctx.require_all_scopes(&["read", "write"])` | 403 unless all scopes are present. |
+
+```rust
+use ultimo::prelude::*;
+
+// Any authenticated caller.
+app.get("/me", |ctx: Context| async move {
+    let me = ctx.require_auth().await?;          // 401 if not authenticated
+    ctx.json(serde_json::json!({ "id": me.id, "scopes": me.scopes })).await
+});
+
+// Requires a specific scope.
+app.get("/admin", |ctx: Context| async move {
+    ctx.require_scope("admin").await?;           // 401 or 403, else continues
+    ctx.json(serde_json::json!({ "ok": true })).await
+});
+
+// Requires several scopes.
+app.post("/articles", |ctx: Context| async move {
+    ctx.require_all_scopes(&["articles:write", "publish"]).await?;
+    ctx.json(serde_json::json!({ "created": true })).await
+});
+```
+
+A failed guard short-circuits the handler with the appropriate status — `401`
+(`UltimoError::Unauthorized`) when there's no authenticated caller, `403`
+(`UltimoError::Forbidden`) when the caller is known but lacks the scope.
+
+## Availability
+
+Guards are compiled whenever an auth method is enabled — that is, with the `jwt`
+**or** `api-key` feature. No separate feature flag.
+
+## Try it
+
+The [`examples/jwt-auth`](https://github.com/ultimo-rs/ultimo/tree/main/examples/jwt-auth)
+demo issues scoped tokens and guards `/api/admin` with `require_scope("admin")`:
+`cargo run -p jwt-auth-example`, log in as `admin` (granted the scope) vs. any
+other name (gets a `403`).
