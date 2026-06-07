@@ -113,6 +113,34 @@ impl Jwt {
     }
 }
 
+use crate::Context;
+
+/// Pull the token out of an `Authorization: Bearer <token>` header value.
+/// The scheme match is case-insensitive; an empty token returns `None`.
+fn parse_bearer(header_value: &str) -> Option<String> {
+    let (scheme, token) = header_value.split_once(' ')?;
+    if !scheme.eq_ignore_ascii_case("bearer") {
+        return None;
+    }
+    let token = token.trim();
+    if token.is_empty() {
+        None
+    } else {
+        Some(token.to_string())
+    }
+}
+
+/// Read the token from the configured source on this request.
+fn extract_token(jwt: &Jwt, ctx: &Context) -> Option<String> {
+    match &jwt.source {
+        TokenSource::Bearer => ctx
+            .req
+            .header("authorization")
+            .and_then(|h| parse_bearer(&h)),
+        TokenSource::Cookie(name) => ctx.cookie(name),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,5 +203,19 @@ mod tests {
             })
             .unwrap();
         assert!(jwt.decode::<Claims>(&token).is_err());
+    }
+
+    #[test]
+    fn bearer_parsing_extracts_token() {
+        assert_eq!(
+            parse_bearer("Bearer abc.def.ghi"),
+            Some("abc.def.ghi".to_string())
+        );
+        // Scheme is case-insensitive.
+        assert_eq!(parse_bearer("bearer xyz"), Some("xyz".to_string()));
+        // Non-bearer schemes and missing tokens are rejected.
+        assert_eq!(parse_bearer("Basic abc"), None);
+        assert_eq!(parse_bearer("Bearer"), None);
+        assert_eq!(parse_bearer("Bearer "), None);
     }
 }
