@@ -27,13 +27,13 @@
 
 ---
 
-⚡ **Industry-leading performance** (158k+ req/sec, 0.6ms latency) - Lightweight, type-safe Rust web framework with **automatic TypeScript client generation** for type-safe full-stack development.
+A lightweight, **secure**, type-safe Rust web framework with **automatic TypeScript client generation** — built on Hyper + Tokio for native speed and full-stack type safety.
 
 ## ✨ Key Features
 
 ### Available Now
 
-- ⚡ **Blazing Fast Performance** - Industry-leading speed: 158k+ req/sec, sub-millisecond latency
+- ⚡ **Fast** - Native Rust on the Hyper + Tokio core, O(1) constant-time routing, regression-guarded benchmarks ([performance](https://docs.ultimo.dev/performance))
 - 🚀 **Automatic TypeScript Generation** - RPC endpoints automatically generate type-safe TypeScript clients
 - 📋 **OpenAPI Support** - Generate OpenAPI 3.0 specs from your RPC procedures for Swagger UI, Prism, and OpenAPI Generator
 - 🔄 **Hybrid RPC Modes** - Choose between REST (individual endpoints) or JSON-RPC (single endpoint) style
@@ -49,7 +49,7 @@
 - 🧱 **Security Hardening** - Security-headers middleware (HSTS/CSP/…), CSRF protection, request body-size limits, and supply-chain CI (`cargo-audit` + `cargo-deny`)
 - 🧪 **Testing Utilities** - In-process `TestClient`, response assertions, middleware/DB/fixture helpers
 - 🔥 **Developer Experience First** - Ergonomic APIs, helpful errors, minimal boilerplate
-- 💪 **Production Ready** - Built-in validation, authentication, rate limiting, CORS
+- 💪 **Production Ready** - Built-in validation, authentication, CORS
 
 ### Coming Soon 🚧
 
@@ -62,17 +62,15 @@ See the [full roadmap](https://docs.ultimo.dev/roadmap) for upcoming features:
 
 ## 📊 Performance
 
-Ultimo delivers exceptional performance, matching industry-leading frameworks:
+Performance is a headline pillar — measured honestly and regression-guarded, not
+cherry-picked. Ultimo is a thin layer over **Hyper + Tokio**, with **O(1)
+constant-time routing** and a benchmark suite that runs on every PR.
 
-| Framework   | Throughput       | Avg Latency | vs Python      |
-| ----------- | ---------------- | ----------- | -------------- |
-| **Ultimo**  | **158k req/sec** | **0.6ms**   | **15x faster** |
-| Axum (Rust) | 153k req/sec     | 0.6ms       | 15x faster     |
-| Hono (Bun)  | 132k req/sec     | 0.8ms       | 13x faster     |
-| Hono (Node) | 62k req/sec      | 1.6ms       | 6x faster      |
-| FastAPI     | 10k req/sec      | 9.5ms       | baseline       |
-
-**Zero performance penalty** for automatic RPC generation, OpenAPI docs, and client SDK generation.
+Run the micro-benchmarks yourself with `make bench`, and see
+**[docs.ultimo.dev/performance](https://docs.ultimo.dev/performance)** for the
+methodology plus a reproducible `oha` recipe for head-to-head comparisons on your
+own hardware. (We don't publish cloud-VM numbers as if they were controlled
+measurements.)
 
 ## 📚 Documentation
 
@@ -516,7 +514,7 @@ ultimo generate -p ./backend -o ./frontend/src/lib/client.ts
 - **Hybrid API Design**: Support both traditional REST endpoints and RPC-style procedures
 - **Type Safety Everywhere**: From Rust backend to TypeScript frontend with automatic type export
 - **Developer Experience First**: Ergonomic APIs, helpful error messages, minimal boilerplate
-- **Production Ready**: Built-in validation, authentication, rate limiting, file uploads
+- **Production Ready**: Built-in validation, authentication, file uploads
 
 ## Tech Stack Requirements
 
@@ -907,7 +905,7 @@ curl http://localhost:3000/protected -H "Authorization: Bearer token123"
 
 ### Phase 4: Features
 
-10. Built-in middleware (logger, CORS, rate limiting)
+10. Built-in middleware (logger, CORS, security headers)
 11. Validation helpers
 12. File upload support
 13. Authentication guards
