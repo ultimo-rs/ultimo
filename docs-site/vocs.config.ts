@@ -26,6 +26,10 @@ export default defineConfig({
           link: "/api-reference",
         },
         {
+          text: "Performance",
+          link: "/performance",
+        },
+        {
           text: "Roadmap",
           link: "/roadmap",
         },
