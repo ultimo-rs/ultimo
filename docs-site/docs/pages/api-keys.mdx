@@ -1,0 +1,124 @@
+# API-Key Authentication
+
+For server-to-server and programmatic clients, Ultimo ships an API-key middleware
+that validates a presented key against a **pluggable store**, resolves it to an
+**identity** (id + scopes), and attaches that identity to the request `Context`.
+Missing or invalid keys are rejected with **401**.
+
+It's secure-by-default: the built-in store keeps only **SHA-256 digests** of keys
+(never the raw secret) and compares them in **constant time**.
+
+:::tip
+API keys identify *machines*, not browsers. Don't embed an API key in
+front-end JavaScript — anyone can read it. For browser logins use
+[Sessions](/sessions) or [JWT](/jwt). The examples here use `curl` / server-side
+clients on purpose.
+:::
+
+## Enable the feature
+
+```toml
+[dependencies]
+ultimo = { version = "0.3", features = ["api-key"] }
+```
+
+## Quick start
+
+```rust
+use ultimo::auth::api_key::{ApiKey, StaticKeys};
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Load keys from the environment in production — never hardcode them.
+    let store = StaticKeys::new()
+        .insert("key-abc", "service-a")
+        .with_scopes("key-def", "service-b", ["read", "write"]);
+
+    let mut app = Ultimo::new_without_defaults();
+    app.use_middleware(ApiKey::new(store).build()); // header "x-api-key" by default
+
+    app.get("/me", |ctx: Context| async move {
+        match ctx.api_key().await {
+            Some(id) => ctx.json(serde_json::json!({ "id": id.id, "scopes": id.scopes })).await,
+            None => ctx.json(serde_json::json!({ "id": null })).await,
+        }
+    });
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+Call it:
+
+```bash
+# Accepted
+curl -H "x-api-key: key-def" http://127.0.0.1:3000/me
+# → {"id":"service-b","scopes":["read","write"]}
+
+# Rejected
+curl -i http://127.0.0.1:3000/me            # → 401 Unauthorized
+curl -i -H "x-api-key: wrong" http://127.0.0.1:3000/me   # → 401 Unauthorized
+```
+
+## Reading the identity
+
+After the middleware accepts a key, the resolved identity is on the `Context`:
+
+```rust
+if let Some(identity) = ctx.api_key().await {
+    // identity.id     -> the key's label (e.g. "service-b") — never the raw key
+    // identity.scopes -> Vec<String>, for authorization decisions
+}
+```
+
+## Configuration
+
+| Method | Effect |
+|---|---|
+| `ApiKey::new(store)` | Validate keys against `store`, read from the `x-api-key` header. |
+| `.header_name(name)` | Read the key from a different header. |
+| `.from_query(name)` | Read the key from a query-string parameter instead. |
+| `.optional()` | Don't 401 on missing/invalid keys — pass through unauthenticated. |
+| `.build()` | Build the verification middleware. |
+
+## Database-backed keys
+
+`StaticKeys` is for in-memory configuration. For keys stored in a database
+(with owners, scopes, expiry, revocation), implement the `ApiKeyStore` trait:
+
+```rust
+use ultimo::auth::api_key::{ApiKeyStore, ApiKeyIdentity};
+
+struct DbKeys { /* pool, etc. */ }
+
+#[async_trait::async_trait]
+impl ApiKeyStore for DbKeys {
+    async fn validate(&self, presented_key: &str) -> Option<ApiKeyIdentity> {
+        // Hash the presented key and look it up BY HASH — never store or query
+        // the raw key. Return the identity (id + scopes) on a match.
+        let hash = sha256_hex(presented_key);
+        self.lookup_by_hash(&hash).await
+    }
+}
+
+app.use_middleware(ApiKey::new(DbKeys { /* … */ }).build());
+```
+
+## Security notes
+
+- **Hash at rest, compare in constant time.** The built-in `StaticKeys` store
+  hashes keys with SHA-256 at construction and never retains the raw value;
+  comparison runs over every entry without early-return, so neither the match
+  position nor whether a key matched leaks via timing. Custom stores should look
+  up **by hash**, not the raw key.
+- **SHA-256, not bcrypt/argon2.** API keys are high-entropy random secrets, not
+  passwords — a fast cryptographic hash is the correct and standard choice. Password
+  KDFs (bcrypt/argon2) exist to slow down brute-forcing *low-entropy* secrets and
+  would only waste CPU here.
+- **Generate strong keys** (≥128 bits of entropy from a CSPRNG) and transmit them
+  only over HTTPS. Treat them like passwords in transit.
+- **Never put an API key in a browser.** It's a server-to-server credential. For
+  user-facing auth use [Sessions](/sessions) or [JWT](/jwt).
+- **Scope and rotate.** Give each key the least scopes it needs (`with_scopes`),
+  and design your store so keys can be revoked/rotated without redeploying.
