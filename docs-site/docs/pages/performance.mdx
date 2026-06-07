@@ -1,0 +1,79 @@
+# Performance
+
+Performance is one of Ultimo's two headline pillars (alongside [security](/security)).
+Our approach is deliberately un-flashy: **measure honestly, guard against
+regressions, and let you reproduce everything.** No cherry-picked bar charts.
+
+## Why Ultimo is fast
+
+- **Built on Hyper 1.0 + Tokio** — the same battle-tested async HTTP core that
+  underpins the fastest Rust servers. Ultimo is a thin, well-organized layer over
+  it, not a re-implementation.
+- **100% safe Rust, zero `unsafe`** (`#![forbid(unsafe_code)]`) — native, compiled,
+  no garbage collector and no runtime reflection. Safety *and* systems-level speed.
+- **O(1) static routing** — route lookup is constant-time regardless of how many
+  routes you register (see below).
+- **Low per-request overhead** — the framework layer (routing, dispatch, response
+  building) is a small, measured constant on top of Hyper.
+
+## What we measure
+
+Benchmarks come in two tiers, for two purposes (full detail in
+[`BENCHMARKS.md`](https://github.com/ultimo-rs/ultimo/blob/main/BENCHMARKS.md)):
+
+1. **Framework-overhead micro-benchmarks** (criterion, in-process via
+   `Ultimo::oneshot`). These isolate Ultimo's own cost from network and OS noise,
+   so they're low-variance and reproducible — the basis for our regression gate.
+2. **End-to-end load benchmarks** (`oha` over real HTTP). Real requests-per-second,
+   for cross-framework comparison — only meaningful on controlled hardware, never
+   a shared CI runner.
+
+We don't conflate the two, and we don't publish cloud-VM throughput as if it were
+a controlled measurement.
+
+## A proven result: O(1) routing
+
+Our benchmark suite earned its keep the day it landed. It revealed that route
+matching scaled **linearly** with the number of registered routes — an O(N) scan.
+We fixed it by indexing static routes in a hash map; lookup is now **constant-time**:
+
+| Registered routes | Before | After |
+| --- | --- | --- |
+| 10 | baseline | baseline |
+| 100 | ~3.6× slower | **flat** |
+| 500 | ~15× slower | **flat** |
+
+Found and fixed via the suite itself ([#89](https://github.com/ultimo-rs/ultimo/issues/89)),
+with the benchmarks proving the improvement. That's the whole point of measuring.
+
+## Regression-guarded
+
+Every pull request that touches the framework runs the micro-benchmark suite
+against the PR's base commit on the same runner and reports the delta. A change
+that makes Ultimo slower shows up in review — performance is part of the contract,
+not an afterthought.
+
+## Reproduce it yourself
+
+Framework-overhead micro-benchmarks:
+
+```bash
+make bench
+# or just the HTTP-overhead suite:
+cargo bench -p ultimo --bench http_bench
+```
+
+End-to-end throughput on **your** hardware (the only numbers you should trust for
+your workload):
+
+```bash
+# Run a release build of your app, then load it from a separate machine/core set:
+oha -z 30s -c 100 --no-tui http://127.0.0.1:3000/
+```
+
+For a fair cross-framework comparison, run the identical endpoint and load profile
+against each framework on the same hardware in the same session — see
+[`BENCHMARKS.md`](https://github.com/ultimo-rs/ultimo/blob/main/BENCHMARKS.md) for
+the full protocol. Published head-to-head numbers will follow once they're
+generated on dedicated hardware; until then, the recipe above lets you verify on
+the box that matters to you.
