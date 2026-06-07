@@ -60,12 +60,18 @@ export default defineConfig({
           link: "/security",
         },
         {
-          text: "Sessions",
-          link: "/sessions",
-        },
-        {
-          text: "Authentication (JWT)",
-          link: "/authentication",
+          text: "Authentication",
+          collapsed: false,
+          items: [
+            {
+              text: "Sessions",
+              link: "/sessions",
+            },
+            {
+              text: "JWT",
+              link: "/jwt",
+            },
+          ],
         },
         {
           text: "WebSocket",
