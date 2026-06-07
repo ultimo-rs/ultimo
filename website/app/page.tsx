@@ -2,6 +2,7 @@ import { ComparisonSection } from "@/components/comparison-section";
 import { CTASection } from "@/components/cta-section";
 import { FeaturesSection } from "@/components/features-section";
 import { HeroSection } from "@/components/hero-section";
+import { SecuritySection } from "@/components/security-section";
 import { StatsSection } from "@/components/stats-section";
 import { TypeSafeSection } from "@/components/type-safe-section";
 
@@ -12,6 +13,7 @@ export default function Home() {
         <HeroSection />
         <FeaturesSection />
         <StatsSection />
+        <SecuritySection />
         <TypeSafeSection />
         <ComparisonSection />
         <CTASection />

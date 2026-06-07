@@ -20,13 +20,13 @@ const featureCategories = [
       {
         title: "Blazing Fast",
         description:
-          "Lightning-fast performance that outpaces the competition. Pure Rust efficiency at its finest.",
+          "Native Rust speed on the Hyper + Tokio core, with a higher-level developer experience.",
         icon: Zap,
         details: [
-          "158,000+ requests per second",
-          "Sub-millisecond average latency",
-          "Zero-cost abstractions",
-          "Async/await with Tokio",
+          "O(1) constant-time routing",
+          "Built on Hyper + Tokio",
+          "Zero-cost abstractions, no GC",
+          "Regression-guarded in CI",
         ],
       },
       {
@@ -63,6 +63,18 @@ const featureCategories = [
           "Built-in pub/sub",
           "Type-safe handlers",
           "Production-ready with 93 tests",
+        ],
+      },
+      {
+        title: "Secure by Default",
+        description:
+          "Authentication, authorization, and hardening ship in the box — in 100% safe Rust.",
+        icon: ShieldCheck,
+        details: [
+          "JWT + API-key auth, scope guards",
+          "Sessions, CSRF, security headers",
+          "#![forbid(unsafe_code)]",
+          "Supply-chain CI (audit + deny)",
         ],
       },
     ],
@@ -102,7 +114,7 @@ const featureCategories = [
         icon: Code2,
         details: [
           "Intuitive routing API",
-          "Hot reload in dev",
+          "Project scaffolding (ultimo new)",
           "Helpful error messages",
           "Great documentation",
         ],
