@@ -1,0 +1,68 @@
+name: bench
+
+# Advisory benchmark regression check. Benchmarks the PR's base commit and the
+# PR head on the SAME runner (the only valid comparison) and publishes the delta
+# to the job summary. It does NOT fail the build — runner noise is real, so this
+# calibrates first; enforcement can be added once the noise floor is known.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ultimo/src/**"
+      - "ultimo/benches/**"
+      - "ultimo/Cargo.toml"
+      - ".github/workflows/bench.yml"
+
+permissions:
+  contents: read
+
+# A newer push to the same PR cancels an in-flight run.
+concurrency:
+  group: bench-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    name: benchmark regression (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need the base commit to benchmark it
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install critcmp
+        run: cargo install critcmp --locked
+
+      - name: Record PR head SHA
+        run: echo "PR_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      # Criterion baselines are saved under target/criterion (gitignored, so they
+      # survive the `git checkout` between runs). Short measurement times keep the
+      # job quick; this is a relative comparison, not a published number.
+      - name: Benchmark base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git checkout --quiet "$BASE_SHA"
+          cargo bench -p ultimo --bench http_bench -- \
+            --save-baseline base --warm-up-time 1 --measurement-time 3
+
+      - name: Benchmark PR
+        run: |
+          git checkout --quiet "$PR_SHA"
+          cargo bench -p ultimo --bench http_bench -- \
+            --save-baseline pr --warm-up-time 1 --measurement-time 3
+
+      - name: Compare (advisory)
+        run: |
+          {
+            echo '## Benchmark comparison — base → PR'
+            echo
+            echo 'Framework-overhead micro-benchmarks (`http_bench`). Advisory only:'
+            echo 'investigate regressions beyond ~10% — shared CI runners are noisy.'
+            echo
+            echo '```'
+            critcmp base pr
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
