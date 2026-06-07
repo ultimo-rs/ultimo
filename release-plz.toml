@@ -12,7 +12,7 @@
 # Default: do NOT manage packages. Opt the published crates in below.
 release = false
 # Keep CHANGELOG.md updated from Conventional Commits.
-changelog_update = true
+changelog_update = false
 # Create a GitHub Release (with notes) when publishing.
 git_release_enable = true
 dependencies_update = false
