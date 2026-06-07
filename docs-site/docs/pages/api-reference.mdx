@@ -225,6 +225,23 @@ let id: Option<u64> = ctx.session().await.get("user_id").await?;
 
 See [Sessions](/sessions).
 
+#### JWT claims (requires `jwt` feature)
+
+##### `jwt_claims(&self) -> Option<serde_json::Value>`
+
+The validated JWT claims for this request (`None` if no valid token was presented).
+
+##### `jwt<T: DeserializeOwned>(&self) -> Result<T>`
+
+Deserialize the validated claims into a typed struct (errors if absent or shape mismatch).
+
+```rust
+let claims = ctx.jwt_claims().await;          // Option<serde_json::Value>
+let mine: MyClaims = ctx.jwt::<MyClaims>().await?;
+```
+
+See [Authentication (JWT)](/authentication).
+
 ### `Request`
 
 Access request data through `ctx.req`.
@@ -478,6 +495,21 @@ echo the cookie token in a header). See [Security](/security).
 ```rust
 app.use_middleware(ultimo::csrf::csrf());
 // or: ultimo::csrf::Csrf::new().header_name("x-csrf-token").build()
+```
+
+#### `Jwt` (requires `jwt` feature)
+
+HS256 JWT auth — verifies signed bearer/cookie tokens, attaches claims to the
+`Context`, and issues tokens. The algorithm is pinned (`alg: none` rejected) and
+`exp` is validated by default. Builder: `hs256(secret)`, `issuer(s)`,
+`audience(s)`, `leeway(secs)`, `from_bearer()`, `from_cookie(name)`, `optional()`,
+`sign(&claims)`, `build()`. See [Authentication (JWT)](/authentication).
+
+```rust
+use ultimo::auth::jwt::Jwt;
+let jwt = Jwt::hs256(b"super-secret-key");
+app.use_middleware(jwt.clone().build());
+let token = jwt.sign(&claims)?;
 ```
 
 ### Custom Middleware
@@ -734,6 +766,7 @@ All features are off by default (`default = []`).
 - `websocket` - RFC 6455 WebSocket support (zero extra dependencies)
 - `session` - Cookie-based session management ([Sessions](/sessions))
 - `csrf` - Double-submit-cookie CSRF protection ([Security](/security))
+- `jwt` - HS256 JWT authentication middleware ([Authentication](/authentication))
 - `testing` - Testing utilities: `TestClient`, assertions, helpers ([Testing](/testing))
 - `test-helpers` - WebSocket test helpers (for integration tests)
 - `sqlx-postgres` / `sqlx-mysql` / `sqlx-sqlite` - SQLx integration per backend

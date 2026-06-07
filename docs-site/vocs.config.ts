@@ -64,6 +64,10 @@ export default defineConfig({
           link: "/sessions",
         },
         {
+          text: "Authentication (JWT)",
+          link: "/authentication",
+        },
+        {
           text: "WebSocket",
           link: "/websocket",
         },

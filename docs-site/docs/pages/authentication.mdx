@@ -1,0 +1,122 @@
+# Authentication (JWT)
+
+Ultimo ships a JWT (JSON Web Token) auth middleware that verifies signed bearer
+tokens, attaches the validated claims to the request `Context`, and can issue
+tokens. It's secure-by-default: the signing algorithm is **pinned to HS256**, so
+`alg: none` and algorithm-confusion attacks are rejected, and token expiry
+(`exp`) is validated automatically.
+
+Verification is delegated to the audited
+[`jsonwebtoken`](https://crates.io/crates/jsonwebtoken) crate rather than
+hand-rolled.
+
+## Enable the feature
+
+JWT support is opt-in:
+
+```toml
+[dependencies]
+ultimo = { version = "0.3", features = ["jwt"] }
+```
+
+## Quick start
+
+```rust
+use ultimo::auth::jwt::Jwt;
+use ultimo::prelude::*;
+
+#[derive(serde::Serialize)]
+struct Claims { sub: String, exp: usize }
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Load the secret from the environment in production — never hardcode it.
+    let jwt = Jwt::hs256(b"super-secret-key");
+
+    let mut app = Ultimo::new_without_defaults();
+
+    // Verify tokens on every request and attach claims to the Context.
+    app.use_middleware(jwt.clone().build());
+
+    app.get("/me", |ctx: Context| async move {
+        let claims = ctx.jwt_claims().await; // Option<serde_json::Value>
+        ctx.json(serde_json::json!({ "claims": claims })).await
+    });
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+## Issuing tokens
+
+The same `Jwt` value that verifies can also sign (the HS256 secret is shared).
+Claims must include an `exp` (expiry) field:
+
+```rust
+let token = jwt.sign(&Claims { sub: "ada".into(), exp: 1_900_000_000 })?;
+```
+
+## Reading claims in a handler
+
+After the middleware accepts a token, the claims are available on the `Context`:
+
+```rust
+// Raw claims object (None if unauthenticated / optional mode).
+let claims: Option<serde_json::Value> = ctx.jwt_claims().await;
+
+// Or deserialize into your own type (errors if absent or shape mismatch).
+#[derive(serde::Deserialize)]
+struct MyClaims { sub: String }
+let mine: MyClaims = ctx.jwt::<MyClaims>().await?;
+```
+
+## Configuration
+
+`Jwt` is a builder. All options are chainable:
+
+| Method | Effect |
+|---|---|
+| `Jwt::hs256(secret)` | Configure HS256 with a symmetric secret (signs + verifies). |
+| `.issuer(s)` | Require the `iss` claim to equal `s`. |
+| `.audience(s)` | Require the `aud` claim to equal `s`. |
+| `.leeway(secs)` | Clock-skew tolerance applied to `exp`/`nbf`. |
+| `.from_bearer()` | Read the token from `Authorization: Bearer <token>` (default). |
+| `.from_cookie(name)` | Read the token from a named cookie instead. |
+| `.optional()` | Don't 401 on missing/invalid tokens — pass through unauthenticated. |
+| `.sign(&claims)` | Issue a signed token. |
+| `.build()` | Build the verification middleware. |
+
+### Required vs optional
+
+By default the middleware returns **`401 Unauthorized`** (with a
+`WWW-Authenticate: Bearer` header) when a token is missing or invalid. Call
+`.optional()` for routes that serve both authenticated and anonymous users — the
+request passes through with no claims attached, and your handler decides what to
+do when `ctx.jwt_claims()` is `None`.
+
+## Security notes
+
+- **HS256 only (today).** RS256/EdDSA (asymmetric keys) are planned. The
+  algorithm is pinned, so `alg: none` and HS/RS confusion tokens are rejected.
+- **`exp` is validated by default** — always set a short expiry. Following
+  least-privilege guidance, use **15–60 minutes** for sensitive systems and mint
+  a fresh token on login.
+- **Load the secret from the environment**, never hardcode it, and rotate it if
+  leaked.
+- **Stateless tokens can't be revoked server-side.** A bearer JWT remains valid
+  until it expires, so "log out everywhere" / instant revocation isn't possible
+  with JWT alone. For those needs use short TTLs plus either the
+  [session](/sessions) middleware (server-side, revocable) or a token blocklist.
+- **Cookie source:** if you use `.from_cookie(...)`, serve over HTTPS and set the
+  cookie `Secure` + `HttpOnly` so it can't be read by JavaScript or sent over
+  plaintext.
+- **Audience gotcha:** `jsonwebtoken` validates `aud` by default. If your tokens
+  carry an `aud` claim but you don't call `.audience(...)` on the verifier, they
+  will be **rejected**. Either set `.audience(...)` to match, or don't include
+  `aud` in your tokens.
+
+## Full example
+
+A runnable login → protected-route demo lives at
+[`examples/jwt-auth`](https://github.com/ultimo-rs/ultimo/tree/main/examples/jwt-auth):
+`cargo run -p jwt-auth-example`, then open `http://127.0.0.1:3000`.

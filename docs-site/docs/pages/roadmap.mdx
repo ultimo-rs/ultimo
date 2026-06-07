@@ -76,7 +76,8 @@ Upcoming features and improvements planned for Ultimo.
 | **100% Safe Rust** (`forbid(unsafe)`) | ✅ Available | 0.3.0 |
 | Security Headers (HSTS/CSP/…) | 🔒 Planned    | 0.4.0   |
 | CSRF Protection           | 🔒 Planned       | 0.4.0   |
-| Auth (JWT / API keys)     | 🔒 Planned       | 0.4.0   |
+| Auth: JWT middleware      | ✅ Available     | 0.4.0   |
+| Auth: API keys / authz guards | 🔒 Planned   | 0.4.0   |
 | Benchmark Suite + CI Guard | ⚡ Planned      | 0.4.0   |
 | Static Files              | 📋 Planned       | 0.5.0   |
 | Compression               | 📋 Planned       | 0.5.0   |
@@ -126,7 +127,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
 - 🔒 Security headers middleware (HSTS, CSP, X-Frame-Options, …)
 - 🔒 CSRF protection (integrates with sessions)
-- 🔒 Auth: JWT + API-key middleware, authorization guards
+- ✅ Auth: JWT middleware (HS256) — shipped; API-key middleware + authorization guards planned
 - 🔒 Request body-size limits, request timeouts, enhanced rate limiting
 - 🔒 `#![forbid(unsafe_code)]` (100% safe Rust), `SECURITY.md` disclosure policy,
   `cargo-deny` + fuzzing in CI, OpenSSF Best Practices
