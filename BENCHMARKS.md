@@ -78,8 +78,12 @@ Cloud CI VMs are shared and noisy (±20–50% throughput swings), so absolute re
 there is meaningless and would make any comparison dishonest. CI is for Tier-1
 regression detection only.
 
-## Known findings
+## Findings & fixes
 
-- **Routing scales ~linearly with route count** (≈1.7µs at 10 routes → ≈26µs at
-  500 in `routing/static`), suggesting an O(N) match rather than the intended
-  O(L) radix-tree lookup. Tracked for investigation — see the issues list.
+- **Routing was O(N) in route count — fixed (#89).** The suite's first run showed
+  `routing/static` growing with the table size (≈1.7µs @10 → ≈26µs @500), i.e. a
+  linear scan over every registered route. Fixed by indexing fully-static routes
+  in an O(1) hash map keyed by `(method, path)` and scanning only parameterized
+  routes. After: `routing/static` is **flat at ≈1.2µs** across 10/100/500 routes
+  (~21× faster at 500), and `routing/param` dropped too (the scan no longer wades
+  through static routes). A textbook example of the benchmark suite earning its keep.
