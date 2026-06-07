@@ -56,6 +56,9 @@ pub mod session;
 #[cfg(feature = "csrf")]
 pub mod csrf;
 
+#[cfg(feature = "jwt")]
+pub mod auth;
+
 // Re-exports for convenience
 pub use app::Ultimo;
 pub use context::Context;

@@ -34,6 +34,9 @@ async-trait = "0.1"
 # Session support (optional) — getrandom for secure session ids
 getrandom = { version = "0.3", optional = true }
 
+# JWT auth (optional) — audited impl; pins algorithm, rejects `alg: none`
+jsonwebtoken = { version = "9", optional = true }
+
 # Database support (optional)
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls"], optional = true }
 diesel = { version = "2.3.10", optional = true }  # >=2.3.8: RUSTSEC fix for COPY command injection + unaligned access
@@ -65,6 +68,9 @@ session = ["dep:getrandom"]
 
 # CSRF protection (double-submit cookie)
 csrf = ["dep:getrandom"]
+
+# JWT authentication middleware (HS256)
+jwt = ["dep:jsonwebtoken"]
 
 # Database features
 database = []

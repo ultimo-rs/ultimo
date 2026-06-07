@@ -230,6 +230,8 @@ pub struct Context {
     trust_proxy: bool,
     #[cfg(feature = "session")]
     session: Arc<RwLock<Option<crate::session::Session>>>,
+    #[cfg(feature = "jwt")]
+    jwt_claims: Arc<RwLock<Option<serde_json::Value>>>,
 
     #[cfg(feature = "database")]
     database: Option<Database>,
@@ -252,6 +254,8 @@ impl Context {
             trust_proxy: false,
             #[cfg(feature = "session")]
             session: Arc::new(RwLock::new(None)),
+            #[cfg(feature = "jwt")]
+            jwt_claims: Arc::new(RwLock::new(None)),
             #[cfg(feature = "database")]
             database: None,
         }
@@ -409,6 +413,30 @@ impl Context {
     #[cfg(feature = "session")]
     pub(crate) async fn set_session(&self, s: crate::session::Session) {
         *self.session.write().await = Some(s);
+    }
+
+    /// The validated JWT claims for this request, if the `jwt` middleware ran
+    /// and accepted a token. Returns a clone of the raw claims object.
+    #[cfg(feature = "jwt")]
+    pub async fn jwt_claims(&self) -> Option<serde_json::Value> {
+        self.jwt_claims.read().await.clone()
+    }
+
+    /// Deserialize the validated JWT claims into a typed struct. Errors if no
+    /// claims are present (unauthenticated) or the shape doesn't match.
+    #[cfg(feature = "jwt")]
+    pub async fn jwt<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
+        let claims =
+            self.jwt_claims.read().await.clone().ok_or_else(|| {
+                crate::error::UltimoError::Unauthorized("no JWT claims".to_string())
+            })?;
+        serde_json::from_value(claims).map_err(crate::error::UltimoError::from)
+    }
+
+    /// Store validated claims on the context (used by the jwt middleware).
+    #[cfg(feature = "jwt")]
+    pub(crate) async fn set_jwt_claims(&self, claims: serde_json::Value) {
+        *self.jwt_claims.write().await = Some(claims);
     }
 
     /// Set the response status code
@@ -757,6 +785,48 @@ mod context_response_tests {
         assert_eq!(c.req.queries().get("a").unwrap().len(), 2);
         assert_eq!(c.req.path(), "/x");
         assert_eq!(c.req.method(), &hyper::Method::GET);
+    }
+}
+
+#[cfg(all(test, feature = "jwt"))]
+mod jwt_claims_tests {
+    use super::*;
+    use serde::Deserialize;
+
+    fn ctx() -> Context {
+        let req = HyperRequest::builder()
+            .method("GET")
+            .uri("/")
+            .body(())
+            .unwrap();
+        let (parts, _) = req.into_parts();
+        Context::from_parts(parts, Bytes::new(), Params::new())
+    }
+
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct Claims {
+        sub: String,
+    }
+
+    #[tokio::test]
+    async fn claims_absent_by_default() {
+        let c = ctx();
+        assert!(c.jwt_claims().await.is_none());
+        assert!(c.jwt::<Claims>().await.is_err());
+    }
+
+    #[tokio::test]
+    async fn set_then_read_typed_claims() {
+        let c = ctx();
+        c.set_jwt_claims(serde_json::json!({ "sub": "ada" })).await;
+        assert_eq!(
+            c.jwt_claims().await,
+            Some(serde_json::json!({ "sub": "ada" }))
+        );
+        assert_eq!(
+            c.jwt::<Claims>().await.unwrap(),
+            Claims { sub: "ada".into() }
+        );
     }
 }
 
