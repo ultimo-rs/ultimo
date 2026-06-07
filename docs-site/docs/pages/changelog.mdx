@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-08
+
+The **Security & Performance** milestone.
+
+### Added
+
+- **JWT authentication** (`jwt` feature): HS256 verify + sign, algorithm pinned (`alg: none` rejected), `exp` validated, claims on `Context`. (#84)
+- **API-key authentication** (`api-key` feature): pluggable `ApiKeyStore` + built-in `StaticKeys` (SHA-256 hashed, constant-time), resolving to an identity (id + scopes). (#86)
+- **Authorization guards**: unified `auth::Principal`; `ctx.require_auth` / `require_scope` / `require_any_scope` / `require_all_scopes`, fed by both JWT and API-key. (#87)
+- **Security-headers middleware** (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy; opt-in CSP). (#56, #71)
+- **CSRF protection** (`csrf` feature): double-submit cookie, constant-time compare. (#57, #80)
+- **Request body-size limit** (`max_body_size`) — 413 on oversize, without buffering the whole body. (#58, #72)
+- **Real client IP** (`ctx.client_ip`), trusted-proxy aware via `trust_proxy`. (#65, #76)
+- `#![forbid(unsafe_code)]` (100% safe Rust) + `SECURITY.md` disclosure policy. (#69)
+
+### Performance
+
+- **O(1) static route lookup** via a hash index — was O(N) in route count. (#90)
+- **Framework-overhead benchmark suite** (criterion) + `BENCHMARKS.md` methodology + an advisory CI regression check. (#88, #13)
+
+### Docs
+
+- New `/performance`, `/jwt`, `/api-keys`, and `/authorization` pages; an "Authentication" docs group; and an honest "Secure & Fast" website (removed unsubstantiated benchmark numbers).
+
 ## [0.3.0] - 2026-06-04
 
 ### Added
