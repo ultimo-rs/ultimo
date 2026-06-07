@@ -240,7 +240,7 @@ let claims = ctx.jwt_claims().await;          // Option<serde_json::Value>
 let mine: MyClaims = ctx.jwt::<MyClaims>().await?;
 ```
 
-See [Authentication (JWT)](/authentication).
+See [JWT Authentication](/jwt).
 
 ### `Request`
 
@@ -503,7 +503,7 @@ HS256 JWT auth — verifies signed bearer/cookie tokens, attaches claims to the
 `Context`, and issues tokens. The algorithm is pinned (`alg: none` rejected) and
 `exp` is validated by default. Builder: `hs256(secret)`, `issuer(s)`,
 `audience(s)`, `leeway(secs)`, `from_bearer()`, `from_cookie(name)`, `optional()`,
-`sign(&claims)`, `build()`. See [Authentication (JWT)](/authentication).
+`sign(&claims)`, `build()`. See [JWT Authentication](/jwt).
 
 ```rust
 use ultimo::auth::jwt::Jwt;
@@ -766,7 +766,7 @@ All features are off by default (`default = []`).
 - `websocket` - RFC 6455 WebSocket support (zero extra dependencies)
 - `session` - Cookie-based session management ([Sessions](/sessions))
 - `csrf` - Double-submit-cookie CSRF protection ([Security](/security))
-- `jwt` - HS256 JWT authentication middleware ([Authentication](/authentication))
+- `jwt` - HS256 JWT authentication middleware ([JWT Authentication](/jwt))
 - `testing` - Testing utilities: `TestClient`, assertions, helpers ([Testing](/testing))
 - `test-helpers` - WebSocket test helpers (for integration tests)
 - `sqlx-postgres` / `sqlx-mysql` / `sqlx-sqlite` - SQLx integration per backend
