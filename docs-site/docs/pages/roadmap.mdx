@@ -19,10 +19,9 @@ Upcoming features and improvements planned for Ultimo.
 ### Session & Auth
 
 - 🎫 **Redis Sessions** - Distributed session storage
-- 🔐 **JWT Support** - Built-in JWT middleware
 - 🔐 **OAuth2** - OAuth provider integration
 
-(Cookie-based session management shipped in 0.3.0 — see [Sessions](/sessions).)
+(Sessions shipped in 0.3.0; JWT + API-key auth, authorization guards, CSRF, and security headers shipped in 0.4.0 — see [Authentication](/jwt) and [Security](/security).)
 
 ### Testing & Development
 
@@ -39,8 +38,6 @@ Upcoming features and improvements planned for Ultimo.
 
 ### Security
 
-- 🛡️ **CSRF Protection** - Cross-site request forgery prevention
-- 🛡️ **Security Headers** - Automatic security headers
 - 🛡️ **Advanced Rate Limiting** - Per-user, per-endpoint rate limits
 - 🛡️ **Request Validation** - Advanced input validation
 
@@ -68,14 +65,16 @@ Upcoming features and improvements planned for Ultimo.
 | **OpenAPI Support**       | ✅ Available     | 0.1.0   |
 | **CLI Tools**             | ✅ Available     | 0.1.0   |
 | **CORS**                  | ✅ Available     | 0.1.0   |
-| **Rate Limiting**         | 📋 Planned       | 0.4.0   |
+| **Rate Limiting**         | 📋 Planned       | 0.5.0   |
 | **Database Integration**  | ✅ Available     | 0.1.0   |
 | **WebSocket Support**     | ✅ Available     | 0.2.1   |
 | **Sessions & Cookies**    | ✅ Available     | 0.3.0   |
 | **Testing Utilities**     | ✅ Available     | 0.3.0   |
 | **100% Safe Rust** (`forbid(unsafe)`) | ✅ Available | 0.3.0 |
-| Security Headers (HSTS/CSP/…) | 🔒 Planned    | 0.4.0   |
-| CSRF Protection           | 🔒 Planned       | 0.4.0   |
+| Security Headers (HSTS/CSP/…) | ✅ Available  | 0.4.0   |
+| CSRF Protection           | ✅ Available     | 0.4.0   |
+| Request Body-Size Limit   | ✅ Available     | 0.4.0   |
+| Real Client IP (proxy-aware) | ✅ Available  | 0.4.0   |
 | Auth: JWT middleware      | ✅ Available     | 0.4.0   |
 | Auth: API keys            | ✅ Available     | 0.4.0   |
 | Auth: authorization guards | ✅ Available    | 0.4.0   |
@@ -113,7 +112,7 @@ Upcoming features and improvements planned for Ultimo.
 - ✅ **279 Comprehensive Tests** - Production-ready with extensive test coverage
 - ✅ **Two Working Examples** - Simple chat + React chat
 
-### v0.3.0 (Current)
+### v0.3.0
 
 - ✅ **Session management** — cookie-based sessions, `SessionStore` + in-memory store, secure middleware
 - ✅ **Cookie helper** — parsing + `Set-Cookie` with security guards
@@ -121,18 +120,18 @@ Upcoming features and improvements planned for Ultimo.
 - ✅ **Router precedence fix**, `Ultimo::oneshot`, `Request::raw_body()`
 - ✅ MSRV 1.86, hardened dependency floors, automated releases + CI guardrails
 
-### v0.4.0 (Next) — Security & Performance
+### v0.4.0 (Current) — Security & Performance
 
 Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
 **Security** (secure-by-default · defense-in-depth · provable)
 
-- 🔒 Security headers middleware (HSTS, CSP, X-Frame-Options, …)
-- 🔒 CSRF protection (integrates with sessions)
+- ✅ Security headers middleware (HSTS, CSP, X-Frame-Options, …)
+- ✅ CSRF protection (integrates with sessions)
 - ✅ Auth: JWT + API-key middleware + authorization guards (scopes) — shipped
-- 🔒 Request body-size limits, request timeouts, enhanced rate limiting
-- 🔒 `#![forbid(unsafe_code)]` (100% safe Rust), `SECURITY.md` disclosure policy,
-  `cargo-deny` + fuzzing in CI, OpenSSF Best Practices
+- ✅ Request body-size limits + real client IP (trusted-proxy aware); 🔒 request timeouts + enhanced rate limiting (planned)
+- ✅ `#![forbid(unsafe_code)]` (100% safe Rust), `SECURITY.md` disclosure policy,
+  `cargo-deny` + `cargo-audit` in CI; 🔒 fuzzing + OpenSSF Best Practices (planned)
 
 **Performance** (proven · regression-guarded)
 
