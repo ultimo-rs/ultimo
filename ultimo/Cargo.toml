@@ -40,6 +40,13 @@ jsonwebtoken = { version = "9", optional = true }
 # API-key auth (optional) — SHA-256 to hash keys (high-entropy secrets, not passwords)
 sha2 = { version = "0.10", optional = true }
 
+# Static file serving (optional) — pure-Rust MIME detection
+mime_guess = { version = "2", optional = true }
+
+# Response compression (optional) — both pure Rust, no C deps
+flate2  = { version = "1", optional = true }
+brotli  = { version = "8", optional = true }
+
 # Database support (optional)
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls"], optional = true }
 diesel = { version = "2.3.10", optional = true }  # >=2.3.8: RUSTSEC fix for COPY command injection + unaligned access
@@ -47,6 +54,7 @@ r2d2 = { version = "0.8", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
+tempfile = "3"
 tracing-subscriber = { workspace = true }
 proptest = "1.5"
 criterion = { version = "0.5", features = ["async_tokio"] }
@@ -77,6 +85,12 @@ jwt = ["dep:jsonwebtoken"]
 
 # API-key authentication middleware (pluggable store, SHA-256 hashed keys)
 api-key = ["dep:sha2"]
+
+# Static file serving + SPA fallback
+static-files = ["dep:mime_guess"]
+
+# Response compression (gzip + brotli)
+compression = ["dep:flate2", "dep:brotli"]
 
 # Database features
 database = []
