@@ -89,6 +89,31 @@ Defaults to `false`.
 app.trust_proxy(true);
 ```
 
+##### `serve_static(&mut self, prefix: &str, dir: &str)` (requires `static-files` feature)
+
+Register a `GET {prefix}/*` route that reads files from `dir` on disk. Sets
+`Content-Type`, `ETag`, and `Content-Length` automatically; returns `304 Not
+Modified` when `If-None-Match` matches. Rejects path traversal attempts.
+
+```rust
+// GET /assets/style.css → reads ./public/style.css
+app.serve_static("/assets", "./public");
+```
+
+See [Static Files](/static-files).
+
+##### `serve_spa(&mut self, dir: &str, fallback: &str)` (requires `static-files` feature)
+
+Configure an SPA fallback: any `GET` request that doesn't match a registered
+route returns the specified file from `dir`. `POST` / `PUT` / `DELETE` etc. 404s
+are not intercepted.
+
+```rust
+app.serve_spa("./dist", "index.html");
+```
+
+See [Static Files](/static-files).
+
 ##### `oneshot(&self, req: hyper::Request<Full<Bytes>>) -> Response`
 
 Dispatch a fully-buffered request through the app **in-process** (no socket).
@@ -530,6 +555,30 @@ app.use_middleware(
 );
 ```
 
+#### `compression()` / `Compression` (requires `compression` feature)
+
+Automatic response compression — brotli preferred, gzip fallback. Pure Rust
+(no C deps). Skips binary MIME types, already-encoded responses, and bodies
+below `min_size` (default 1 024 bytes). Always sets `Vary: Accept-Encoding`.
+
+```rust
+use ultimo::middleware::builtin::{compression, Compression};
+
+// Defaults: brotli + gzip, min_size = 1024
+app.use_middleware(compression());
+
+// Customized:
+app.use_middleware(
+    Compression::new()
+        .gzip()
+        .brotli()
+        .min_size(512)
+        .build(),
+);
+```
+
+See [Compression](/middleware#compression).
+
 #### `csrf()` / `Csrf` (requires `csrf` feature)
 
 Double-submit-cookie CSRF protection (constant-time compare; unsafe methods must
@@ -825,13 +874,15 @@ All features are off by default (`default = []`).
 - `csrf` - Double-submit-cookie CSRF protection ([Security](/security))
 - `jwt` - HS256 JWT authentication middleware ([JWT Authentication](/jwt))
 - `api-key` - API-key authentication with a pluggable store ([API-Key Authentication](/api-keys))
+- `static-files` - Static file serving + SPA fallback (`serve_static`, `serve_spa`) ([Static Files](/static-files))
+- `compression` - Automatic gzip/brotli response compression (`compression()`, `Compression`) ([Compression](/middleware#compression))
 - `testing` - Testing utilities: `TestClient`, assertions, helpers ([Testing](/testing))
 - `test-helpers` - WebSocket test helpers (for integration tests)
 - `sqlx-postgres` / `sqlx-mysql` / `sqlx-sqlite` - SQLx integration per backend
 - `diesel-postgres` / `diesel-mysql` / `diesel-sqlite` - Diesel integration per backend
 
 ```toml
-ultimo = { version = "0.3", features = ["websocket", "session", "sqlx-postgres"] }
+ultimo = { version = "0.5", features = ["websocket", "session", "sqlx-postgres"] }
 ```
 
 ---

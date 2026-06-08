@@ -1,0 +1,102 @@
+# Static Files
+
+Serve frontend assets — CSS, JavaScript, images — directly from disk, and
+support Single Page Application (SPA) routing with a fallback to `index.html`.
+
+Requires the `static-files` Cargo feature:
+
+```toml
+ultimo = { version = "0.5", features = ["static-files"] }
+```
+
+## Serving a directory
+
+`serve_static(prefix, dir)` registers a `GET {prefix}/*` route that reads
+files from `dir` on disk.
+
+```rust
+use ultimo::prelude::*;
+
+let mut app = Ultimo::new();
+
+// GET /assets/style.css → reads ./public/style.css
+app.serve_static("/assets", "./public");
+
+app.listen("127.0.0.1:3000").await
+```
+
+**Response headers set automatically:**
+
+- `Content-Type` — detected from the file extension.
+- `ETag` — `"{size}-{mtime_secs}"`, used for conditional GET.
+- `Content-Length`.
+
+**Conditional GET:** If the client sends `If-None-Match` matching the current
+ETag, the server returns `304 Not Modified` with an empty body, saving
+bandwidth on repeat visits.
+
+## SPA fallback
+
+For Single Page Applications where the client-side router handles URLs (React
+Router, Vue Router, etc.), every `GET` request that doesn't match an API route
+should return `index.html`. Use `serve_spa`:
+
+```rust
+use ultimo::prelude::*;
+
+let mut app = Ultimo::new();
+
+// API routes first — they take precedence over the SPA fallback
+app.get("/api/user", |ctx: Context| async move {
+    ctx.json(serde_json::json!({ "name": "Ada" })).await
+});
+
+// Serve static assets from ./dist/assets under /assets
+app.serve_static("/assets", "./dist/assets");
+
+// Fallback: any unmatched GET → ./dist/index.html
+app.serve_spa("./dist", "index.html");
+
+app.listen("127.0.0.1:3000").await
+```
+
+> `serve_spa` only intercepts `GET` requests that returned 404.
+> `POST`, `PUT`, `DELETE`, etc. 404s pass through unchanged.
+
+## Security
+
+Path traversal is prevented at the filesystem level: the resolved path is
+canonicalized and must remain inside the configured root directory. Requests
+like `GET /assets/../../etc/passwd` return 404 — no existence leak, no
+directory escape.
+
+Directory listing is not supported — requesting a path that resolves to a
+directory returns 404. Use `serve_spa` if you want a catch-all.
+
+## Pairing with compression
+
+Mount the `compression()` middleware before serving static files to enable
+automatic gzip/brotli on text assets:
+
+```rust
+use ultimo::middleware::builtin::compression;
+use ultimo::prelude::*;
+
+let mut app = Ultimo::new();
+app.use_middleware(compression());
+app.serve_static("/assets", "./dist/assets");
+app.serve_spa("./dist", "index.html");
+```
+
+See the [Compression](/middleware#compression) section for details.
+
+## Full example
+
+See [`examples/spa-demo`](https://github.com/ultimo-rs/ultimo/tree/main/examples/spa-demo)
+for a runnable end-to-end demo combining static files, SPA fallback, and
+compression.
+
+```bash
+cargo run -p spa-demo
+# → http://127.0.0.1:3000
+```
