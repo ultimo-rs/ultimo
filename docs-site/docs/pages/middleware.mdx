@@ -79,6 +79,60 @@ app.use_middleware(
 
 See [Security](/security) for the full list and defaults.
 
+### Compression (requires `compression` feature)
+
+Automatically compress response bodies with **brotli** or **gzip** (pure Rust —
+no C dependencies). Prefers brotli over gzip when the client accepts both, skips
+already-encoded responses and binary MIME types, and always sets `Vary: Accept-Encoding`.
+
+```toml
+ultimo = { version = "0.5", features = ["compression"] }
+```
+
+Quick start with sensible defaults (brotli + gzip, 1 KB minimum body):
+
+```rust
+use ultimo::middleware::builtin::compression;
+
+app.use_middleware(compression());
+```
+
+Customized with the `Compression` builder:
+
+```rust
+use ultimo::middleware::builtin::Compression;
+
+app.use_middleware(
+    Compression::new()
+        .gzip()        // enable gzip
+        .brotli()      // enable brotli (preferred over gzip when both on)
+        .min_size(512) // only compress bodies ≥ 512 bytes
+        .build(),
+);
+```
+
+**Behavior:**
+
+- `Vary: Accept-Encoding` is always set (required for correct caching).
+- Brotli is chosen first if the client sends `Accept-Encoding: br` (or `br, gzip`).
+- Responses whose `Content-Type` starts with `image/`, `audio/`, `video/`, or
+  `font/woff`, or whose type is an already-compressed container
+  (`application/zip`, `application/gzip`, etc.) are passed through unchanged.
+- If the response already carries `Content-Encoding`, the middleware skips it —
+  no double-compression.
+- Bodies smaller than `min_size` (default: **1024 bytes**) are not compressed
+  because the overhead can exceed the saving.
+
+Mount compression **before** static-file serving so text assets (HTML, JS, CSS)
+are compressed on the fly:
+
+```rust
+use ultimo::middleware::builtin::compression;
+
+app.use_middleware(compression());
+app.serve_static("/assets", "./dist/assets");
+```
+
 ### Server identity headers
 
 ```rust

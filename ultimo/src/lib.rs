@@ -59,6 +59,9 @@ pub mod csrf;
 #[cfg(any(feature = "jwt", feature = "api-key"))]
 pub mod auth;
 
+#[cfg(feature = "static-files")]
+pub(crate) mod static_files;
+
 // Re-exports for convenience
 pub use app::Ultimo;
 pub use context::Context;

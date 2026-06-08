@@ -110,13 +110,15 @@ Everything is opt-in (`default = []`):
 | `jwt` | JWT authentication middleware (HS256) |
 | `api-key` | API-key authentication with a pluggable store |
 | `csrf` | CSRF protection (double-submit cookie) |
+| `static-files` | Static file serving + SPA fallback (`serve_static`, `serve_spa`) |
+| `compression` | Automatic gzip/brotli response compression (pure Rust, no C deps) |
 | `testing` | In-process `TestClient`, assertions, fixtures |
 | `test-helpers` | WebSocket test helpers (for integration tests) |
 | `sqlx-postgres` · `sqlx-mysql` · `sqlx-sqlite` | SQLx integration per backend |
 | `diesel-postgres` · `diesel-mysql` · `diesel-sqlite` | Diesel integration per backend |
 
 ```toml
-ultimo = { version = "0.4", features = ["websocket", "jwt", "sqlx-postgres"] }
+ultimo = { version = "0.5", features = ["websocket", "jwt", "sqlx-postgres"] }
 ```
 
 ## CLI

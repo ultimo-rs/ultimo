@@ -411,6 +411,216 @@ pub mod builtin {
     pub fn security_headers() -> BoxedMiddleware {
         SecurityHeaders::new().build()
     }
+
+    // -------------------------------------------------------------------------
+    // Response compression
+    // -------------------------------------------------------------------------
+
+    /// Response compression middleware (gzip + brotli).
+    ///
+    /// Negotiates the best encoding from the request's `Accept-Encoding` header.
+    /// Brotli is preferred over gzip when both are accepted.
+    ///
+    /// Skips compression when:
+    /// - The response body is smaller than `min_size` bytes (default: 1024).
+    /// - The `Content-Type` is a binary format (images, audio, video, zip, …).
+    /// - The response already carries a `Content-Encoding` header.
+    ///
+    /// Always sets `Vary: Accept-Encoding` (required by RFC 7231 so caches
+    /// serve the correct version to each client).
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// let mut app = Ultimo::new_without_defaults();
+    /// app.use_middleware(ultimo::middleware::builtin::compression());
+    /// // or configured:
+    /// app.use_middleware(
+    ///     ultimo::middleware::builtin::Compression::new()
+    ///         .gzip()
+    ///         .brotli()
+    ///         .min_size(512)
+    ///         .build(),
+    /// );
+    /// ```
+    #[cfg(feature = "compression")]
+    #[derive(Debug, Clone)]
+    pub struct Compression {
+        gzip: bool,
+        brotli: bool,
+        min_size: usize,
+    }
+
+    #[cfg(feature = "compression")]
+    impl Default for Compression {
+        fn default() -> Self {
+            Self {
+                gzip: true,
+                brotli: true,
+                min_size: 1024,
+            }
+        }
+    }
+
+    #[cfg(feature = "compression")]
+    impl Compression {
+        /// Create with defaults (gzip + brotli enabled, min_size = 1024 bytes).
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// Enable gzip compression.
+        pub fn gzip(mut self) -> Self {
+            self.gzip = true;
+            self
+        }
+
+        /// Enable brotli compression.
+        pub fn brotli(mut self) -> Self {
+            self.brotli = true;
+            self
+        }
+
+        /// Minimum response body size in bytes before compression is applied.
+        /// Responses smaller than this are passed through unchanged (default: 1024).
+        pub fn min_size(mut self, bytes: usize) -> Self {
+            self.min_size = bytes;
+            self
+        }
+
+        /// Build the [`BoxedMiddleware`].
+        pub fn build(self) -> BoxedMiddleware {
+            use brotli::CompressorWriter;
+            use flate2::{write::GzEncoder, Compression as GzLevel};
+            use http_body_util::BodyExt;
+            use hyper::header::{CONTENT_ENCODING, CONTENT_LENGTH, VARY};
+            use std::io::Write;
+
+            let gzip_enabled = self.gzip;
+            let brotli_enabled = self.brotli;
+            let min_size = self.min_size;
+
+            Arc::new(move |ctx, next| {
+                Box::pin(async move {
+                    // Capture Accept-Encoding BEFORE consuming ctx with next().
+                    let accept_enc = ctx
+                        .req
+                        .header("accept-encoding")
+                        .unwrap_or_default()
+                        .to_lowercase();
+
+                    let mut res = next(ctx).await?;
+
+                    // Always set Vary (RFC 7231 §7.1.4).
+                    res.headers_mut().insert(
+                        VARY,
+                        hyper::header::HeaderValue::from_static("Accept-Encoding"),
+                    );
+
+                    // Skip if already encoded.
+                    if res.headers().contains_key(CONTENT_ENCODING) {
+                        return Ok(res);
+                    }
+
+                    // Decompose response so we can inspect and replace the body.
+                    let (parts, body) = res.into_parts();
+                    // Full<Bytes> is infallible — unwrap is safe.
+                    let body_bytes = body.collect().await.unwrap().to_bytes();
+
+                    // Skip below min_size.
+                    if body_bytes.len() < min_size {
+                        return Ok(hyper::Response::from_parts(parts, Full::new(body_bytes)));
+                    }
+
+                    // Skip binary content types.
+                    let ct = parts
+                        .headers
+                        .get(hyper::header::CONTENT_TYPE)
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or("")
+                        .to_lowercase();
+
+                    const SKIP_PREFIXES: &[&str] = &["image/", "audio/", "video/", "font/woff"];
+                    const SKIP_EXACT: &[&str] = &[
+                        "application/zip",
+                        "application/gzip",
+                        "application/x-gzip",
+                        "application/octet-stream",
+                    ];
+                    let skip = SKIP_PREFIXES.iter().any(|p| ct.starts_with(p))
+                        || SKIP_EXACT.iter().any(|e| ct.starts_with(e));
+
+                    if skip {
+                        return Ok(hyper::Response::from_parts(parts, Full::new(body_bytes)));
+                    }
+
+                    // Choose algorithm: prefer brotli > gzip > identity.
+                    let use_brotli =
+                        brotli_enabled && accept_enc.split(',').any(|t| t.trim() == "br");
+                    let use_gzip = !use_brotli
+                        && gzip_enabled
+                        && accept_enc.split(',').any(|t| t.trim().starts_with("gzip"));
+
+                    if use_brotli {
+                        let mut compressed = Vec::new();
+                        {
+                            let mut writer = CompressorWriter::new(&mut compressed, 4096, 5, 22);
+                            writer.write_all(&body_bytes).unwrap();
+                        }
+                        let len = compressed.len();
+                        let mut res =
+                            hyper::Response::from_parts(parts, Full::new(Bytes::from(compressed)));
+                        res.headers_mut().insert(
+                            CONTENT_ENCODING,
+                            hyper::header::HeaderValue::from_static("br"),
+                        );
+                        res.headers_mut().insert(
+                            CONTENT_LENGTH,
+                            hyper::header::HeaderValue::from_str(&len.to_string()).unwrap(),
+                        );
+                        Ok(res)
+                    } else if use_gzip {
+                        let mut compressed = Vec::new();
+                        {
+                            let mut encoder = GzEncoder::new(&mut compressed, GzLevel::default());
+                            encoder.write_all(&body_bytes).unwrap();
+                            encoder.finish().unwrap();
+                        }
+                        let len = compressed.len();
+                        let mut res =
+                            hyper::Response::from_parts(parts, Full::new(Bytes::from(compressed)));
+                        res.headers_mut().insert(
+                            CONTENT_ENCODING,
+                            hyper::header::HeaderValue::from_static("gzip"),
+                        );
+                        res.headers_mut().insert(
+                            CONTENT_LENGTH,
+                            hyper::header::HeaderValue::from_str(&len.to_string()).unwrap(),
+                        );
+                        Ok(res)
+                    } else {
+                        // No matching encoding — pass through unmodified.
+                        Ok(hyper::Response::from_parts(parts, Full::new(body_bytes)))
+                    }
+                })
+            })
+        }
+    }
+
+    /// Compression middleware with defaults (gzip + brotli, min 1 KB).
+    ///
+    /// Convenience alias for `Compression::new().build()`.
+    ///
+    /// Requires the `compression` Cargo feature.
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// let mut app = Ultimo::new_without_defaults();
+    /// app.use_middleware(ultimo::middleware::builtin::compression());
+    /// ```
+    #[cfg(feature = "compression")]
+    pub fn compression() -> BoxedMiddleware {
+        Compression::new().build()
+    }
 }
 
 #[cfg(test)]

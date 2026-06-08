@@ -86,6 +86,10 @@ export default defineConfig({
           ],
         },
         {
+          text: "Static Files",
+          link: "/static-files",
+        },
+        {
           text: "WebSocket",
           link: "/websocket",
         },

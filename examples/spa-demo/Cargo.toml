@@ -1,0 +1,15 @@
+[package]
+name = "spa-demo"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "spa-demo"
+path = "src/main.rs"
+
+[dependencies]
+ultimo = { path = "../../ultimo", features = ["static-files", "compression"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

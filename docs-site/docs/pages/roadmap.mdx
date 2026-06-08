@@ -12,9 +12,10 @@ Upcoming features and improvements planned for Ultimo.
 
 ### Performance & Streaming
 
-- 🗜️ **Response Compression** - Automatic gzip/brotli compression
 - 📡 **Streaming Responses** - Large file streaming support
 - ⚡ **HTTP/2 Push** - Server push for critical resources
+
+(Response compression shipped in 0.5.0 — see [Compression](/middleware#compression).)
 
 ### Session & Auth
 
@@ -32,9 +33,7 @@ Upcoming features and improvements planned for Ultimo.
 
 ### Static Files & SPAs
 
-- 📁 **Static File Serving** - Serve frontend assets
-- 📁 **SPA Fallback** - Single Page Application routing support
-- 📁 **Asset Compression** - Pre-compressed asset serving
+(Static file serving, SPA fallback, and response compression shipped in 0.5.0 — see [Static Files](/static-files) and [Compression](/middleware#compression).)
 
 ### Security
 
@@ -80,8 +79,8 @@ Upcoming features and improvements planned for Ultimo.
 | Auth: authorization guards | ✅ Available    | 0.4.0   |
 | Benchmark Suite (criterion) | ✅ Available  | 0.4.0   |
 | Perf CI Regression Guard  | ✅ Available     | 0.4.0   |
-| Static Files              | 📋 Planned       | 0.5.0   |
-| Compression               | 📋 Planned       | 0.5.0   |
+| Static Files + SPA Fallback | ✅ Available   | 0.5.0   |
+| Compression (gzip/brotli) | ✅ Available     | 0.5.0   |
 | Hot Reload                | 📋 Planned       | 0.5.0   |
 | Development Dashboard     | 📋 Planned       | 0.5.0   |
 | Multi-language Clients    | 📋 Planned       | 0.5.0   |
@@ -141,8 +140,8 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
 ### v0.5.0
 
-- Static file serving + SPA fallback
-- Response compression
+- ✅ **Static file serving + SPA fallback** — `serve_static`, `serve_spa`, ETag caching, path-traversal protection (`static-files` feature)
+- ✅ **Response compression** — automatic brotli/gzip middleware, pure Rust, builder API (`compression` feature)
 - Hot reload development mode
 - Development dashboard with live metrics and debugging tools
 - Multi-language client generation (Python/Go/Dart/Swift)

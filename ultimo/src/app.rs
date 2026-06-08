@@ -54,6 +54,11 @@ pub struct Ultimo {
 
     #[cfg(feature = "websocket")]
     channel_manager: Arc<ChannelManager>,
+
+    /// SPA fallback: `(root_dir, fallback_filename)`. When set, any `GET`
+    /// request that returns 404 is answered with this file instead.
+    #[cfg(feature = "static-files")]
+    spa_fallback: Option<(std::path::PathBuf, String)>,
 }
 
 impl Ultimo {
@@ -74,6 +79,8 @@ impl Ultimo {
             websocket_routes: HashMap::new(),
             #[cfg(feature = "websocket")]
             channel_manager: Arc::new(ChannelManager::new()),
+            #[cfg(feature = "static-files")]
+            spa_fallback: None,
         };
 
         // Add X-Powered-By header by default (like Express.js)
@@ -100,6 +107,8 @@ impl Ultimo {
             websocket_routes: HashMap::new(),
             #[cfg(feature = "websocket")]
             channel_manager: Arc::new(ChannelManager::new()),
+            #[cfg(feature = "static-files")]
+            spa_fallback: None,
         }
     }
 
@@ -284,6 +293,60 @@ impl Ultimo {
         self
     }
 
+    /// Serve static files from `dir` under the URL prefix `prefix`.
+    ///
+    /// Registers a `GET {prefix}/*path` route. Responds with the correct
+    /// `Content-Type`, sets an `ETag`, and handles `If-None-Match` → 304.
+    /// Path traversal attempts return 404.
+    ///
+    /// Requires the `static-files` Cargo feature.
+    ///
+    /// ```rust,no_run
+    /// use ultimo::prelude::*;
+    ///
+    /// let mut app = Ultimo::new();
+    /// app.serve_static("/assets", "./public");
+    /// ```
+    #[cfg(feature = "static-files")]
+    pub fn serve_static(&mut self, prefix: &str, dir: impl Into<std::path::PathBuf>) -> &mut Self {
+        let root = dir.into();
+        let pattern = format!("{}/*path", prefix.trim_end_matches('/'));
+        self.get(&pattern, move |ctx: Context| {
+            let root = root.clone();
+            async move {
+                let rel = ctx.req.param("path")?.to_string();
+                let inm = ctx.req.header("if-none-match");
+                crate::static_files::serve_file(&root, &rel, inm).await
+            }
+        });
+        self
+    }
+
+    /// Serve a Single Page Application from `dir`.
+    ///
+    /// Any `GET` request that returns 404 (no matching route) is answered
+    /// with `dir/fallback` instead, enabling client-side routing.
+    ///
+    /// Mount API routes **before** calling `serve_spa` so they take
+    /// precedence.
+    ///
+    /// Requires the `static-files` Cargo feature.
+    ///
+    /// ```rust,no_run
+    /// use ultimo::prelude::*;
+    ///
+    /// let mut app = Ultimo::new();
+    /// app.get("/api/hello", |ctx: Context| async move {
+    ///     ctx.json(serde_json::json!({ "ok": true })).await
+    /// });
+    /// app.serve_spa("./dist", "index.html");
+    /// ```
+    #[cfg(feature = "static-files")]
+    pub fn serve_spa(&mut self, dir: impl Into<std::path::PathBuf>, fallback: &str) -> &mut Self {
+        self.spa_fallback = Some((dir.into(), fallback.to_string()));
+        self
+    }
+
     /// Handle an incoming HTTP request
     async fn handle_request(&self, req: HyperRequest<Incoming>, peer_addr: SocketAddr) -> Response {
         // Check for WebSocket upgrade request (needs the live `Incoming` body)
@@ -400,6 +463,17 @@ impl Ultimo {
         let (handler_id, params) = match self.router.find_route(method, &path) {
             Some(route_match) => route_match,
             None => {
+                // SPA fallback: serve index.html for unmatched GET requests.
+                #[cfg(feature = "static-files")]
+                if parts.method == hyper::Method::GET {
+                    if let Some((ref spa_dir, ref spa_file)) = self.spa_fallback {
+                        if let Ok(spa_resp) =
+                            crate::static_files::serve_file(spa_dir, spa_file, None).await
+                        {
+                            return spa_resp;
+                        }
+                    }
+                }
                 return response::helpers::not_found()
                     .unwrap_or_else(|_| response::helpers::text("Not Found").unwrap());
             }

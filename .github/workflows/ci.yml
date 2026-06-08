@@ -46,6 +46,12 @@ jobs:
       - name: clippy (websocket + test-helpers + testing + session + csrf + jwt + api-key, all targets)
         run: cargo clippy -p ultimo --all-targets --features "websocket,test-helpers,testing,session,csrf,jwt,api-key" -- -D warnings
 
+      # Static-files + compression are pure-Rust, no system deps — lint lib only.
+      # --all-targets would pull in WebSocket integration tests that need their
+      # own feature; the dedicated test steps below verify the test targets.
+      - name: clippy (static-files + compression, lib)
+        run: cargo clippy -p ultimo --lib --features "static-files,compression" -- -D warnings
+
   # ── Unit + integration tests (no DB system deps) ──────────────────────
   test:
     name: test (${{ matrix.os }})
@@ -103,6 +109,18 @@ jobs:
           cargo test -p ultimo --features "jwt" --test authz
           cargo test -p ultimo --features "session" --doc
 
+      # Static file serving + SPA fallback. Pure Rust, no system deps.
+      # Tests in ultimo/tests/static_files.rs cover path traversal, ETag/304,
+      # MIME detection, and SPA fallback routing.
+      - name: Static file tests (static-files feature)
+        run: cargo test -p ultimo --features "static-files" --test static_files
+
+      # Response compression. Pure Rust (flate2/miniz_oxide + brotli crate).
+      # Tests in ultimo/tests/compression.rs cover gzip, brotli, skip rules,
+      # Vary header, double-compress guard, and builder min_size override.
+      - name: Compression tests (compression feature)
+        run: cargo test -p ultimo --features "compression" --test compression
+
       # websocket_pubsub_bench uses test_helpers::ChannelManager, so benches
       # need test-helpers in addition to websocket.
       - name: Benches compile (don't run)
@@ -159,8 +177,8 @@ jobs:
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
       - uses: Swatinem/rust-cache@v2
-      - name: cargo check (default + websocket)
-        run: cargo check -p ultimo -p ultimo-cli --features "websocket"
+      - name: cargo check (default + websocket + static-files + compression)
+        run: cargo check -p ultimo -p ultimo-cli --features "websocket,static-files,compression"
 
   # ── Public-API breaking-change detection ──────────────────────────────
   # Guards the pre-1.0 public API against accidental SemVer breakage by
