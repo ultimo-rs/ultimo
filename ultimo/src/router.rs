@@ -44,8 +44,11 @@ pub type Params = HashMap<String, String>;
 enum Segment {
     /// Static path segment
     Static(String),
-    /// Dynamic parameter segment
+    /// Dynamic parameter segment (`:name`)
     Param(String),
+    /// Catch-all wildcard segment (`*name`) — must be the last segment;
+    /// captures all remaining path segments joined by `/`.
+    Wildcard(String),
 }
 
 /// Route pattern for matching
@@ -70,7 +73,9 @@ impl Route {
         path.split('/')
             .filter(|s| !s.is_empty())
             .map(|segment| {
-                if let Some(stripped) = segment.strip_prefix(':') {
+                if let Some(stripped) = segment.strip_prefix('*') {
+                    Segment::Wildcard(stripped.to_string())
+                } else if let Some(stripped) = segment.strip_prefix(':') {
                     Segment::Param(stripped.to_string())
                 } else {
                     Segment::Static(segment.to_string())
@@ -81,28 +86,57 @@ impl Route {
 
     /// Match this route against an incoming path
     pub fn matches(&self, path: &str) -> Option<Params> {
-        let path_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        let path_segs: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
 
-        // Must have same number of segments
-        if path_segments.len() != self.segments.len() {
-            return None;
+        // Check whether the last segment is a wildcard
+        let has_wildcard = matches!(self.segments.last(), Some(Segment::Wildcard(_)));
+
+        if has_wildcard {
+            let prefix = &self.segments[..self.segments.len() - 1];
+            // Wildcard requires at least one trailing segment beyond the prefix
+            if path_segs.len() <= prefix.len() {
+                return None;
+            }
+            let mut params = HashMap::new();
+            for (route_seg, path_seg) in prefix.iter().zip(path_segs.iter()) {
+                match route_seg {
+                    Segment::Static(expected) => {
+                        if expected.as_str() != *path_seg {
+                            return None;
+                        }
+                    }
+                    Segment::Param(name) => {
+                        params.insert(name.clone(), (*path_seg).to_string());
+                    }
+                    Segment::Wildcard(_) => unreachable!("wildcard must be the last segment"),
+                }
+            }
+            // Capture all remaining segments joined by '/'
+            if let Some(Segment::Wildcard(name)) = self.segments.last() {
+                let rest = path_segs[prefix.len()..].join("/");
+                params.insert(name.clone(), rest);
+            }
+            return Some(params);
         }
 
+        // Original logic: exact segment count required
+        if path_segs.len() != self.segments.len() {
+            return None;
+        }
         let mut params = HashMap::new();
-
-        for (route_seg, path_seg) in self.segments.iter().zip(path_segments.iter()) {
+        for (route_seg, path_seg) in self.segments.iter().zip(path_segs.iter()) {
             match route_seg {
                 Segment::Static(expected) => {
-                    if expected != path_seg {
+                    if expected.as_str() != *path_seg {
                         return None;
                     }
                 }
                 Segment::Param(name) => {
-                    params.insert(name.clone(), path_seg.to_string());
+                    params.insert(name.clone(), (*path_seg).to_string());
                 }
+                Segment::Wildcard(_) => unreachable!("wildcard only at end"),
             }
         }
-
         Some(params)
     }
 
@@ -127,7 +161,7 @@ impl Route {
         for seg in &self.segments {
             match seg {
                 Segment::Static(s) => parts.push(s),
-                Segment::Param(_) => return None,
+                Segment::Param(_) | Segment::Wildcard(_) => return None,
             }
         }
         Some(parts.join("/"))
@@ -388,5 +422,57 @@ mod tests {
         r.add_route(Method::POST, "/x", 2);
         assert_eq!(r.find_route(Method::GET, "/x").unwrap().0, 1);
         assert_eq!(r.find_route(Method::POST, "/x").unwrap().0, 2);
+    }
+
+    // --- Wildcard segment tests ---
+
+    #[test]
+    fn wildcard_matches_single_segment() {
+        let route = Route::new("/assets/*path");
+        let params = route.matches("/assets/style.css").unwrap();
+        assert_eq!(params["path"], "style.css");
+    }
+
+    #[test]
+    fn wildcard_matches_nested_path() {
+        let route = Route::new("/assets/*path");
+        let params = route.matches("/assets/css/theme/main.css").unwrap();
+        assert_eq!(params["path"], "css/theme/main.css");
+    }
+
+    #[test]
+    fn wildcard_requires_prefix_match() {
+        let route = Route::new("/assets/*path");
+        assert!(route.matches("/other/style.css").is_none());
+    }
+
+    #[test]
+    fn wildcard_does_not_match_prefix_only() {
+        // /assets alone has no trailing segment — wildcard requires at least one
+        let route = Route::new("/assets/*path");
+        assert!(route.matches("/assets").is_none());
+    }
+
+    #[test]
+    fn wildcard_does_not_produce_static_key() {
+        // Routes with wildcards must go in the dynamic (slow-path) scan
+        let route = Route::new("/assets/*path");
+        assert!(route.static_key().is_none());
+    }
+
+    #[test]
+    fn wildcard_specificity_equals_static_prefix_count() {
+        let route = Route::new("/assets/public/*path");
+        // "assets" and "public" are static segments; wildcard counts as 0
+        assert_eq!(route.specificity(), 2);
+    }
+
+    #[test]
+    fn wildcard_route_is_found_via_router() {
+        let mut r = Router::new();
+        r.add_route(Method::GET, "/static/*path", 42);
+        let (id, params) = r.find_route(Method::GET, "/static/js/app.js").unwrap();
+        assert_eq!(id, 42);
+        assert_eq!(params["path"], "js/app.js");
     }
 }
