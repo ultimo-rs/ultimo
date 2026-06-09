@@ -7,6 +7,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Re-export of the `ts-rs` `TS` derive so users can `#[derive(TS)]` on their
+/// RPC input/output types without adding `ts-rs` to their own `Cargo.toml`.
+/// Available with the `client-gen` feature.
+#[cfg(feature = "client-gen")]
+pub use ts_rs::TS;
+
 /// RPC mode determines how procedures are exposed as HTTP endpoints
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RpcMode {
@@ -169,8 +175,9 @@ impl RpcRegistry {
         self.procedure(name, handler, ts_input, ts_output, false)
     }
 
-    /// Register a query procedure (idempotent, uses GET in REST mode)
-    pub fn query<F, Fut, I, O>(
+    /// Register a query procedure with explicit TypeScript type strings
+    /// (escape hatch for types that cannot derive `TS`). Uses GET in REST mode.
+    pub fn query_with_types<F, Fut, I, O>(
         &self,
         name: impl Into<String>,
         handler: F,
@@ -185,8 +192,9 @@ impl RpcRegistry {
         self.procedure(name, handler, ts_input, ts_output, true)
     }
 
-    /// Register a mutation procedure (state-changing, uses POST in REST mode)
-    pub fn mutation<F, Fut, I, O>(
+    /// Register a mutation procedure with explicit TypeScript type strings
+    /// (escape hatch for types that cannot derive `TS`). Uses POST in REST mode.
+    pub fn mutation_with_types<F, Fut, I, O>(
         &self,
         name: impl Into<String>,
         handler: F,
@@ -199,6 +207,48 @@ impl RpcRegistry {
         O: Serialize + 'static,
     {
         self.procedure(name, handler, ts_input, ts_output, false)
+    }
+
+    /// Register a query procedure (idempotent; GET in REST mode). Input/output
+    /// TypeScript types are derived from the Rust types via `ts-rs`.
+    #[cfg(feature = "client-gen")]
+    pub fn query<F, Fut, I, O>(&self, name: impl Into<String>, handler: F)
+    where
+        F: Fn(I) -> Fut + Send + Sync + Clone + 'static,
+        Fut: std::future::Future<Output = Result<O>> + Send + 'static,
+        I: for<'de> Deserialize<'de> + ts_rs::TS + 'static,
+        O: Serialize + ts_rs::TS + 'static,
+    {
+        let cfg = ts_rs::Config::default();
+        let ts_input = <I as ts_rs::TS>::name(&cfg);
+        let ts_output = <O as ts_rs::TS>::name(&cfg);
+        {
+            let mut decls = self.type_decls.lock().unwrap();
+            collect_type_decls::<I>(&mut decls);
+            collect_type_decls::<O>(&mut decls);
+        }
+        self.procedure(name, handler, ts_input, ts_output, true);
+    }
+
+    /// Register a mutation procedure (state-changing; POST in REST mode).
+    /// Input/output TypeScript types are derived from the Rust types via `ts-rs`.
+    #[cfg(feature = "client-gen")]
+    pub fn mutation<F, Fut, I, O>(&self, name: impl Into<String>, handler: F)
+    where
+        F: Fn(I) -> Fut + Send + Sync + Clone + 'static,
+        Fut: std::future::Future<Output = Result<O>> + Send + 'static,
+        I: for<'de> Deserialize<'de> + ts_rs::TS + 'static,
+        O: Serialize + ts_rs::TS + 'static,
+    {
+        let cfg = ts_rs::Config::default();
+        let ts_input = <I as ts_rs::TS>::name(&cfg);
+        let ts_output = <O as ts_rs::TS>::name(&cfg);
+        {
+            let mut decls = self.type_decls.lock().unwrap();
+            collect_type_decls::<I>(&mut decls);
+            collect_type_decls::<O>(&mut decls);
+        }
+        self.procedure(name, handler, ts_input, ts_output, false);
     }
 
     /// Internal method to register with options
@@ -784,7 +834,7 @@ mod tests {
     #[tokio::test]
     async fn test_rpc_query_registration() {
         let registry = RpcRegistry::new();
-        registry.query(
+        registry.query_with_types(
             "test_query",
             |input: TestInput| async move {
                 Ok(TestOutput {
@@ -803,7 +853,7 @@ mod tests {
     #[tokio::test]
     async fn test_rpc_mutation_registration() {
         let registry = RpcRegistry::new();
-        registry.mutation(
+        registry.mutation_with_types(
             "test_mutation",
             |input: TestInput| async move {
                 Ok(TestOutput {
@@ -823,21 +873,21 @@ mod tests {
     async fn test_rpc_multiple_procedures() {
         let registry = RpcRegistry::new();
 
-        registry.query(
+        registry.query_with_types(
             "query1",
             |_: TestInput| async move { Ok(TestOutput { result: 1 }) },
             "{}".to_string(),
             "{}".to_string(),
         );
 
-        registry.query(
+        registry.query_with_types(
             "query2",
             |_: TestInput| async move { Ok(TestOutput { result: 2 }) },
             "{}".to_string(),
             "{}".to_string(),
         );
 
-        registry.mutation(
+        registry.mutation_with_types(
             "mutation1",
             |_: TestInput| async move { Ok(TestOutput { result: 3 }) },
             "{}".to_string(),
@@ -863,7 +913,7 @@ mod tests {
     async fn test_typescript_client_with_procedures() {
         let registry = RpcRegistry::new();
 
-        registry.query(
+        registry.query_with_types(
             "getUser",
             |_: TestInput| async move { Ok(TestOutput { result: 42 }) },
             "{ id: number }".to_string(),
@@ -881,7 +931,7 @@ mod tests {
     async fn test_openapi_generation_rest_mode() {
         let registry = RpcRegistry::new_with_mode(RpcMode::Rest);
 
-        registry.query(
+        registry.query_with_types(
             "testQuery",
             |_: TestInput| async move { Ok(TestOutput { result: 123 }) },
             "{ value: number }".to_string(),
@@ -899,7 +949,7 @@ mod tests {
     async fn test_openapi_generation_jsonrpc_mode() {
         let registry = RpcRegistry::new_with_mode(RpcMode::JsonRpc);
 
-        registry.query(
+        registry.query_with_types(
             "testQuery",
             |_: TestInput| async move { Ok(TestOutput { result: 456 }) },
             "{ value: number }".to_string(),
@@ -935,21 +985,21 @@ mod tests {
     async fn test_openapi_includes_all_procedures() {
         let registry = RpcRegistry::new_with_mode(RpcMode::Rest);
 
-        registry.query(
+        registry.query_with_types(
             "getUser",
             |_: TestInput| async move { Ok(TestOutput { result: 1 }) },
             "{}".to_string(),
             "{}".to_string(),
         );
 
-        registry.query(
+        registry.query_with_types(
             "listUsers",
             |_: TestInput| async move { Ok(TestOutput { result: 2 }) },
             "{}".to_string(),
             "{}".to_string(),
         );
 
-        registry.mutation(
+        registry.mutation_with_types(
             "createUser",
             |_: TestInput| async move { Ok(TestOutput { result: 3 }) },
             "{}".to_string(),
@@ -968,14 +1018,14 @@ mod tests {
     async fn test_list_procedures_returns_names() {
         let registry = RpcRegistry::new();
 
-        registry.query(
+        registry.query_with_types(
             "proc1",
             |_: TestInput| async move { Ok(TestOutput { result: 1 }) },
             "{}".to_string(),
             "{}".to_string(),
         );
 
-        registry.query(
+        registry.query_with_types(
             "proc2",
             |_: TestInput| async move { Ok(TestOutput { result: 2 }) },
             "{}".to_string(),
@@ -1042,6 +1092,48 @@ mod client_gen_tests {
         assert!(
             !client.contains("export interface User"),
             "hardcoded User interface leaked into output:\n{client}"
+        );
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize, ts_rs::TS)]
+    struct GetThingInput {
+        id: u32,
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize, ts_rs::TS)]
+    struct Thing {
+        id: u32,
+        label: String,
+    }
+
+    #[tokio::test]
+    async fn derived_query_emits_named_types_and_signature() {
+        let rpc = RpcRegistry::new_with_mode(RpcMode::Rest);
+        rpc.query("getThing", |_input: GetThingInput| async move {
+            Ok(Thing {
+                id: 1,
+                label: "x".into(),
+            })
+        });
+
+        let client = rpc.generate_typescript_client();
+        // Method signature references the derived named types.
+        assert!(
+            client.contains("getThing(params: GetThingInput): Promise<Thing>"),
+            "signature missing:\n{client}"
+        );
+        // Both interfaces are declared (no dangling references).
+        assert!(
+            client.contains("type GetThingInput = "),
+            "input decl missing:\n{client}"
+        );
+        assert!(
+            client.contains("type Thing = "),
+            "output decl missing:\n{client}"
+        );
+        assert!(
+            client.contains("label: string"),
+            "Thing body missing:\n{client}"
         );
     }
 }
