@@ -85,6 +85,24 @@ Per-vendor auth integrations (Clerk/Cognito/…) are intentionally NOT separate
 features — they collapse to one OIDC/JWKS verifier + provider presets. Better
 Auth is excluded (it's a TS-native backend, not a token issuer to verify).
 
+## Hono / FastAPI-inspired additions (added)
+
+- **Typed handler extractors** (0.7) — FastAPI/axum-style typed path/query/body/
+  header params, auto-parsed + validated, structured 422. Completes the
+  type-safe story: type-safe *input* to mirror the type-safe *output* (TS
+  client). Headline DX.
+- **Validation from types** (0.7) — Pydantic-style, wired into the extractor/RPC
+  boundary.
+- **Turnkey interactive API docs** (0.6) — `app.serve_docs("/docs")` serving
+  Swagger UI / Scalar / ReDoc from the generated OpenAPI spec (FastAPI's
+  signature). The `swagger_ui_html()` helper already exists; make it one call.
+- **Built-in middleware pack** (0.8) — request-id, cache-control/ETag,
+  server-timing, basic-auth, trailing-slash (Hono-style breadth).
+
+Considered and declined: edge / multi-runtime (Hono Workers/WASM) — mismatch
+with native Hyper+Tokio; SSR / JSX templating — counter to the Rust-API +
+typed-TS-frontend model.
+
 ## Out of scope
 
 This is a documentation change to `roadmap.mdx` (plus reconciling the Feature

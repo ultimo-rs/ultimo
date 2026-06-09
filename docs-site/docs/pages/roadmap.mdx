@@ -17,6 +17,13 @@ a stable **1.0**.
   from your Rust types (tRPC-style subscriptions, in Rust).
 - ❗ **End-to-end typed errors** — RPC errors surfaced as typed results in the
   generated client.
+- 🎯 **Typed handler extractors** — declare typed path / query / body / header
+  params on a handler; they're parsed and validated automatically, with a
+  structured **422** on bad input. Ultimo already gives type-safe *output* (the
+  TS client); this gives type-safe *input* — the handler signature becomes the
+  contract. Inspired by FastAPI / axum.
+- ✅ **Validation from types** — derive request validation from the type
+  (Pydantic-style), wired into the extractor and RPC boundary.
 - 🪄 **`#[derive(UltimoType)]`** — a thin wrapper so client types derive without
   adding `ts-rs` to your own `Cargo.toml`.
 
@@ -38,6 +45,16 @@ a stable **1.0**.
 - ⏱️ **Request timeouts** + **HTTP graceful shutdown** (WebSocket graceful
   shutdown already ships).
 - 🔄 **Hot reload** — `ultimo dev` with file-watching auto-restart.
+
+### Developer experience
+
+- 📖 **Turnkey interactive API docs** — one call (`app.serve_docs("/docs")`) to
+  serve Swagger UI / Scalar / ReDoc wired to the generated OpenAPI spec
+  (FastAPI's signature `/docs`). The Swagger UI helper exists today; this makes
+  it one line.
+- 🧩 **Built-in middleware pack** — small, expected pieces: `request-id`,
+  `cache-control` / ETag helpers, `server-timing`, basic-auth, trailing-slash
+  normalization (Hono-style breadth).
 
 ### Integrations
 
@@ -75,6 +92,11 @@ dependencies and rot as each vendor's API changes).
 > Schema Introspection / Smart Suggestions), Go/Dart/Swift client generation
 > (focus stays TypeScript-first), and a standalone Mock Server (testing
 > utilities already ship).
+>
+> Considered and declined: edge / multi-runtime deployment (Hono's
+> Workers/WASM model) — an architectural mismatch with Ultimo's native
+> Hyper + Tokio core; and server-side rendering / JSX templating — counter to
+> the "Rust API + typed TypeScript frontend" model (a cookbook at most).
 
 ## Feature Status
 
@@ -107,8 +129,10 @@ dependencies and rot as each vendor's API changes).
 | `ultimo generate` (runs generate-client) | ✅ Available | 0.5.0 |
 | Codegen: `ultimo new` scaffold + `--watch` | 📋 Planned | 0.6.0 |
 | Frontend Client Adapters (TanStack Query / hooks) | 📋 Planned | 0.6.0 |
+| Interactive API Docs (Swagger/Scalar/ReDoc) | 📋 Planned | 0.6.0 |
 | Deployment Guides         | 📋 Planned       | 0.6.0   |
 | Advanced Rate Limiting    | 📋 Planned       | 0.6.0   |
+| Typed Handler Extractors + Validation | 📋 Planned | 0.7.0 |
 | Typed RPC Subscriptions / SSE | 📋 Planned   | 0.7.0   |
 | OAuth2                    | 📋 Planned       | 0.7.0   |
 | Auth Providers (OIDC/JWKS + presets) | 📋 Planned | 0.7.0 |
@@ -119,6 +143,7 @@ dependencies and rot as each vendor's API changes).
 | WebSocket Compression     | 📋 Planned       | 0.8.0   |
 | Hot Reload (`ultimo dev`) | 📋 Planned       | 0.8.0   |
 | `#[derive(UltimoType)]`   | 📋 Planned       | 0.8.0   |
+| Built-in Middleware Pack (request-id, cache-control, …) | 📋 Planned | 0.8.0 |
 | End-to-end Typed Errors   | 📋 Planned       | 0.9.0   |
 | S3-compatible Storage     | 💡 Demand-driven | post-1.0 |
 | Background Tasks          | 💡 Demand-driven | post-1.0 |
@@ -197,11 +222,13 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - Codegen: scaffold `generate-client` into `ultimo new` templates; TypeScript
   docs rewrite; `ultimo generate --watch`
 - **Frontend client adapters** — TanStack Query / React hooks (and Svelte/Vue)
+- **Turnkey interactive API docs** — `serve_docs` (Swagger UI / Scalar / ReDoc)
 - Deployment guides (Docker, Fly.io/Railway, AWS, DigitalOcean, Azure, GCR, K8s)
 - Advanced rate limiting (per-user, per-endpoint)
 
 ### v0.7.0 — Real-time, auth, & production gaps
 
+- **Typed handler extractors + validation-from-types** (type-safe input)
 - Typed RPC subscriptions / SSE (derived event types)
 - OAuth2 provider integration
 - **Auth providers (OIDC/JWKS)** — RS256/ES256 + remote JWKS, presets for
@@ -216,6 +243,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - WebSocket compression (per-message deflate)
 - Hot reload (`ultimo dev`)
 - `#[derive(UltimoType)]` (drop the `ts-rs` dependency papercut)
+- Built-in middleware pack (request-id, cache-control/ETag, server-timing, basic-auth)
 
 ### v0.9.0 → v1.0.0 — Stabilize
 
