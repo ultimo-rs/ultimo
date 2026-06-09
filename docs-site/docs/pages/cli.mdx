@@ -39,16 +39,25 @@ Short form:
 ultimo generate -p ./backend -o ./frontend/src/client.ts
 ```
 
-This command:
+This runs a **`generate-client` binary** in your project
+(`cargo run --bin generate-client -- <output>`), so the client is produced by
+your real RPC registry — no source parsing, no guessing.
 
-1. Builds the project at `--project` (`cargo build --release`)
-2. Locates the TypeScript client your app emits (call
-   `rpc.generate_client_file(path)` in your binary — see
-   [TypeScript Clients](/typescript))
-3. Copies it to the `--output` path
+Add `src/bin/generate-client.rs` to your project:
 
-> The client is produced by your app's RPC registry at build time, not by static
-> source analysis. A more integrated `generate` is on the roadmap.
+```rust
+// src/bin/generate-client.rs
+fn main() {
+    let out = std::env::args().nth(1).expect("usage: generate-client <output>");
+    let rpc = my_app::build_registry(); // build the same RpcRegistry your server uses
+    rpc.generate_client_file(&out).expect("failed to write client");
+}
+```
+
+The binary receives the `--output` path as its first argument and writes the
+client there (see [TypeScript Clients](/typescript) for building the registry).
+Derive your RPC types with `#[derive(ultimo::rpc::TS)]` and enable the
+`client-gen` feature so the client carries real types.
 
 ### Example Output
 

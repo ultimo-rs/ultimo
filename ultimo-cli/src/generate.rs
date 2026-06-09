@@ -1,112 +1,101 @@
 use anyhow::{Context, Result};
 use colored::Colorize;
-use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Run the project's `generate-client` binary to emit a TypeScript client.
+///
+/// Convention: the project defines `src/bin/generate-client.rs` which builds its
+/// `RpcRegistry` and calls `rpc.generate_client_file(<output>)`. This command
+/// runs that binary (`cargo run --bin generate-client -- <output>`) so the
+/// client is produced by the real registry — no source parsing, no guessing.
 pub async fn run(project: PathBuf, output: PathBuf, watch: bool) -> Result<()> {
     println!("📂 Project: {}", project.display().to_string().cyan());
     println!("📝 Output: {}", output.display().to_string().cyan());
 
     if watch {
-        println!("👀 Watch mode enabled");
-        println!();
         println!(
             "{}",
-            "Coming soon! Use the generate command without --watch for now.".yellow()
+            "Watch mode is not implemented yet — run without --watch.".yellow()
         );
         return Ok(());
     }
 
-    println!();
-    println!("{}", "🔍 Analyzing Rust project...".bold());
-
-    // Step 1: Check if Cargo.toml exists
+    // The project must be a Cargo package.
     let cargo_toml = project.join("Cargo.toml");
     if !cargo_toml.exists() {
         anyhow::bail!("No Cargo.toml found in {}", project.display());
     }
 
-    println!("✅ Found Cargo.toml");
+    // Resolve the output path to an absolute path *before* changing the child's
+    // working directory, so a relative `--output` stays relative to where the
+    // user invoked the command, not to the project dir.
+    let output_abs = absolutize(&output)?;
+    if let Some(parent) = output_abs.parent() {
+        std::fs::create_dir_all(parent).context("Failed to create output directory")?;
+    }
 
-    // Step 2: Build the project to extract RPC metadata
-    println!("{}", "🔨 Building project...".bold());
+    println!();
+    println!("{}", "🔨 Running generate-client binary...".bold());
 
-    let output_result = Command::new("cargo")
-        .arg("build")
-        .arg("--release")
+    let status = Command::new("cargo")
+        .arg("run")
+        .arg("--quiet")
+        .arg("--bin")
+        .arg("generate-client")
         .current_dir(&project)
-        .output()
-        .context("Failed to build project")?;
+        .arg("--")
+        .arg(&output_abs)
+        .status()
+        .context("Failed to invoke `cargo run --bin generate-client`")?;
 
-    if !output_result.status.success() {
-        let error = String::from_utf8_lossy(&output_result.stderr);
-        anyhow::bail!("Build failed:\n{}", error);
-    }
-
-    println!("✅ Build successful");
-
-    // Step 3: Look for TypeScript client code in build artifacts or generated files
-    println!("{}", "🔍 Searching for RPC definitions...".bold());
-
-    // Check common locations for generated client code
-    let possible_locations = vec![
-        project.join("target/ultimo-client.ts"),
-        project.join("ultimo-client.ts"),
-    ];
-
-    let mut client_code = None;
-    for location in possible_locations {
-        if location.exists() {
-            client_code = Some(fs::read_to_string(&location)?);
-            println!("✅ Found TypeScript client at {}", location.display());
-            break;
-        }
-    }
-
-    // If no pre-generated client found, try to extract from running the binary
-    if client_code.is_none() {
-        println!("⚠️  No pre-generated client found");
-        println!("💡 Tip: Make sure your main.rs calls rpc.generate_typescript_client()");
-        println!();
-        println!("Add this to your main.rs:");
-        println!(
-            "{}",
-            "    let client = rpc.generate_typescript_client();".bright_black()
-        );
-        println!(
-            "{}",
-            "    fs::write(\"ultimo-client.ts\", client)?;".bright_black()
+    if !status.success() {
+        anyhow::bail!(
+            "`cargo run --bin generate-client` failed in {project}.\n\n\
+             `ultimo generate` runs a `generate-client` binary in your project. \
+             Add `src/bin/generate-client.rs`:\n\n\
+             {snippet}\n\n\
+             It must accept the output path as its first argument.",
+            project = project.display(),
+            snippet = EXAMPLE_BIN.trim_end(),
         );
     }
 
-    // Step 4: Create output directory if needed
-    if let Some(parent) = output.parent() {
-        fs::create_dir_all(parent).context("Failed to create output directory")?;
-    }
-
-    // Step 5: Write the TypeScript client
-    if let Some(code) = client_code {
-        fs::write(&output, code).context("Failed to write TypeScript client")?;
-
-        println!();
-        println!(
-            "{}",
-            "✨ TypeScript client generated successfully!"
-                .green()
-                .bold()
+    if !output_abs.exists() {
+        anyhow::bail!(
+            "generate-client ran but did not write {}. Make sure your \
+             generate-client binary writes the client to the path given as its \
+             first CLI argument (e.g. `rpc.generate_client_file(&args[1])`).",
+            output_abs.display()
         );
-        println!("📄 {}", output.display().to_string().cyan());
     }
 
+    println!();
+    println!(
+        "{}",
+        "✨ TypeScript client generated successfully!"
+            .green()
+            .bold()
+    );
+    println!("📄 {}", output_abs.display().to_string().cyan());
     Ok(())
 }
 
-/// Generate TypeScript client from RPC registry at runtime
-#[allow(dead_code)]
-pub fn generate_from_code(rpc_definitions: &str) -> Result<String> {
-    // Parse RPC definitions and generate TypeScript code
-    // This would be called during the build process
+/// Example `src/bin/generate-client.rs` shown in the error message.
+const EXAMPLE_BIN: &str = r#"    // src/bin/generate-client.rs
+    fn main() {
+        let out = std::env::args().nth(1).expect("usage: generate-client <output>");
+        let rpc = my_app::build_registry(); // build the same RpcRegistry your server uses
+        rpc.generate_client_file(&out).expect("failed to write client");
+    }"#;
 
-    Ok(rpc_definitions.to_string())
+/// Make `path` absolute relative to the current working directory, without
+/// requiring it to exist yet (so the output file need not exist).
+fn absolutize(path: &Path) -> Result<PathBuf> {
+    if path.is_absolute() {
+        Ok(path.to_path_buf())
+    } else {
+        let cwd = std::env::current_dir().context("Failed to read current directory")?;
+        Ok(cwd.join(path))
+    }
 }
