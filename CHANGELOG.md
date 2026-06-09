@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-09
+
+### Added
+
+- **Static file serving** (`static-files` feature): `serve_static` serves assets from disk with automatic `Content-Type`, `ETag`, and `304 Not Modified`; `serve_spa` adds Single Page Application fallback routing; path traversal is blocked at the filesystem level. Adds catch-all (`*name`) wildcard segments to the router. (#101)
+- **Response compression** (`compression` feature): automatic gzip/brotli middleware (brotli preferred), pure Rust with no C dependencies, configurable via the `Compression` builder. Skips binary content types, already-encoded responses, and small bodies; always sets `Vary: Accept-Encoding`. (#101)
+
+### Changed
+
+- Crate install snippets (`ultimo = "…"`) across the README and docs pages are now derived from the workspace version and enforced by the `version-sync` CI gate, eliminating version drift. (#102)
+
 ## [0.4.0] - 2026-06-08
 
 The **Security & Performance** milestone.
