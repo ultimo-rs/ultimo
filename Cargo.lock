@@ -174,7 +174,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
 name = "basic-example"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1587,7 +1587,7 @@ dependencies = [
 
 [[package]]
 name = "jwt-auth-example"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2425,7 +2425,7 @@ dependencies = [
 
 [[package]]
 name = "rpc-modes"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2693,7 +2693,7 @@ dependencies = [
 
 [[package]]
 name = "session-auth-example"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3570,7 +3570,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "ultimo"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "base64 0.21.7",
@@ -3608,7 +3608,7 @@ dependencies = [
 
 [[package]]
 name = "ultimo-cli"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "clap",
