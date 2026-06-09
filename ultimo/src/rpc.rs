@@ -44,6 +44,10 @@ pub struct RpcRegistry {
     procedures: Arc<std::sync::Mutex<HashMap<String, RpcHandler>>>,
     type_definitions: Arc<std::sync::Mutex<Vec<TypeDefinition>>>,
     metadata: Arc<std::sync::Mutex<HashMap<String, ProcedureMetadata>>>,
+    /// TS interface/type declarations collected from registered procedure
+    /// input/output types (keyed by TS name → declaration). Populated by the
+    /// `client-gen` query/mutation methods; empty otherwise.
+    type_decls: Arc<std::sync::Mutex<std::collections::BTreeMap<String, String>>>,
 }
 
 /// Type definition for TypeScript generation
@@ -129,6 +133,7 @@ impl RpcRegistry {
             procedures: Arc::new(std::sync::Mutex::new(HashMap::new())),
             type_definitions: Arc::new(std::sync::Mutex::new(Vec::new())),
             metadata: Arc::new(std::sync::Mutex::new(HashMap::new())),
+            type_decls: Arc::new(std::sync::Mutex::new(std::collections::BTreeMap::new())),
         }
     }
 
@@ -419,14 +424,17 @@ export class UltimoRpcClient {
         client
     }
 
-    /// Append type definitions to generated client
+    /// Append collected type declarations to the generated client.
     fn append_type_definitions(&self, client: &mut String) {
+        let decls = self.type_decls.lock().unwrap();
+        if decls.is_empty() {
+            return;
+        }
         client.push_str("\n// Type Definitions\n");
-        client.push_str("export interface User {\n");
-        client.push_str("  id: number;\n");
-        client.push_str("  name: string;\n");
-        client.push_str("  email: string;\n");
-        client.push_str("}\n");
+        for decl in decls.values() {
+            client.push_str(decl);
+            client.push('\n');
+        }
     }
 
     /// Generate TypeScript client and save to file
@@ -1024,5 +1032,16 @@ mod client_gen_tests {
         assert!(decls["Inner"].contains("flag: boolean"));
         assert!(decls["Outer"].contains("inner: Inner"));
         assert!(decls["Outer"].contains("items: Array<Inner>"));
+    }
+
+    #[test]
+    fn generated_client_has_no_hardcoded_user_interface() {
+        // A registry with no procedures must not invent a `User` interface.
+        let rpc = RpcRegistry::new();
+        let client = rpc.generate_typescript_client();
+        assert!(
+            !client.contains("export interface User"),
+            "hardcoded User interface leaked into output:\n{client}"
+        );
     }
 }
