@@ -81,7 +81,7 @@ middleware issues a random token in a (non-HttpOnly) cookie; on unsafe methods
 are compared in **constant time** (mismatch → 403). Safe methods are exempt.
 
 ```rust
-// Cargo.toml: ultimo = { version = "0.3", features = ["csrf"] }
+// Cargo.toml: ultimo = { version = "0.4", features = ["csrf"] }
 app.use_middleware(ultimo::csrf::csrf());
 
 // or customized:
