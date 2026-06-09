@@ -55,6 +55,9 @@ r2d2 = { version = "0.8", optional = true }
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3"
+# For client-gen integration tests: the TS derive expands to `::ts_rs` paths,
+# which an integration-test crate can only resolve via a dev-dependency.
+ts-rs = { workspace = true }
 tracing-subscriber = { workspace = true }
 proptest = "1.5"
 criterion = { version = "0.5", features = ["async_tokio"] }
