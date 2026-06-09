@@ -21,7 +21,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 validator = { workspace = true }
 multer = { workspace = true }
-ts-rs = { workspace = true }
+ts-rs = { workspace = true, optional = true }
 tracing = { workspace = true }
 bytes = { workspace = true }
 
@@ -91,6 +91,9 @@ static-files = ["dep:mime_guess"]
 
 # Response compression (gzip + brotli)
 compression = ["dep:flate2", "dep:brotli"]
+
+# TypeScript client generation — derive RPC client types from Rust types via ts-rs
+client-gen = ["dep:ts-rs"]
 
 # Database features
 database = []
