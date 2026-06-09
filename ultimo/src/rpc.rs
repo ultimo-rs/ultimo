@@ -63,6 +63,59 @@ pub struct ProcedureMetadata {
     pub is_query: bool, // true = GET (idempotent), false = POST (mutation)
 }
 
+/// Collect the TypeScript declarations of `T` and all of its transitive
+/// struct/enum dependencies into `out` (keyed by TS type name, so duplicates
+/// across procedures collapse). Primitives and containers (`number`,
+/// `Array<…>`, …) are walked for their inner types but never emitted as a
+/// declaration of their own.
+#[cfg(feature = "client-gen")]
+fn collect_type_decls<T: ts_rs::TS + 'static>(
+    out: &mut std::collections::BTreeMap<String, String>,
+) {
+    use std::any::TypeId;
+    use std::collections::HashSet;
+    use ts_rs::{Config, TypeVisitor, TS};
+
+    struct DeclCollector<'a> {
+        cfg: &'a Config,
+        seen: HashSet<TypeId>,
+        decls: &'a mut std::collections::BTreeMap<String, String>,
+    }
+
+    impl TypeVisitor for DeclCollector<'_> {
+        fn visit<U: TS + 'static + ?Sized>(&mut self) {
+            if !self.seen.insert(TypeId::of::<U>()) {
+                return; // already visited — also breaks recursive-type cycles
+            }
+            let name = U::name(self.cfg);
+            // Only named structs/enums get a `type X = …` declaration. Their
+            // names are bare identifiers (`User`), and their inline form (the
+            // `{ … }` body / union) differs from the name. Containers
+            // (`Array<…>`), tuples (`[…]`) and unions (`… | …`) are not bare
+            // identifiers; primitives (`number`) inline to their own name.
+            // ts-rs' `decl()` panics for non-declarable types, so we filter
+            // before calling it — but always recurse to reach inner types.
+            let is_named_type = name
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+            if is_named_type && U::inline(self.cfg) != name {
+                self.decls.insert(name, U::decl(self.cfg));
+            }
+            U::visit_dependencies(self); // always recurse into inner types
+        }
+    }
+
+    let cfg = Config::default();
+    let mut collector = DeclCollector {
+        cfg: &cfg,
+        seen: HashSet::new(),
+        decls: out,
+    };
+    <DeclCollector as TypeVisitor>::visit::<T>(&mut collector);
+}
+
 impl RpcRegistry {
     /// Create a new RPC registry with default JsonRpc mode
     pub fn new() -> Self {
@@ -925,5 +978,51 @@ mod tests {
         assert_eq!(names.len(), 2);
         assert!(names.contains(&"proc1".to_string()));
         assert!(names.contains(&"proc2".to_string()));
+    }
+}
+
+#[cfg(all(test, feature = "client-gen"))]
+mod client_gen_tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    #[derive(ts_rs::TS)]
+    #[allow(dead_code)]
+    struct Inner {
+        flag: bool,
+    }
+
+    #[derive(ts_rs::TS)]
+    #[allow(dead_code)]
+    struct Outer {
+        inner: Inner,
+        items: Vec<Inner>,
+        count: u32,
+    }
+
+    #[test]
+    fn collects_struct_and_nested_decls_but_not_primitives() {
+        let mut decls: BTreeMap<String, String> = BTreeMap::new();
+        collect_type_decls::<Outer>(&mut decls);
+
+        // Both named structs are present...
+        assert!(
+            decls.contains_key("Outer"),
+            "Outer missing: {:?}",
+            decls.keys()
+        );
+        assert!(
+            decls.contains_key("Inner"),
+            "Inner missing: {:?}",
+            decls.keys()
+        );
+        // ...and no primitive/container leaked in as a declaration.
+        assert!(!decls.contains_key("number"));
+        assert!(!decls.keys().any(|k| k.starts_with("Array")));
+
+        // The declarations are real `type X = {...}` strings.
+        assert!(decls["Inner"].contains("flag: boolean"));
+        assert!(decls["Outer"].contains("inner: Inner"));
+        assert!(decls["Outer"].contains("items: Array<Inner>"));
     }
 }
