@@ -88,7 +88,7 @@ TypeScript client — no hand-written types, no drift.
 
 ```bash
 # Generate a TypeScript client from your RPC definitions
-cargo run -p ultimo-cli -- generate --path ./src --output ./client
+cargo run -p ultimo-cli -- generate --project ./backend --output ./client
 ```
 
 ```typescript
@@ -126,12 +126,12 @@ ultimo = { version = "0.4", features = ["websocket", "jwt", "sqlx-postgres"] }
 ```bash
 cargo install ultimo-cli   # installs the `ultimo` binary
 
-ultimo new my-app --template fullstack         # scaffold a new project
-ultimo generate --path ./src --output ./client # generate the TypeScript client
-ultimo build --profile release                 # production build
+ultimo new my-app --template fullstack                 # scaffold a new project
+ultimo generate --project ./backend --output ./client  # generate the TypeScript client
 ```
 
-> `ultimo dev` (hot-reload dev server) is experimental — see the [roadmap](https://docs.ultimo.dev/roadmap).
+> `ultimo dev` and `ultimo build` are **not implemented yet** — use `cargo run` and
+> `cargo build --release` for now. See the [roadmap](https://docs.ultimo.dev/roadmap).
 
 ## Documentation
 

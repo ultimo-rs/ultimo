@@ -20,7 +20,7 @@ Verify installation:
 
 ```bash
 ultimo --version
-# ultimo 0.3.0
+# ultimo 0.4.1
 ```
 
 ## Commands
@@ -41,10 +41,14 @@ ultimo generate -p ./backend -o ./frontend/src/client.ts
 
 This command:
 
-1. Analyzes your Rust RPC definitions
-2. Extracts type information
-3. Generates a type-safe TypeScript client
-4. Writes it to the specified output file
+1. Builds the project at `--project` (`cargo build --release`)
+2. Locates the TypeScript client your app emits (call
+   `rpc.generate_client_file(path)` in your binary — see
+   [TypeScript Clients](/typescript))
+3. Copies it to the `--output` path
+
+> The client is produced by your app's RPC registry at build time, not by static
+> source analysis. A more integrated `generate` is on the roadmap.
 
 ### Example Output
 
@@ -203,77 +207,28 @@ Then use:
 ultimo generate  # Uses config file settings
 ```
 
+### Create a new project
+
+Scaffold a new Ultimo project:
+
+```bash
+ultimo new my-app --template fullstack
+```
+
+Available templates: `basic`, `fullstack`, `api-only`, `rpc`, `production`.
+
 ## Future Commands
 
-These commands are coming soon:
+> ⚠️ **Not implemented yet.** These commands exist as placeholders and currently
+> print a notice. The flags below are tentative sketches, not a stable interface.
+> Until they land, use the cargo equivalents.
 
-### New Project
-
-```bash
-# Create new Ultimo project
-ultimo new my-app --template fullstack
-
-# Templates available:
-# - api: REST API server
-# - rpc: RPC-only server
-# - fullstack: Backend + frontend
-# - minimal: Bare bones setup
-```
-
-### Development Server
-
-```bash
-# Start with hot reload
-ultimo dev --port 3000
-
-# Watch and restart on changes
-ultimo dev --watch
-
-# With frontend proxy
-ultimo dev --proxy http://localhost:5173
-```
-
-### Build
-
-```bash
-# Production build
-ultimo build --profile release
-
-# With optimizations
-ultimo build --profile release --strip --lto
-
-# Cross-compilation
-ultimo build --target x86_64-unknown-linux-musl
-```
-
-### Test
-
-```bash
-# Run all tests
-ultimo test
-
-# Run specific test
-ultimo test integration
-
-# With coverage
-ultimo test --coverage
-```
-
-### Format & Lint
-
-```bash
-# Format code
-ultimo fmt
-
-# Check formatting
-ultimo fmt --check
-
-# Run linter
-ultimo lint
-
-# Fix linting issues
-ultimo lint --fix
-```
+| Command | Status | Use instead |
+| --- | --- | --- |
+| `ultimo dev` | Planned (0.7.0) — file-watching dev server | `cargo run` |
+| `ultimo build` | Planned — production build wrapper | `cargo build --release` |
+| `ultimo test` | Not planned yet | `cargo test` |
+| `ultimo fmt` / `ultimo lint` | Not planned yet | `cargo fmt` / `cargo clippy` |
 
 ## CLI Help
 
