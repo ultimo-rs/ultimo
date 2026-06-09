@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-09
+
+### Added
+
+- **TypeScript client type derivation** (`client-gen` feature): RPC client types are now derived from your Rust types via `ts-rs`. `#[derive(TS)]` on your input/output structs and the generated client emits real `type X = {...}` declarations — no more hand-written type strings or dangling references. `ts_rs::TS` is re-exported as `ultimo::rpc::TS`. (#107)
+
+### Changed
+
+- **BREAKING:** `RpcRegistry::query` / `mutation` now take `(name, handler)` and derive their TypeScript input/output types from the Rust types (bounds `I: TS, O: TS`, gated behind `client-gen`). The previous string-typed signatures are preserved as `query_with_types` / `mutation_with_types`. (#107)
+- `ts-rs` is now an optional dependency behind `client-gen` (previously an unused hard dependency) and was upgraded 8.1 → 12. Default builds no longer pull it. (#107)
+- Removed the hardcoded `User` interface that was previously injected into every generated client. (#107)
+
 ## [0.4.1] - 2026-06-09
 
 ### Added
