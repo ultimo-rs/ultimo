@@ -118,7 +118,7 @@ Everything is opt-in (`default = []`):
 | `diesel-postgres` · `diesel-mysql` · `diesel-sqlite` | Diesel integration per backend |
 
 ```toml
-ultimo = { version = "0.5", features = ["websocket", "jwt", "sqlx-postgres"] }
+ultimo = { version = "0.4", features = ["websocket", "jwt", "sqlx-postgres"] }
 ```
 
 ## CLI
