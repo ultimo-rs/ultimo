@@ -2430,6 +2430,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "ts-rs",
  "ultimo",
 ]
 

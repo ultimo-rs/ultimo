@@ -44,23 +44,23 @@ export class UltimoRpcClient {
     return response.json();
   }
 
-  async listUsers(params: {}): Promise<{ users: User[]; total: number }> {
+  async listUsers(params: EmptyParams): Promise<UserListResponse> {
     return this.get('/listUsers', params);
   }
 
-  async getUserById(params: { id: number }): Promise<User> {
+  async getUserById(params: GetUserInput): Promise<User> {
     return this.get('/getUserById', params);
   }
 
-  async createUser(params: { name: string; email: string }): Promise<User> {
+  async createUser(params: CreateUserInput): Promise<User> {
     return this.post('/createUser', params);
   }
 
 }
 
 // Type Definitions
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-}
+type CreateUserInput = { name: string, email: string, };
+type EmptyParams = Record<symbol, never>;
+type GetUserInput = { id: number, };
+type User = { id: number, name: string, email: string, };
+type UserListResponse = { users: Array<User>, total: number, };
