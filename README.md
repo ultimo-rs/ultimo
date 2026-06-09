@@ -112,6 +112,7 @@ Everything is opt-in (`default = []`):
 | `csrf` | CSRF protection (double-submit cookie) |
 | `static-files` | Static file serving + SPA fallback (`serve_static`, `serve_spa`) |
 | `compression` | Automatic gzip/brotli response compression (pure Rust, no C deps) |
+| `client-gen` | Derive RPC client TypeScript types from Rust types (via `ts-rs`) |
 | `testing` | In-process `TestClient`, assertions, fixtures |
 | `test-helpers` | WebSocket test helpers (for integration tests) |
 | `sqlx-postgres` · `sqlx-mysql` · `sqlx-sqlite` | SQLx integration per backend |

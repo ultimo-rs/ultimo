@@ -876,6 +876,7 @@ All features are off by default (`default = []`).
 - `api-key` - API-key authentication with a pluggable store ([API-Key Authentication](/api-keys))
 - `static-files` - Static file serving + SPA fallback (`serve_static`, `serve_spa`) ([Static Files](/static-files))
 - `compression` - Automatic gzip/brotli response compression (`compression()`, `Compression`) ([Compression](/middleware#compression))
+- `client-gen` - Derive RPC client TypeScript types from Rust types via `ts-rs`; `query`/`mutation` infer types from `#[derive(TS)]` structs (string-typed `query_with_types`/`mutation_with_types` remain as escape hatches)
 - `testing` - Testing utilities: `TestClient`, assertions, helpers ([Testing](/testing))
 - `test-helpers` - WebSocket test helpers (for integration tests)
 - `sqlx-postgres` / `sqlx-mysql` / `sqlx-sqlite` - SQLx integration per backend

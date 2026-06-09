@@ -21,7 +21,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 validator = { workspace = true }
 multer = { workspace = true }
-ts-rs = { workspace = true }
+ts-rs = { workspace = true, optional = true }
 tracing = { workspace = true }
 bytes = { workspace = true }
 
@@ -55,6 +55,9 @@ r2d2 = { version = "0.8", optional = true }
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3"
+# For client-gen integration tests: the TS derive expands to `::ts_rs` paths,
+# which an integration-test crate can only resolve via a dev-dependency.
+ts-rs = { workspace = true }
 tracing-subscriber = { workspace = true }
 proptest = "1.5"
 criterion = { version = "0.5", features = ["async_tokio"] }
@@ -91,6 +94,9 @@ static-files = ["dep:mime_guess"]
 
 # Response compression (gzip + brotli)
 compression = ["dep:flate2", "dep:brotli"]
+
+# TypeScript client generation — derive RPC client types from Rust types via ts-rs
+client-gen = ["dep:ts-rs"]
 
 # Database features
 database = []
