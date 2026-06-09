@@ -79,8 +79,8 @@ Upcoming features and improvements planned for Ultimo.
 | Auth: authorization guards | ✅ Available    | 0.4.0   |
 | Benchmark Suite (criterion) | ✅ Available  | 0.4.0   |
 | Perf CI Regression Guard  | ✅ Available     | 0.4.0   |
-| Static Files + SPA Fallback | ✅ Available   | 0.5.0   |
-| Compression (gzip/brotli) | ✅ Available     | 0.5.0   |
+| Static Files + SPA Fallback | ✅ Available   | 0.4.1   |
+| Compression (gzip/brotli) | ✅ Available     | 0.4.1   |
 | Hot Reload                | 📋 Planned       | 0.5.0   |
 | Development Dashboard     | 📋 Planned       | 0.5.0   |
 | Multi-language Clients    | 📋 Planned       | 0.5.0   |
@@ -138,10 +138,13 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - ⚡ Published comparison vs axum / actix / hono / express / fastapi
 - ✅ `/performance` page with reproducible methodology + self-serve recipe
 
-### v0.5.0
+### v0.4.1
 
 - ✅ **Static file serving + SPA fallback** — `serve_static`, `serve_spa`, ETag caching, path-traversal protection (`static-files` feature)
 - ✅ **Response compression** — automatic brotli/gzip middleware, pure Rust, builder API (`compression` feature)
+
+### v0.5.0
+
 - Hot reload development mode
 - Development dashboard with live metrics and debugging tools
 - Multi-language client generation (Python/Go/Dart/Swift)
