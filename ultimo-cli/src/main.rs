@@ -40,14 +40,14 @@ enum Commands {
         template: String,
     },
 
-    /// Start development server with hot reload
+    /// [not implemented yet] Development server with hot reload (planned for 0.7.0)
     Dev {
         /// Port to run on
         #[arg(short, long, default_value = "3000")]
         port: u16,
     },
 
-    /// Build for production
+    /// [not implemented yet] Production build — use `cargo build --release` for now
     Build {
         /// Build profile (debug or release)
         #[arg(short, long, default_value = "release")]
@@ -73,18 +73,19 @@ async fn main() -> anyhow::Result<()> {
         Commands::New { name, template } => {
             new::run(name, template).await?;
         }
-        Commands::Dev { port } => {
+        Commands::Dev { port: _ } => {
             println!(
-                "🔥 Starting development server on port {}",
-                port.to_string().green()
+                "{}",
+                "`ultimo dev` is not implemented yet (planned for 0.7.0).".yellow()
             );
-            println!();
-            println!("{}", "Coming soon!".yellow());
+            println!("Run your app directly for now:  {}", "cargo run".cyan());
         }
-        Commands::Build { profile } => {
-            println!("🔨 Building with profile: {}", profile.green());
-            println!();
-            println!("{}", "Coming soon!".yellow());
+        Commands::Build { profile: _ } => {
+            println!("{}", "`ultimo build` is not implemented yet.".yellow());
+            println!(
+                "Build with cargo for now:  {}",
+                "cargo build --release".cyan()
+            );
         }
     }
 
