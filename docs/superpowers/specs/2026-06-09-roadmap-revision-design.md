@@ -67,6 +67,24 @@ a credible 1.0.
 - **0.9 → 1.0** — end-to-end typed errors, 1.0 stabilization (API freeze, docs
   completeness), **MCP server** *(if demand)*, **Python client** *(if demand)*.
 
+## Integrations theme (added)
+
+Same principle as everything else: a **generic capability in core + thin
+presets/adapters + cookbook guides**, never bundled vendor SDKs.
+
+- **Tier 1 (commit):** Frontend client adapters (TanStack Query / React hooks —
+  pulled to 0.6 as the differentiator); Auth providers (OIDC/JWKS verification +
+  presets for Clerk/Cognito/Auth0/Supabase, 0.7); Observability (OpenTelemetry +
+  Prometheus, 0.7); Redis (sessions · cache · rate-limit, 0.8).
+- **Tier 2 (demand-driven):** S3-compatible object storage; in-process
+  background tasks.
+- **Tier 3 (cookbook only, not framework code):** email (SMTP/Resend/Postmark),
+  payments (Stripe webhooks), vendor message queues.
+
+Per-vendor auth integrations (Clerk/Cognito/…) are intentionally NOT separate
+features — they collapse to one OIDC/JWKS verifier + provider presets. Better
+Auth is excluded (it's a TS-native backend, not a token issuer to verify).
+
 ## Out of scope
 
 This is a documentation change to `roadmap.mdx` (plus reconciling the Feature

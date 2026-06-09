@@ -10,6 +10,9 @@ a stable **1.0**.
 
 - 🧩 **Finish the codegen story** — scaffold `generate-client` into `ultimo new`
   templates; TypeScript docs/workflow rewrite; `ultimo generate --watch`.
+- ⚛️ **Frontend client adapters** — generate **TanStack Query / React hooks**
+  (and Svelte/Vue) from your RPC, not just a bare client — typed all the way
+  into the UI, with caching and invalidation.
 - 📡 **Typed RPC subscriptions / SSE** — server-push with event types derived
   from your Rust types (tRPC-style subscriptions, in Rust).
 - ❗ **End-to-end typed errors** — RPC errors surfaced as typed results in the
@@ -35,6 +38,27 @@ a stable **1.0**.
 - ⏱️ **Request timeouts** + **HTTP graceful shutdown** (WebSocket graceful
   shutdown already ships).
 - 🔄 **Hot reload** — `ultimo dev` with file-watching auto-restart.
+
+### Integrations
+
+One principle throughout: a **generic capability in core**, plus **thin presets
+/ adapters** and **cookbook guides** — never bundled vendor SDKs (which bloat
+dependencies and rot as each vendor's API changes).
+
+- 🔑 **Auth providers (OIDC/JWKS)** — verify RS256/ES256 JWTs against a
+  provider's JWKS endpoint (caching + key rotation, `iss`/`aud` validation),
+  with presets/guides for Clerk, Cognito, Auth0, Supabase, WorkOS, Keycloak.
+  Extends the `jwt` feature.
+- 📈 **Observability** — OpenTelemetry traces + metrics, and a Prometheus
+  endpoint (built on the `tracing` already used internally).
+- 🧰 **Redis** — one integration backing sessions, the rate-limit store, and
+  response/data caching.
+- 🗄️ **S3-compatible object storage** — pairs with the existing multipart
+  upload support (demand-driven).
+- ⚙️ **Background tasks** — in-process Tokio job spawning (demand-driven).
+
+> Cookbook guides only (app-layer, not framework code): email
+> (SMTP/Resend/Postmark), payments (Stripe webhooks), and vendor message queues.
 
 ### Toward 1.0
 
@@ -81,18 +105,23 @@ a stable **1.0**.
 | Compression (gzip/brotli) | ✅ Available     | 0.4.1   |
 | TypeScript Type Derivation (`client-gen`) | ✅ Available | 0.5.0 |
 | `ultimo generate` (runs generate-client) | ✅ Available | 0.5.0 |
+| Codegen: `ultimo new` scaffold + `--watch` | 📋 Planned | 0.6.0 |
+| Frontend Client Adapters (TanStack Query / hooks) | 📋 Planned | 0.6.0 |
 | Deployment Guides         | 📋 Planned       | 0.6.0   |
 | Advanced Rate Limiting    | 📋 Planned       | 0.6.0   |
-| Codegen: `ultimo new` scaffold + `--watch` | 📋 Planned | 0.6.0 |
 | Typed RPC Subscriptions / SSE | 📋 Planned   | 0.7.0   |
 | OAuth2                    | 📋 Planned       | 0.7.0   |
+| Auth Providers (OIDC/JWKS + presets) | 📋 Planned | 0.7.0 |
+| Observability (OpenTelemetry + Prometheus) | 📋 Planned | 0.7.0 |
 | Streaming Responses       | 📋 Planned       | 0.7.0   |
 | Request Timeouts + HTTP Graceful Shutdown | 📋 Planned | 0.7.0 |
-| Redis Sessions            | 📋 Planned       | 0.8.0   |
+| Redis (sessions · cache · rate-limit) | 📋 Planned | 0.8.0 |
 | WebSocket Compression     | 📋 Planned       | 0.8.0   |
 | Hot Reload (`ultimo dev`) | 📋 Planned       | 0.8.0   |
 | `#[derive(UltimoType)]`   | 📋 Planned       | 0.8.0   |
 | End-to-end Typed Errors   | 📋 Planned       | 0.9.0   |
+| S3-compatible Storage     | 💡 Demand-driven | post-1.0 |
+| Background Tasks          | 💡 Demand-driven | post-1.0 |
 | MCP Server                | 💡 Demand-driven | post-1.0 |
 | Python Client Generation  | 💡 Demand-driven | post-1.0 |
 
@@ -167,19 +196,23 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
 - Codegen: scaffold `generate-client` into `ultimo new` templates; TypeScript
   docs rewrite; `ultimo generate --watch`
+- **Frontend client adapters** — TanStack Query / React hooks (and Svelte/Vue)
 - Deployment guides (Docker, Fly.io/Railway, AWS, DigitalOcean, Azure, GCR, K8s)
 - Advanced rate limiting (per-user, per-endpoint)
 
-### v0.7.0 — Real-time & production gaps
+### v0.7.0 — Real-time, auth, & production gaps
 
 - Typed RPC subscriptions / SSE (derived event types)
 - OAuth2 provider integration
+- **Auth providers (OIDC/JWKS)** — RS256/ES256 + remote JWKS, presets for
+  Clerk / Cognito / Auth0 / Supabase
+- **Observability** — OpenTelemetry traces + metrics, Prometheus endpoint
 - Streaming responses
 - Request timeouts + HTTP graceful shutdown
 
 ### v0.8.0 — Distribution & dev experience
 
-- Redis sessions (distributed storage)
+- **Redis integration** — sessions, cache, and rate-limit store (one dependency)
 - WebSocket compression (per-message deflate)
 - Hot reload (`ultimo dev`)
 - `#[derive(UltimoType)]` (drop the `ts-rs` dependency papercut)
@@ -190,7 +223,8 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - Public-API audit + SemVer freeze
 - Documentation completeness
 - Production battle-testing
-- _(Demand-driven: MCP server, Python client generation)_
+- _(Demand-driven: S3-compatible storage, background tasks, MCP server, Python
+  client generation)_
 
 ## Contributing
 
