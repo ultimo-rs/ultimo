@@ -52,6 +52,11 @@ jobs:
       - name: clippy (static-files + compression, lib)
         run: cargo clippy -p ultimo --lib --features "static-files,compression" -- -D warnings
 
+      # client-gen (ts-rs TypeScript client derivation). Lint lib only for the
+      # same reason as above.
+      - name: clippy (client-gen, lib)
+        run: cargo clippy -p ultimo --lib --features "client-gen" -- -D warnings
+
   # ── Unit + integration tests (no DB system deps) ──────────────────────
   test:
     name: test (${{ matrix.os }})
@@ -120,6 +125,14 @@ jobs:
       # Vary header, double-compress guard, and builder min_size override.
       - name: Compression tests (compression feature)
         run: cargo test -p ultimo --features "compression" --test compression
+
+      # TypeScript client generation (ts-rs type derivation). Covers the decl
+      # collector, derived query/mutation, and the golden-file client test.
+      - name: Client-gen tests (client-gen feature)
+        run: |
+          cargo test -p ultimo --features "client-gen" --lib client_gen_tests
+          cargo test -p ultimo --features "client-gen" --test client_gen
+          cargo build -p rpc-modes
 
       # websocket_pubsub_bench uses test_helpers::ChannelManager, so benches
       # need test-helpers in addition to websocket.
