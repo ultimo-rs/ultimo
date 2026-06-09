@@ -7,6 +7,7 @@ mod new;
 
 #[derive(Parser)]
 #[command(name = "ultimo")]
+#[command(version)]
 #[command(about = "Ultimo Framework CLI - Build modern Rust web applications", long_about = None)]
 struct Cli {
     #[command(subcommand)]
