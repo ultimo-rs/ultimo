@@ -9,6 +9,7 @@
     <a href="https://github.com/ultimo-rs/ultimo/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License" /></a>
     <a href="https://github.com/ultimo-rs/ultimo/actions"><img src="https://img.shields.io/github/actions/workflow/status/ultimo-rs/ultimo/ci.yml?branch=main&style=flat-square" alt="Build Status" /></a>
     <a href="https://github.com/ultimo-rs/ultimo/blob/main/SECURITY.md"><img src="https://img.shields.io/badge/unsafe-forbidden-success.svg?style=flat-square" alt="Unsafe forbidden" /></a>
+    <a href="https://deps.rs/repo/github/ultimo-rs/ultimo"><img src="https://deps.rs/repo/github/ultimo-rs/ultimo/status.svg?style=flat-square" alt="Dependency status" /></a>
     <img src="https://img.shields.io/badge/MSRV-1.86-blue.svg?style=flat-square" alt="MSRV 1.86" />
   </p>
 
