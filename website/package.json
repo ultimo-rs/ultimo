@@ -59,6 +59,7 @@
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.4",
     "rehype-pretty-code": "^0.14.3",
+    "rehype-slug": "^6.0.0",
     "shiki": "^4.2.0",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.5.5",

@@ -8,9 +8,9 @@ tags: ["tutorial", "getting-started", "api"]
 
 # Build Your First API with Ultimo in 10 Minutes
 
-Ultimo lets you build REST and JSON-RPC APIs in Rust with automatic TypeScript client generation. In this tutorial, you'll create a fully functional Todo API, expose it via both REST and JSON-RPC, and generate a typed TypeScript client that a frontend can consume immediately.
+Ultimo lets you build REST and JSON-RPC APIs in [Rust](https://www.rust-lang.org) with automatic [TypeScript](https://www.typescriptlang.org) client generation. In this tutorial, you'll create a fully functional Todo API, expose it via both REST and JSON-RPC, and generate a typed TypeScript client that a frontend can consume immediately.
 
-By the end, you'll have a running API server, curl commands to test it, and a generated TypeScript client ready to drop into any React, Vue, or Svelte project.
+By the end, you'll have a running API server, curl commands to test it, and a [generated TypeScript client](/blog/how-typescript-codegen-works) ready to drop into any React, Vue, or Svelte project.
 
 ## Prerequisites
 
@@ -62,11 +62,11 @@ serde_json = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 ```
 
-Run `cargo build` to fetch dependencies. This will take a moment on the first run as it compiles Ultimo and its dependencies.
+Run `cargo build` to fetch dependencies — the [ultimo crate](https://crates.io/crates/ultimo) and its transitive deps. This will take a moment on the first run as it compiles Ultimo and its dependencies.
 
 ## Step 3: Define Your Data Types
 
-Open `src/main.rs` and start by defining the data structures for our Todo API. Ultimo uses standard Serde derives plus its own `TS` derive macro for TypeScript generation:
+Open `src/main.rs` and start by defining the data structures for our Todo API. Ultimo uses standard [Serde](https://serde.rs) derives plus its own `TS` derive macro for [TypeScript generation](/blog/how-typescript-codegen-works):
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -203,7 +203,7 @@ Each handler follows the same pattern: extract state, parse input, perform logic
 
 ## Step 5: Add JSON-RPC Endpoints
 
-One of Ultimo's standout features is serving JSON-RPC alongside REST from the same application. JSON-RPC is ideal for frontend clients because it uses a single endpoint and maps cleanly to generated TypeScript functions.
+One of Ultimo's [standout features](/features) is serving JSON-RPC alongside REST from the same application. JSON-RPC is ideal for frontend clients because it uses a single endpoint and maps cleanly to generated TypeScript functions.
 
 Define an RPC registry with query (read) and mutation (write) methods:
 
@@ -296,7 +296,7 @@ async fn main() -> Result<()> {
 }
 ```
 
-The `Ultimo` builder chains everything together: shared state, RPC registry, REST routes, and middleware. The JSON-RPC endpoint is automatically mounted at `/rpc` when you attach an `RpcRegistry`.
+The `Ultimo` builder chains everything together: shared state, RPC registry, REST routes, and middleware — all running on [Tokio](https://tokio.rs). The [JSON-RPC](https://developer.mozilla.org/en-US/docs/Web/HTTP) endpoint is automatically mounted at `/rpc` when you attach an `RpcRegistry`.
 
 ## Step 7: Run and Test
 
@@ -362,7 +362,7 @@ Response:
 
 ## Step 8: Generate the TypeScript Client
 
-This is where Ultimo truly shines. Run the CLI generator to produce a fully typed TypeScript client from your Rust API:
+This is where Ultimo truly shines. Run the CLI generator to produce a [fully typed TypeScript client](/blog/how-typescript-codegen-works) from your Rust API:
 
 ```bash
 ultimo generate --path ./src --output ./client
@@ -457,7 +457,7 @@ const updated = await api.todosToggle({ id: newTodo.id });
 console.log(updated.completed); // true
 ```
 
-No manual API wiring, no fetch boilerplate, no type mismatches between frontend and backend. Change a field in your Rust struct, re-run `ultimo generate`, and the TypeScript compiler immediately flags any frontend code that uses the old shape.
+No manual API wiring, no fetch boilerplate, no type mismatches between frontend and backend — a key advantage if you're [choosing between Rust frameworks](/blog/ultimo-vs-axum-comparison). Change a field in your Rust struct, re-run `ultimo generate`, and the TypeScript compiler immediately flags any frontend code that uses the old shape.
 
 For continuous development, use watch mode:
 
@@ -469,7 +469,7 @@ This regenerates the client whenever your Rust source files change.
 
 ## Step 10: Add Middleware
 
-Ultimo ships with built-in middleware for common needs. You already saw `Logger` and `Cors` in the main function. Here's how to add more:
+Ultimo ships with [built-in middleware](/features) for common needs. You already saw `Logger` and `Cors` in the main function. Here's how to add more:
 
 ```rust
 use ultimo::middleware::{Logger, Cors, RateLimit, SecurityHeaders};
@@ -676,17 +676,17 @@ async fn main() -> Result<()> {
 
 You now have a working API with both REST and JSON-RPC interfaces, plus a generated TypeScript client. Here's where to go from here:
 
-- **Add a database** — Ultimo supports SQLx (Postgres, MySQL, SQLite) and Diesel out of the box. Enable the `sqlx-sqlite` feature and replace the in-memory `Vec` with a real database. See the [database guide](https://docs.ultimo.dev/database).
+- **Add a database** — Ultimo supports SQLx (Postgres, MySQL, SQLite) and Diesel out of the box. Enable the `sqlx-sqlite` feature and replace the in-memory `Vec` with a real database. See the [database guide](https://docs.ultimo.dev/database) in the [API documentation](https://docs.ultimo.dev).
 
-- **Add authentication** — Use JWT tokens or API keys with Ultimo's auth guards. The `jwt-auth` example in the repository shows the full pattern including token issuance, validation middleware, and protected routes.
+- **Add authentication** — Use JWT tokens or API keys with Ultimo's auth guards. The `jwt-auth` example in the [repository](https://github.com/ultimo-rs/ultimo/tree/main/examples/jwt-auth) shows the full pattern including token issuance, validation middleware, and protected routes.
 
 - **Add WebSocket** — Enable the `websocket` feature for real-time updates. Ultimo's pub/sub system lets you broadcast todo changes to connected clients with just a few lines of code.
 
 - **Add validation** — Use Ultimo's `validate` function to enforce constraints on request bodies before processing them.
 
-- **Deploy** — Ultimo compiles to a single static binary. Build with `ultimo build --profile release`, copy the binary to your server, and run it. No runtime dependencies needed.
+- **Deploy** — Ultimo compiles to a single static binary. Build with `ultimo build --profile release`, copy the binary to your server, and run it. No runtime dependencies needed. If you're coming from another framework, the [migration guide](/blog/migrating-from-axum-to-ultimo) covers common patterns.
 
-Check out the [full documentation](https://docs.ultimo.dev) and the [examples directory](https://github.com/ultimo-rs/ultimo/tree/main/examples) for more patterns and real-world usage.
+Check out the [full documentation](https://docs.ultimo.dev) and the [examples directory](https://github.com/ultimo-rs/ultimo/tree/main/examples) for more patterns and real-world usage. Also see [what's new in v0.5.0](/blog/introducing-ultimo-v0-5) for the latest additions.
 
 ---
 

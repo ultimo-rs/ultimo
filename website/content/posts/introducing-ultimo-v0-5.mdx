@@ -8,7 +8,7 @@ tags: ["release", "typescript", "rpc"]
 
 # Introducing Ultimo v0.5.0: Derive Your TypeScript Types from Rust
 
-Every full-stack Rust developer knows the pain: you change a field in your Rust struct, forget to update the TypeScript interface, and your frontend silently breaks at runtime. Ultimo v0.5.0 eliminates that entire class of bugs by deriving your TypeScript types directly from Rust — at compile time, with zero runtime cost.
+Every full-stack [Rust](https://www.rust-lang.org) developer knows the pain: you change a field in your Rust struct, forget to update the [TypeScript](https://www.typescriptlang.org) interface, and your frontend silently breaks at runtime. Ultimo v0.5.0 eliminates that entire class of bugs by deriving your TypeScript types directly from Rust — at compile time, with zero runtime cost.
 
 This release also ships static file serving, response compression, and a streamlined RPC registration API. Let's dig in.
 
@@ -45,7 +45,7 @@ Ultimo v0.5.0 integrates [ts-rs](https://github.com/Aleph-Alpha/ts-rs) (upgraded
 
 1. Derive `TS` on your input/output structs.
 2. Register handlers with `query` or `mutation` — types are inferred automatically.
-3. Run `ultimo generate` — the emitted TypeScript client includes real type declarations derived from your Rust code.
+3. Run `ultimo generate` — the emitted [TypeScript client](/blog/how-typescript-codegen-works) includes real type declarations derived from your Rust code.
 
 ```rust
 use ultimo::prelude::*;
@@ -112,7 +112,7 @@ The `client-gen` feature is opt-in. Add it to your `Cargo.toml`:
 ultimo = { version = "0.5", features = ["client-gen"] }
 ```
 
-This pulls in `ts-rs` as a dependency and re-exports the `TS` derive macro as `ultimo::rpc::TS`. If you don't use TypeScript client generation, you pay nothing — `ts-rs` is no longer a hard dependency.
+This pulls in [`ts-rs`](https://github.com/Aleph-Alpha/ts-rs) as a dependency and re-exports the `TS` derive macro as `ultimo::rpc::TS`. If you don't use TypeScript client generation, you pay nothing — `ts-rs` is no longer a hard dependency.
 
 ## Type Mapping: Rust → TypeScript
 
@@ -261,7 +261,7 @@ Here's what happens at each stage:
 - **Code generation time:** `ultimo generate` reads the `TS` impls and writes `.ts` files. This is a one-shot CLI operation, not part of your server's hot path.
 - **Runtime:** Zero cost. The `TS` trait is never invoked during request handling. Your handler's type signature is the same `Fn(Context, RpcRequest) -> Future<RpcResponse>` it always was.
 
-Benchmarks confirm no measurable regression. Our standard JSON-RPC throughput test (10,000 concurrent requests, 1KB payloads) shows identical numbers between v0.4.x and v0.5.0:
+[Benchmarks](/blog/ultimo-vs-axum-comparison) confirm no measurable regression. Our standard JSON-RPC throughput test (10,000 concurrent requests, 1KB payloads) shows identical numbers between v0.4.x and v0.5.0:
 
 ```bash
 # v0.4.1 baseline
@@ -277,7 +277,7 @@ The variance is within noise. Type derivation is purely a developer-experience i
 
 ## Putting It All Together
 
-Here's a complete example combining the new features — a typed RPC API with static file serving and compression:
+Here's a [complete example](/blog/build-your-first-api-with-ultimo) combining the new features — a typed RPC API with static file serving and compression:
 
 ```rust
 use ultimo::prelude::*;
@@ -325,7 +325,7 @@ async fn main() {
 }
 ```
 
-Generate your TypeScript client:
+Generate your [TypeScript client](/blog/how-typescript-codegen-works):
 
 ```bash
 cargo run -p ultimo-cli -- generate --path ./src --output ./frontend/src/api
@@ -364,14 +364,14 @@ The only breaking change is the `query`/`mutation` method signature. If you're u
 
 ## What's Next
 
-Ultimo v0.5.0 completes the core developer experience story: you write Rust structs once, and both your server and your TypeScript client understand the same types. Looking ahead:
+Ultimo v0.5.0 completes the [core developer experience](/features) story: you write Rust structs once, and both your server and your TypeScript client understand the same types. Looking ahead:
 
 - **v0.5.x patches:** Multi-language client generation (Python, Swift, Kotlin) using the same `TS` trait infrastructure generalized to other targets.
 - **v0.6.0:** MCP server for AI-assisted development — let your editor understand your Ultimo API surface natively.
-- **v1.0.0:** Stable API commitment, complete documentation, and production deployment guides.
+- **v1.0.0:** Stable API commitment, [complete documentation](https://docs.ultimo.dev), and production deployment guides.
 
 We're building Ultimo to be the framework where Rust's type system isn't just a backend luxury — it's a full-stack guarantee. v0.5.0 is the release that makes that real.
 
 ---
 
-**Get started:** [docs.ultimo.dev](https://docs.ultimo.dev) · **Source:** [github.com/ultimo-rs/ultimo](https://github.com/ultimo-rs/ultimo) · **Install:** `cargo add ultimo`
+**Get started:** [Build your first API](/blog/build-your-first-api-with-ultimo) · **Docs:** [docs.ultimo.dev](https://docs.ultimo.dev) · **Source:** [github.com/ultimo-rs/ultimo](https://github.com/ultimo-rs/ultimo) · **Install:** [`cargo add ultimo`](https://crates.io/crates/ultimo)

@@ -8,7 +8,7 @@ tags: ["architecture", "typescript", "deep-dive"]
 
 # How TypeScript Codegen Works in Ultimo
 
-One of Ultimo's most powerful features is automatic TypeScript client generation. You define your API types in Rust, register your RPC methods, run a single CLI command, and get a fully typed TypeScript client — no manual schema writing, no drift between server and client, no runtime validation overhead.
+One of Ultimo's most powerful [features](/features) is automatic [TypeScript](https://www.typescriptlang.org) client generation. You define your API types in [Rust](https://www.rust-lang.org), register your RPC methods, run a single CLI command, and get a fully typed TypeScript client — no manual schema writing, no drift between server and client, no runtime validation overhead.
 
 This post walks through the entire pipeline, from the proc macros that extract type metadata to the final `.ts` file your frontend imports. By the end, you'll understand every stage of the process and the design decisions behind it.
 
@@ -54,7 +54,7 @@ Each stage is independently testable and designed to fail loudly at compile time
 
 ## Step 1: Type Metadata via ts-rs
 
-The foundation of Ultimo's codegen is [ts-rs](https://github.com/Aleph-Alpha/ts-rs) v12, a procedural macro crate that derives TypeScript type definitions from Rust types at compile time.
+The foundation of Ultimo's codegen is [ts-rs](https://github.com/Aleph-Alpha/ts-rs) v12, a [procedural macro](https://doc.rust-lang.org/book/ch19-06-macros.html) crate that derives TypeScript type definitions from Rust types at compile time.
 
 When you annotate a struct with `#[derive(TS)]`, the proc macro generates an implementation of the `TS` trait:
 
@@ -92,7 +92,7 @@ Because the derive macro runs during compilation, type errors surface immediatel
 
 ## Step 2: The RPC Registry
 
-Ultimo's `RpcRegistry` is the bridge between your handler functions and the code generator. When you register an RPC method, the registry captures everything needed to generate the client:
+Ultimo's `RpcRegistry` is the bridge between your handler functions and the code generator. When you [register an RPC method](/blog/build-your-first-api-with-ultimo), the registry captures everything needed to generate the client:
 
 ```rust
 use ultimo::prelude::*;
@@ -399,7 +399,7 @@ This starts a file watcher (using `notify` v6) that monitors your Rust source fi
 3. Diffs against the current generated output
 4. Writes the file only if the output actually changed (avoids triggering unnecessary frontend HMR)
 
-The typical dev workflow looks like:
+The typical [dev workflow](/blog/build-your-first-api-with-ultimo) looks like:
 
 ```bash
 # Terminal 1: Ultimo dev server with hot reload
@@ -412,7 +412,7 @@ ultimo generate --path ./src --output ./frontend/src/api.ts --watch
 npm run dev
 ```
 
-Change a Rust struct → client regenerates in ~200ms (incremental) → TypeScript compiler catches any frontend breakage → fix it → full-stack type safety maintained continuously.
+Change a Rust struct → client regenerates in ~200ms (incremental) → TypeScript compiler catches any frontend breakage → fix it → [full-stack type safety](https://docs.ultimo.dev) maintained continuously.
 
 ## Design Decisions
 
@@ -420,7 +420,7 @@ Change a Rust struct → client regenerates in ~200ms (incremental) → TypeScri
 
 We evaluated three approaches for extracting TypeScript types from Rust:
 
-1. **Custom proc macro** — Full control but enormous maintenance burden. Handling every serde attribute, generic bound, and edge case means reimplementing what ts-rs already does.
+1. **Custom proc macro** — Full control but enormous maintenance burden. Handling every [serde](https://serde.rs) attribute, generic bound, and edge case means reimplementing what ts-rs already does.
 2. **ts-rs** — Battle-tested (500+ stars, active maintenance), handles serde attributes correctly, produces idiomatic TypeScript. The trait-based API (`name()`, `inline()`, `dependencies()`) is exactly what a code generator needs.
 3. **specta** — Similar goals but tightly coupled to its own framework ecosystem. ts-rs is more standalone.
 
@@ -430,11 +430,11 @@ We chose ts-rs because it gives us accurate TypeScript from Rust types with zero
 
 OpenAPI (Swagger) is the industry standard for REST API documentation and client generation. We considered generating an OpenAPI spec and using existing tools (openapi-generator, orval) to produce the client. We rejected this for several reasons:
 
-- **JSON-RPC doesn't map cleanly to OpenAPI.** OpenAPI models resources with HTTP methods; JSON-RPC models procedures. Forcing RPC into REST semantics loses information.
+- **[JSON-RPC](https://www.json.org) doesn't map cleanly to OpenAPI.** OpenAPI models resources with HTTP methods; JSON-RPC models procedures. Forcing RPC into REST semantics loses information.
 - **Extra indirection.** Rust → OpenAPI YAML → TypeScript means two translation steps where types can drift or lose fidelity. Rust → TypeScript directly is one step.
 - **Generic client generators produce generic code.** Tools like openapi-generator emit verbose, framework-specific clients. Our generated code is minimal and framework-agnostic.
 
-That said, Ultimo does support OpenAPI for its REST routes — it's just not the path for RPC client generation.
+That said, Ultimo does support [OpenAPI for its REST routes](/features) — it's just not the path for RPC client generation.
 
 ### Why Not Protobuf/gRPC?
 
@@ -445,7 +445,7 @@ Protocol Buffers require a separate `.proto` schema language. This means:
 - Frontend developers need protobuf tooling (protoc, grpc-web)
 - The wire format is binary, making debugging harder without specialized tools
 
-Ultimo's approach keeps Rust structs as the single source of truth. There's no separate schema to maintain, no binary wire format to debug, and the generated client uses plain JSON over HTTP — debuggable with `curl` and browser DevTools.
+[Ultimo](https://crates.io/crates/ultimo)'s approach keeps Rust structs as the single source of truth. There's no separate schema to maintain, no binary wire format to debug, and the generated client uses plain JSON over HTTP — debuggable with `curl` and browser DevTools.
 
 ## Limitations and Edge Cases
 
@@ -493,7 +493,7 @@ Enums with many variants generate correspondingly large TypeScript unions. For e
 
 ## Future Plans
 
-The current pipeline is production-ready for TypeScript, but we're planning extensions:
+The current pipeline is [production-ready](/blog/introducing-ultimo-v0-5) for TypeScript, but we're planning extensions:
 
 - **Multi-language codegen** — The RPC registry's metadata is language-agnostic. Adding Dart, Kotlin, or Swift generators requires only a new emitter backend, not changes to the registry or metadata extraction.
 - **SDK-style clients** — Beyond bare functions, generate clients with built-in retry logic, request deduplication, optimistic updates, and cache invalidation based on the query/mutation distinction.
@@ -502,7 +502,7 @@ The current pipeline is production-ready for TypeScript, but we're planning exte
 
 ## Summary
 
-Ultimo's TypeScript codegen pipeline is a four-stage process built on a simple insight: if the Rust compiler already knows your types, there's no reason to describe them again in another language.
+[Ultimo's](https://github.com/ultimo-rs/ultimo) TypeScript codegen pipeline is a four-stage process built on a simple insight: if the Rust compiler already knows your types, there's no reason to describe them again in another language.
 
 1. **`#[derive(TS)]`** extracts type metadata at compile time via the ts-rs crate
 2. **The RPC Registry** captures method names, type definitions, and query/mutation semantics at registration time
