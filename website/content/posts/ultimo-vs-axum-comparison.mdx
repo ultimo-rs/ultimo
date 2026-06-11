@@ -1,0 +1,388 @@
+---
+title: "Ultimo vs Axum: A Practical Comparison for 2026"
+description: "An honest feature-by-feature comparison of Ultimo and Axum — covering performance, developer experience, type safety, ecosystem, and when to choose each Rust web framework."
+date: "2026-06-08"
+author: "Ultimo Team"
+tags: ["comparison", "axum", "rust"]
+---
+
+# Ultimo vs Axum: A Practical Comparison for 2026
+
+If you're building a web service in [Rust](https://www.rust-lang.org) in 2026, you've likely narrowed your choices to a handful of frameworks. Two that frequently appear side-by-side are **[Axum](https://github.com/tokio-rs/axum)** and **Ultimo**. Both are built on **[Hyper](https://hyper.rs) 1.0 + [Tokio](https://tokio.rs)**, both prioritize type safety, and both produce extremely fast HTTP services. But they take fundamentally different approaches to developer experience, abstraction, and what belongs "in the box."
+
+This post is an honest, feature-by-feature comparison. We build Ultimo, so we obviously believe in its approach — but we also genuinely respect Axum and use it ourselves in certain contexts. Our goal isn't to declare a winner; it's to help you choose the right tool for *your* project.
+
+## Architecture: Same Engine, Different Chassis
+
+Under the hood, Ultimo and Axum share the same async runtime stack:
+
+- **[Tokio](https://tokio.rs)** for the async executor and I/O primitives
+- **[Hyper](https://hyper.rs) 1.0** for the HTTP/1.1 and HTTP/2 implementation
+- **[Tower](https://docs.rs/tower)** (Axum) or function-based middleware (Ultimo) for the middleware layer
+
+Because the performance-critical layer — connection handling, request parsing, response serialization — is identical between the two, raw throughput differences are negligible. The frameworks diverge in what they build *on top* of that shared core.
+
+**Axum** follows a composition-first philosophy. It provides minimal built-in functionality and relies on the Tower ecosystem for middleware, the broader crate ecosystem for sessions/auth/CSRF, and extractors for type-safe request parsing. This makes Axum extremely flexible — you can swap almost any component.
+
+**Ultimo** follows a batteries-included philosophy. It ships sessions, CSRF protection, JWT authentication, API-key auth, authorization guards, WebSocket pub/sub, JSON-RPC, [TypeScript client generation](/blog/how-typescript-codegen-works), and OpenAPI spec generation as [integrated features](/features). The tradeoff is less flexibility in exchange for less boilerplate and guaranteed component interoperability.
+
+## Performance: Effectively Identical
+
+Let's address the elephant in the room: **performance between Ultimo and Axum is nearly identical.** This isn't marketing spin — it's a direct consequence of sharing the same Hyper + Tokio core.
+
+In our benchmarks (available in the [repository under `examples/benchmark/`](https://github.com/ultimo-rs/ultimo/tree/main/examples/benchmark)), both frameworks handle **150,000+ requests/second** on commodity hardware for simple JSON responses. The differences fall within measurement noise — typically less than 3%.
+
+Where minor differences appear:
+
+- **Routing lookup**: Ultimo uses O(1) hash-based routing; Axum uses a trie. For applications with hundreds of routes, Ultimo's lookup is marginally faster. For typical applications (10-50 routes), the difference is unmeasurable.
+- **Middleware overhead**: Axum's Tower layers add a thin abstraction layer per middleware. Ultimo's function-based middleware is slightly leaner. In practice, your database query will dominate latency by 1000x regardless.
+
+**Bottom line:** Don't choose between these frameworks based on performance. Choose based on developer experience, features, and ecosystem fit.
+
+## Developer Experience: Hello World
+
+Let's start with the simplest possible comparison — a JSON API endpoint.
+
+**Ultimo:**
+
+```rust
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let app = Ultimo::new()
+        .get("/hello", hello)
+        .build();
+
+    app.listen("127.0.0.1:3000").await
+}
+
+async fn hello(ctx: Context) -> Result<impl Into<Response>> {
+    ctx.json(serde_json::json!({ "message": "Hello, world!" }))
+}
+```
+
+**Axum:**
+
+```rust
+use axum::{routing::get, Json, Router};
+use serde_json::{json, Value};
+
+#[tokio::main]
+async fn main() {
+    let app = Router::new()
+        .route("/hello", get(hello));
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+        .await
+        .unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+
+async fn hello() -> Json<Value> {
+    Json(json!({ "message": "Hello, world!" }))
+}
+```
+
+Both are concise and readable. Axum's version is slightly more explicit about the listener setup, while Ultimo wraps that into `.listen()`. The real differences emerge as applications grow in complexity.
+
+## Routing
+
+**Ultimo** uses O(1) hash-map routing with method-based registration:
+
+```rust
+let app = Ultimo::new()
+    .get("/users", list_users)
+    .get("/users/:id", get_user)
+    .post("/users", create_user)
+    .delete("/users/:id", delete_user)
+    .build();
+```
+
+**Axum** uses a trie-based router with method routing:
+
+```rust
+let app = Router::new()
+    .route("/users", get(list_users).post(create_user))
+    .route("/users/:id", get(get_user).delete(delete_user));
+```
+
+Axum's router is more flexible — it supports nested routers, fallback handlers, and complex route composition patterns natively. Ultimo's router is simpler and marginally faster for large route tables, but offers fewer composition primitives.
+
+## Request Handling: Context vs Extractors
+
+This is where the philosophical split is most visible.
+
+**Ultimo's Context pattern** — every handler receives a single `Context` object that provides access to everything:
+
+```rust
+async fn create_user(ctx: Context) -> Result<impl Into<Response>> {
+    let body: CreateUserRequest = ctx.parse_json().await?;
+    let db = ctx.state::<DbPool>()?;
+    let auth = ctx.auth()?;
+
+    // Business logic...
+    ctx.json_with_status(201, user)
+}
+```
+
+**Axum's Extractor pattern** — request data is extracted via function parameters:
+
+```rust
+async fn create_user(
+    State(pool): State<DbPool>,
+    Extension(auth): Extension<AuthUser>,
+    Json(body): Json<CreateUserRequest>,
+) -> impl IntoResponse {
+    // Business logic...
+    (StatusCode::CREATED, Json(user))
+}
+```
+
+### Tradeoffs
+
+| Aspect | Ultimo (Context) | Axum (Extractors) |
+|--------|-----------------|-------------------|
+| **Compile-time checking** | Runtime access | Compile-time type checking via generics |
+| **Discoverability** | IDE autocomplete on `ctx.` | Must know available extractors |
+| **Flexibility** | Access anything, anywhere | Order-dependent extraction |
+| **Refactoring** | Add features without changing signature | Adding data requires signature changes |
+| **Learning curve** | One concept to learn | Multiple extractor types to learn |
+| **Error messages** | Clear runtime errors | Sometimes cryptic trait bound errors |
+
+Axum's extractors provide stronger compile-time guarantees — if your handler compiles, the extraction will succeed (barring runtime data issues). This is a genuine advantage for large teams. Ultimo's Context trades some compile-time safety for a flatter learning curve and less ceremony when prototyping.
+
+## TypeScript Client Generation
+
+This is Ultimo's standout feature. When you define JSON-RPC methods or annotated REST routes, Ultimo can [automatically generate a fully-typed TypeScript client](/blog/how-typescript-codegen-works):
+
+```rust
+// Define your RPC methods in Rust
+rpc.register("users.list", list_users);
+rpc.register("users.create", create_user);
+rpc.register("users.delete", delete_user);
+```
+
+Then run:
+
+```bash
+ultimo generate --path ./src --output ./frontend/src/api
+```
+
+The generated client includes full TypeScript types matching your Rust structs, proper error handling, and method signatures. Your frontend developers get autocomplete, type checking, and zero manual API client maintenance.
+
+**With Axum**, you'd typically:
+1. Manually write OpenAPI specs (or use `utoipa` to derive them)
+2. Run a separate code generator like `openapi-typescript-codegen`
+3. Maintain synchronization between your Rust types and the generated client
+
+Ultimo collapses this into a single, integrated workflow. For teams with a TypeScript frontend, this eliminates an entire category of bugs — API contract mismatches between frontend and backend.
+
+## Authentication & Authorization
+
+**Ultimo** ships integrated auth primitives:
+
+```rust
+use ultimo::prelude::*;
+
+let app = Ultimo::new()
+    .middleware(jwt_auth(JwtConfig::new("secret")))
+    .get("/admin", admin_only)
+    .build();
+
+async fn admin_only(ctx: Context) -> Result<impl Into<Response>> {
+    let claims = ctx.auth::<Claims>()?;
+    require_role(&claims, "admin")?;
+    ctx.json(json!({ "secret": "data" }))
+}
+```
+
+JWT authentication, API-key validation, session-based auth, and authorization guards are all built-in, tested together, and documented in one place.
+
+**Axum** relies on the ecosystem — crates like `axum-extra`, `tower-http`, `axum-login`, or custom Tower middleware. These work well, but you're assembling from parts rather than using an integrated solution. Version compatibility between auth crates, session crates, and the framework itself requires attention.
+
+## JSON-RPC Support
+
+Ultimo has first-class JSON-RPC 2.0 support:
+
+```rust
+let mut rpc = RpcRegistry::new();
+rpc.register("math.add", |ctx: Context| async move {
+    let params: AddParams = ctx.parse_json().await?;
+    ctx.json(json!({ "result": params.a + params.b }))
+});
+
+let app = Ultimo::new()
+    .rpc("/rpc", rpc)
+    .build();
+```
+
+This integrates with TypeScript client generation — your RPC methods become typed function calls on the frontend.
+
+Axum has no built-in JSON-RPC support. You'd implement it manually or find a community crate. For applications that benefit from RPC semantics (internal microservices, real-time apps, complex client interactions), this is a significant productivity difference.
+
+## WebSocket Support
+
+Both frameworks support WebSocket connections, but with different ergonomics.
+
+**Ultimo** provides built-in pub/sub:
+
+```rust
+let app = Ultimo::new()
+    .websocket("/ws", ws_handler)
+    .build();
+
+async fn ws_handler(ctx: Context, ws: WebSocket) -> Result<()> {
+    ws.subscribe("chat:general").await;
+    while let Some(msg) = ws.recv().await {
+        ws.broadcast("chat:general", msg).await;
+    }
+    Ok(())
+}
+```
+
+**Axum** uses the `axum::extract::ws` module:
+
+```rust
+async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
+    ws.on_upgrade(handle_socket)
+}
+
+async fn handle_socket(mut socket: WebSocket) {
+    while let Some(msg) = socket.recv().await {
+        // Manual pub/sub implementation needed
+    }
+}
+```
+
+Axum gives you the raw WebSocket connection; Ultimo adds pub/sub channels, room management, and broadcast primitives on top. If you need custom WebSocket behavior, Axum's approach is more flexible. If you want chat rooms, real-time notifications, or event streaming out of the box, Ultimo saves significant implementation time.
+
+## Middleware
+
+**Ultimo** uses function-based middleware:
+
+```rust
+async fn timing_middleware(ctx: Context, next: Next) -> Result<Response> {
+    let start = Instant::now();
+    let response = next.run(ctx).await?;
+    println!("Request took: {:?}", start.elapsed());
+    Ok(response)
+}
+
+let app = Ultimo::new()
+    .middleware(timing_middleware)
+    .build();
+```
+
+**Axum** uses Tower layers and services:
+
+```rust
+use tower_http::trace::TraceLayer;
+use tower::ServiceBuilder;
+
+let app = Router::new()
+    .route("/", get(handler))
+    .layer(
+        ServiceBuilder::new()
+            .layer(TraceLayer::new_for_http())
+            .layer(TimeoutLayer::new(Duration::from_secs(10)))
+    );
+```
+
+Tower's middleware ecosystem is **significantly larger** than Ultimo's. [`tower-http`](https://docs.rs/tower-http) alone provides compression, CORS, request ID, tracing, timeouts, rate limiting, and more — all battle-tested in production. This is one of Axum's strongest advantages.
+
+Ultimo's middleware is simpler to write (it's just an async function), but the ecosystem of pre-built middleware is smaller. Ultimo compensates by building common middleware (compression, CORS, security headers, rate limiting) into the framework itself, but specialized needs may require writing custom middleware.
+
+## Ecosystem & Maturity
+
+Let's be direct: **Axum has a larger ecosystem and is more mature.** It reached [version 0.8.x](https://docs.rs/axum) with a post-1.0 stability promise, has hundreds of community crates, extensive documentation, and is used in production by major companies.
+
+| Metric | Ultimo | Axum |
+|--------|--------|------|
+| **Current version** | [0.5.0](/blog/introducing-ultimo-v0-5) (pre-1.0) | 0.8.x (post-1.0 stability) |
+| **First release** | 2024 | 2021 |
+| **Community crates** | Growing | Hundreds |
+| **Production users** | Early adopters | Major companies |
+| **Documentation** | [Complete](https://docs.ultimo.dev), improving | Extensive |
+| **Breaking changes** | Possible (pre-1.0) | Rare, well-managed |
+| **Tower compatibility** | No (own middleware) | Full |
+| **GitHub stars** | Growing | 20,000+ |
+
+If stability and ecosystem breadth are your top priorities, Axum is the safer choice today. If integrated features and developer velocity matter more, Ultimo offers a compelling alternative.
+
+## Comprehensive Feature Comparison
+
+| Feature | Ultimo | Axum |
+|---------|--------|------|
+| HTTP/1.1 + HTTP/2 | ✅ | ✅ |
+| Async (Tokio) | ✅ | ✅ |
+| JSON serialization | ✅ (built-in) | ✅ (via serde) |
+| Path parameters | ✅ | ✅ |
+| Query parameters | ✅ | ✅ |
+| Request body parsing | ✅ | ✅ |
+| Static file serving | ✅ (built-in) | Via `tower-http` |
+| Response compression | ✅ (built-in) | Via `tower-http` |
+| WebSocket | ✅ (with pub/sub) | ✅ (raw) |
+| JSON-RPC | ✅ (first-class) | ❌ |
+| TypeScript client gen | ✅ (automatic) | ❌ |
+| OpenAPI generation | ✅ (built-in) | Via `utoipa` |
+| Sessions | ✅ (built-in) | Via `tower-sessions` |
+| CSRF protection | ✅ (built-in) | Manual |
+| JWT auth | ✅ (built-in) | Via ecosystem |
+| API-key auth | ✅ (built-in) | Manual |
+| Authorization guards | ✅ (built-in) | Manual / `axum-extra` |
+| Rate limiting | ✅ (built-in) | Via `tower-governor` |
+| Nested routers | Basic | ✅ (advanced) |
+| Tower middleware | ❌ | ✅ |
+| Compile-time extraction | ❌ (runtime Context) | ✅ |
+| `#![forbid(unsafe_code)]` | ✅ | ❌ (some unsafe) |
+| Routing complexity | O(1) hash | O(log n) trie |
+| Hot reload (dev) | ✅ (CLI) | Via `cargo-watch` |
+| Project scaffolding | ✅ (CLI templates) | Manual |
+
+## When to Choose Ultimo
+
+Ultimo is the stronger choice when:
+
+- **You have a TypeScript frontend.** [Automatic client generation](/blog/how-typescript-codegen-works) eliminates API contract drift and saves hours of manual client maintenance per sprint.
+- **You want batteries included.** If your app needs auth + sessions + CSRF + WebSocket + validation, Ultimo gives you [all of that](/features) without researching and integrating five separate crates.
+- **You're building a full-stack application.** The combination of REST, JSON-RPC, WebSocket, and TS client gen means one framework covers your entire API surface.
+- **Your team prioritizes development velocity.** Less boilerplate, integrated features, and CLI tooling (scaffolding, hot reload, code generation) accelerate the build-ship-iterate cycle.
+- **You want zero `unsafe` code.** Ultimo's `#![forbid(unsafe_code)]` guarantee means no memory safety surprises in the framework layer.
+- **You're building a startup MVP or internal tool.** The integrated feature set gets you to production faster without assembling an ecosystem.
+
+## When to Choose Axum
+
+Axum is the stronger choice when:
+
+- **You need maximum flexibility.** Axum's minimal core and Tower compatibility mean you can swap any component for a custom implementation.
+- **You're building infrastructure or platform services.** Tower's composable middleware model excels at cross-cutting concerns in complex service architectures.
+- **API stability is paramount.** Axum's post-1.0 stability guarantee means fewer upgrade headaches over time. Ultimo is pre-1.0 and may introduce breaking changes.
+- **You need the broader ecosystem.** If your project requires niche middleware, specialized extractors, or community crates that don't exist for Ultimo yet, Axum's ecosystem has you covered.
+- **Your team is already proficient with Tower.** If you have existing Tower services, layers, and middleware, Axum integrates seamlessly.
+- **You prefer compile-time guarantees.** Axum's extractor pattern catches more errors at compile time than Ultimo's runtime Context access.
+- **You're contributing to a large codebase.** Axum's explicit extraction and Tower's trait-based composition make it easier for large teams to reason about request handling boundaries.
+
+## Can You Use Both?
+
+Yes — and this is more practical than it sounds. Because both frameworks run on Tokio, you can:
+
+1. **Run both in the same binary** using separate Tokio tasks, each binding to different ports.
+2. **[Gradually migrate](/blog/migrating-from-axum-to-ultimo)** by routing new endpoints to Ultimo while keeping existing Axum handlers.
+3. **Share business logic** — your domain layer (database queries, business rules, models) doesn't depend on the web framework. Only the thin handler layer differs.
+
+A pragmatic approach for existing Axum projects: keep your current codebase on Axum, but consider Ultimo for new microservices where [TypeScript client generation](/blog/how-typescript-codegen-works) or integrated auth would save significant time.
+
+## Conclusion
+
+Axum and Ultimo represent two valid philosophies for Rust web development. Axum gives you a minimal, composable foundation backed by the largest ecosystem in Rust web. Ultimo gives you an integrated, full-featured platform that prioritizes developer velocity and frontend integration.
+
+Neither is universally "better." The right choice depends on your team, your project's needs, and where you want to spend your complexity budget.
+
+If you're starting a new project with a TypeScript frontend, need auth/sessions/CSRF/WebSocket out of the box, and value shipping speed — [give Ultimo a try](https://crates.io/crates/ultimo). If you need maximum flexibility, Tower compatibility, or ecosystem breadth — Axum remains an excellent choice.
+
+The Rust web ecosystem is richer for having both.
+
+---
+
+*Ready to try Ultimo? Check out our [getting started guide](/blog/build-your-first-api-with-ultimo) or explore the [examples repository](https://github.com/ultimo-rs/ultimo/tree/main/examples).*

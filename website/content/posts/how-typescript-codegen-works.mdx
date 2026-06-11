@@ -1,0 +1,512 @@
+---
+title: "How TypeScript Codegen Works in Ultimo"
+description: "A deep dive into Ultimo's TypeScript client generation pipeline — from #[derive(TS)] on Rust structs through the RPC registry to a fully typed, zero-dependency TypeScript client."
+date: "2026-06-06"
+author: "Ultimo Team"
+tags: ["architecture", "typescript", "deep-dive"]
+---
+
+# How TypeScript Codegen Works in Ultimo
+
+One of Ultimo's most powerful [features](/features) is automatic [TypeScript](https://www.typescriptlang.org) client generation. You define your API types in [Rust](https://www.rust-lang.org), register your RPC methods, run a single CLI command, and get a fully typed TypeScript client — no manual schema writing, no drift between server and client, no runtime validation overhead.
+
+This post walks through the entire pipeline, from the proc macros that extract type metadata to the final `.ts` file your frontend imports. By the end, you'll understand every stage of the process and the design decisions behind it.
+
+## The End-to-End Pipeline
+
+Here's how a Rust type becomes a TypeScript type in your frontend bundle:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. Rust Source                                                  │
+│     #[derive(TS, Serialize, Deserialize)]                       │
+│     struct CreateUser { name: String, age: u32 }                │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │ cargo build (proc macro expansion)
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  2. ts-rs Trait Implementation                                   │
+│     impl TS for CreateUser {                                    │
+│       fn name() -> String { "CreateUser" }                      │
+│       fn inline() -> String { "{ name: string; age: number }" } │
+│       fn dependencies() -> Vec<Dependency> { vec![] }           │
+│     }                                                           │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │ RPC registration
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  3. RPC Registry Metadata                                        │
+│     Method: "createUser"                                        │
+│     Input:  TypeDef { name: "CreateUser", def: "..." }          │
+│     Output: TypeDef { name: "User", def: "..." }                │
+│     Kind:   Mutation                                            │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │ ultimo generate
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  4. Generated TypeScript Client                                  │
+│     export interface CreateUser { name: string; age: number }   │
+│     export async function createUser(params: CreateUser)...     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Each stage is independently testable and designed to fail loudly at compile time rather than silently at runtime.
+
+## Step 1: Type Metadata via ts-rs
+
+The foundation of Ultimo's codegen is [ts-rs](https://github.com/Aleph-Alpha/ts-rs) v12, a [procedural macro](https://doc.rust-lang.org/book/ch19-06-macros.html) crate that derives TypeScript type definitions from Rust types at compile time.
+
+When you annotate a struct with `#[derive(TS)]`, the proc macro generates an implementation of the `TS` trait:
+
+```rust
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct CreateUserRequest {
+    pub name: String,
+    pub email: String,
+    pub age: u32,
+    pub role: Option<UserRole>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub enum UserRole {
+    Admin,
+    Member,
+    Guest,
+}
+```
+
+After macro expansion, the compiler has access to three critical pieces of information via the `TS` trait:
+
+- **`TS::name()`** — Returns the TypeScript type name (e.g., `"CreateUserRequest"`)
+- **`TS::inline()`** — Returns the full inline type definition (e.g., `"{ name: string; email: string; age: number; role: UserRole | null }"`)
+- **`TS::dependencies()`** — Returns a list of types this definition depends on (e.g., `[UserRole]`)
+
+The `dependencies()` method is crucial — it lets the CLI traverse the type graph and emit all referenced types, even those not directly used as RPC inputs or outputs. If `CreateUserRequest` references `UserRole`, and `UserRole` references `Permission`, all three appear in the generated output.
+
+### Why Compile-Time?
+
+Because the derive macro runs during compilation, type errors surface immediately. If you rename a field in Rust but forget to update your frontend, the generated client changes on the next `ultimo generate` run. Your TypeScript compiler then catches the mismatch. There's no runtime layer where things can go wrong silently.
+
+## Step 2: The RPC Registry
+
+Ultimo's `RpcRegistry` is the bridge between your handler functions and the code generator. When you [register an RPC method](/blog/build-your-first-api-with-ultimo), the registry captures everything needed to generate the client:
+
+```rust
+use ultimo::prelude::*;
+
+async fn create_user(ctx: Context, req: CreateUserRequest) -> Result<User> {
+    let user = ctx.db().insert_user(&req).await?;
+    Ok(user)
+}
+
+pub fn build_app() -> Ultimo {
+    Ultimo::new()
+        .rpc_mut(|rpc| {
+            rpc.mutation::<CreateUserRequest, User>("createUser", create_user);
+            rpc.query::<GetUserRequest, User>("getUser", get_user);
+            rpc.query::<ListUsersRequest, Vec<User>>("listUsers", list_users);
+        })
+        .build()
+}
+```
+
+The `.mutation::<I, O>()` and `.query::<I, O>()` methods have trait bounds that enforce `I: TS + DeserializeOwned` and `O: TS + Serialize`. This means you **cannot** register a method with types that lack `#[derive(TS)]` — the compiler rejects it.
+
+At registration time, the registry stores:
+
+```rust
+struct RpcMethodMeta {
+    name: String,                // "createUser"
+    input_type_name: String,     // "CreateUserRequest"
+    input_type_def: String,      // "{ name: string; email: string; ... }"
+    output_type_name: String,    // "User"
+    output_type_def: String,     // "{ id: string; name: string; ... }"
+    kind: RpcKind,               // Mutation | Query
+    input_deps: Vec<TypeDef>,    // Transitive type dependencies
+    output_deps: Vec<TypeDef>,   // Transitive type dependencies
+}
+```
+
+The distinction between `query` and `mutation` matters for the generated client — queries can be cached, retried, and deduplicated; mutations cannot.
+
+## Step 3: The CLI Generator
+
+Running `ultimo generate --path ./src --output ./client` triggers a multi-phase process:
+
+**Phase 1: Crate Compilation.** The CLI invokes `cargo build` on your project. This triggers all `#[derive(TS)]` expansions, making type metadata available to the build system.
+
+**Phase 2: Metadata Extraction.** The CLI scans your source for `RpcRegistry` usage and extracts the registered methods along with their type information. It reads the exported type definitions that ts-rs makes available after compilation.
+
+**Phase 3: Dependency Resolution.** Starting from the input and output types of each registered method, the generator walks the dependency graph. If `User` contains a `Vec<Address>` and `Address` contains an `Option<Country>`, all three types are pulled in.
+
+**Phase 4: Deduplication.** Multiple methods might share types (e.g., several endpoints return `User`). The generator deduplicates by type name, ensuring each interface appears exactly once in the output.
+
+**Phase 5: Code Emission.** The generator writes a self-contained TypeScript module with:
+- All interface/type definitions (topologically sorted so dependencies appear before dependents)
+- A typed function for each RPC method
+- A configurable base client with error handling
+
+## Step 4: Generated Output
+
+Here's what a complete generated client looks like for a small API:
+
+```typescript
+// Generated by ultimo-cli v0.5.0 — do not edit manually
+// Source: ./src
+
+// ═══════════════════════════════════════════
+// Types
+// ═══════════════════════════════════════════
+
+export interface CreateUserRequest {
+  name: string;
+  email: string;
+  age: number;
+  role: UserRole | null;
+}
+
+export type UserRole = "Admin" | "Member" | "Guest";
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  age: number;
+  role: UserRole | null;
+  created_at: string;
+}
+
+export interface GetUserRequest {
+  id: string;
+}
+
+export interface ListUsersRequest {
+  page: number;
+  per_page: number;
+  filter: UserFilter | null;
+}
+
+export interface UserFilter {
+  role: UserRole | null;
+  min_age: number | null;
+  max_age: number | null;
+}
+
+// ═══════════════════════════════════════════
+// Client
+// ═══════════════════════════════════════════
+
+export interface ClientConfig {
+  baseUrl: string;
+  headers?: Record<string, string>;
+}
+
+let _config: ClientConfig = { baseUrl: "" };
+
+export function configure(config: ClientConfig): void {
+  _config = config;
+}
+
+async function rpcCall<T>(method: string, params: unknown): Promise<T> {
+  const response = await fetch(`${_config.baseUrl}/rpc`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ..._config.headers,
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: crypto.randomUUID(),
+      method,
+      params,
+    }),
+  });
+
+  const json = await response.json();
+
+  if (json.error) {
+    throw new RpcError(json.error.code, json.error.message, json.error.data);
+  }
+
+  return json.result as T;
+}
+
+export class RpcError extends Error {
+  constructor(
+    public code: number,
+    message: string,
+    public data?: unknown
+  ) {
+    super(message);
+    this.name = "RpcError";
+  }
+}
+
+// ═══════════════════════════════════════════
+// API Functions
+// ═══════════════════════════════════════════
+
+/** Mutation: createUser */
+export async function createUser(params: CreateUserRequest): Promise<User> {
+  return rpcCall<User>("createUser", params);
+}
+
+/** Query: getUser */
+export async function getUser(params: GetUserRequest): Promise<User> {
+  return rpcCall<User>("getUser", params);
+}
+
+/** Query: listUsers */
+export async function listUsers(params: ListUsersRequest): Promise<User[]> {
+  return rpcCall<User[]>("listUsers", params);
+}
+```
+
+The generated file is zero-dependency — it uses only the `fetch` API and `crypto.randomUUID()`, both available in all modern runtimes (browsers, Node 18+, Deno, Bun).
+
+## Handling Complex Types
+
+The type mapping handles real-world complexity beyond simple structs.
+
+### Nested Structs
+
+Types that reference other types are resolved transitively:
+
+```rust
+#[derive(TS, Serialize)]
+pub struct Order {
+    pub id: String,
+    pub items: Vec<OrderItem>,
+    pub shipping: Address,
+}
+
+#[derive(TS, Serialize)]
+pub struct OrderItem {
+    pub product_id: String,
+    pub quantity: u32,
+    pub price: Money,
+}
+```
+
+Generates:
+
+```typescript
+export interface Order {
+  id: string;
+  items: OrderItem[];
+  shipping: Address;
+}
+
+export interface OrderItem {
+  product_id: string;
+  quantity: number;
+  price: Money;
+}
+```
+
+### Tagged Enums (Discriminated Unions)
+
+Serde's tagged enums map to TypeScript discriminated unions:
+
+```rust
+#[derive(TS, Serialize)]
+#[serde(tag = "type")]
+pub enum PaymentMethod {
+    CreditCard { last_four: String, expiry: String },
+    BankTransfer { iban: String },
+    Crypto { wallet_address: String, chain: String },
+}
+```
+
+Generates:
+
+```typescript
+export type PaymentMethod =
+  | { type: "CreditCard"; last_four: string; expiry: string }
+  | { type: "BankTransfer"; iban: string }
+  | { type: "Crypto"; wallet_address: string; chain: string };
+```
+
+This is one of the most powerful mappings — you get exhaustive pattern matching in TypeScript for free.
+
+### Generics
+
+Generic types are inlined at each usage site:
+
+```rust
+#[derive(TS, Serialize)]
+pub struct Paginated<T: TS> {
+    pub items: Vec<T>,
+    pub total: u64,
+    pub page: u32,
+}
+```
+
+When used as `Paginated<User>`, the output inlines to:
+
+```typescript
+export interface PaginatedUser {
+  items: User[];
+  total: number;
+  page: number;
+}
+```
+
+## The Type Mapping
+
+Here is the complete mapping from Rust types to TypeScript types:
+
+| Rust Type | TypeScript Type |
+|-----------|----------------|
+| `String`, `&str` | `string` |
+| `u8`, `u16`, `u32`, `i8`, `i16`, `i32` | `number` |
+| `u64`, `i64`, `u128`, `i128` | `number` |
+| `f32`, `f64` | `number` |
+| `bool` | `boolean` |
+| `()` | `null` |
+| `Vec<T>` | `T[]` |
+| `Option<T>` | `T \| null` |
+| `HashMap<K, V>` | `Record<K, V>` |
+| `BTreeMap<K, V>` | `Record<K, V>` |
+| `HashSet<T>` | `T[]` |
+| `(A, B, C)` | `[A, B, C]` |
+| `Box<T>`, `Arc<T>`, `Rc<T>` | `T` (transparent) |
+| `Uuid` | `string` |
+| `DateTime<Utc>` (chrono) | `string` |
+| `NaiveDate` | `string` |
+| Unit enum variants | String literal union |
+| Tagged enum | Discriminated union |
+| Untagged enum | Union type |
+| Struct | Interface |
+
+Smart pointer types (`Box`, `Arc`, `Rc`) are transparent — the generated TypeScript sees only the inner type. This matches how serde serializes them.
+
+## Watch Mode
+
+During development, running the generator manually after every change is tedious. Watch mode automates it:
+
+```bash
+ultimo generate --path ./src --output ./client/api.ts --watch
+```
+
+This starts a file watcher (using `notify` v6) that monitors your Rust source files. When a `.rs` file changes:
+
+1. The CLI re-triggers compilation (incremental — only changed crates rebuild)
+2. Re-extracts type metadata
+3. Diffs against the current generated output
+4. Writes the file only if the output actually changed (avoids triggering unnecessary frontend HMR)
+
+The typical [dev workflow](/blog/build-your-first-api-with-ultimo) looks like:
+
+```bash
+# Terminal 1: Ultimo dev server with hot reload
+ultimo dev --port 3001
+
+# Terminal 2: TypeScript client generation in watch mode
+ultimo generate --path ./src --output ./frontend/src/api.ts --watch
+
+# Terminal 3: Frontend dev server (Vite, Next.js, etc.)
+npm run dev
+```
+
+Change a Rust struct → client regenerates in ~200ms (incremental) → TypeScript compiler catches any frontend breakage → fix it → [full-stack type safety](https://docs.ultimo.dev) maintained continuously.
+
+## Design Decisions
+
+### Why ts-rs?
+
+We evaluated three approaches for extracting TypeScript types from Rust:
+
+1. **Custom proc macro** — Full control but enormous maintenance burden. Handling every [serde](https://serde.rs) attribute, generic bound, and edge case means reimplementing what ts-rs already does.
+2. **ts-rs** — Battle-tested (500+ stars, active maintenance), handles serde attributes correctly, produces idiomatic TypeScript. The trait-based API (`name()`, `inline()`, `dependencies()`) is exactly what a code generator needs.
+3. **specta** — Similar goals but tightly coupled to its own framework ecosystem. ts-rs is more standalone.
+
+We chose ts-rs because it gives us accurate TypeScript from Rust types with zero custom macro code to maintain.
+
+### Why Not OpenAPI?
+
+OpenAPI (Swagger) is the industry standard for REST API documentation and client generation. We considered generating an OpenAPI spec and using existing tools (openapi-generator, orval) to produce the client. We rejected this for several reasons:
+
+- **[JSON-RPC](https://www.json.org) doesn't map cleanly to OpenAPI.** OpenAPI models resources with HTTP methods; JSON-RPC models procedures. Forcing RPC into REST semantics loses information.
+- **Extra indirection.** Rust → OpenAPI YAML → TypeScript means two translation steps where types can drift or lose fidelity. Rust → TypeScript directly is one step.
+- **Generic client generators produce generic code.** Tools like openapi-generator emit verbose, framework-specific clients. Our generated code is minimal and framework-agnostic.
+
+That said, Ultimo does support [OpenAPI for its REST routes](/features) — it's just not the path for RPC client generation.
+
+### Why Not Protobuf/gRPC?
+
+Protocol Buffers require a separate `.proto` schema language. This means:
+
+- Developers maintain types in two places (Rust structs AND .proto files)
+- The Rust structs might drift from the proto definitions
+- Frontend developers need protobuf tooling (protoc, grpc-web)
+- The wire format is binary, making debugging harder without specialized tools
+
+[Ultimo](https://crates.io/crates/ultimo)'s approach keeps Rust structs as the single source of truth. There's no separate schema to maintain, no binary wire format to debug, and the generated client uses plain JSON over HTTP — debuggable with `curl` and browser DevTools.
+
+## Limitations and Edge Cases
+
+No system is perfect. Here's what the current pipeline handles poorly:
+
+### Third-Party Types Without `#[derive(TS)]`
+
+If your RPC method uses a type from a crate that doesn't derive `TS`, you have two options:
+
+```rust
+// Option 1: Newtype wrapper
+#[derive(TS, Serialize)]
+pub struct MyDateTime(#[ts(type = "string")] chrono::DateTime<chrono::Utc>);
+
+// Option 2: Type override at the field level
+#[derive(TS, Serialize)]
+pub struct Event {
+    pub name: String,
+    #[ts(type = "string")]
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+```
+
+The `#[ts(type = "...")]` attribute lets you manually specify the TypeScript type for fields that can't be derived automatically.
+
+### Complex Lifetimes
+
+Types with lifetime parameters (`&'a str`, borrowed data) generally don't make sense in a serialization context. Since RPC types must be `DeserializeOwned` (owned, no lifetimes), this is rarely an issue in practice. If you hit it, the compiler error is clear.
+
+### Recursive Types
+
+Self-referential types (e.g., a tree node containing `Vec<Self>`) are supported by ts-rs but require boxing:
+
+```rust
+#[derive(TS, Serialize)]
+pub struct TreeNode {
+    pub value: String,
+    pub children: Vec<Box<TreeNode>>,
+}
+```
+
+### Large Union Types
+
+Enums with many variants generate correspondingly large TypeScript unions. For enums with 50+ variants, the generated type is correct but may slow down TypeScript's type checker on older versions of `tsc`.
+
+## Future Plans
+
+The current pipeline is [production-ready](/blog/introducing-ultimo-v0-5) for TypeScript, but we're planning extensions:
+
+- **Multi-language codegen** — The RPC registry's metadata is language-agnostic. Adding Dart, Kotlin, or Swift generators requires only a new emitter backend, not changes to the registry or metadata extraction.
+- **SDK-style clients** — Beyond bare functions, generate clients with built-in retry logic, request deduplication, optimistic updates, and cache invalidation based on the query/mutation distinction.
+- **React Query / TanStack Query integration** — Generate pre-configured hooks (`useQuery`/`useMutation`) in addition to the base client.
+- **Streaming types** — Map Rust's `Stream<Item = T>` to AsyncIterator or EventSource-based TypeScript types for real-time endpoints.
+
+## Summary
+
+[Ultimo's](https://github.com/ultimo-rs/ultimo) TypeScript codegen pipeline is a four-stage process built on a simple insight: if the Rust compiler already knows your types, there's no reason to describe them again in another language.
+
+1. **`#[derive(TS)]`** extracts type metadata at compile time via the ts-rs crate
+2. **The RPC Registry** captures method names, type definitions, and query/mutation semantics at registration time
+3. **`ultimo generate`** compiles your crate, walks the type graph, deduplicates, and emits TypeScript
+4. **The generated client** is a zero-dependency `.ts` module with full type definitions and fetch-based API functions
+
+The result is a development experience where changing a Rust struct's field automatically propagates to your TypeScript frontend — caught by the compiler, not by a user in production. Combined with watch mode, it enables a tight feedback loop that keeps your entire stack type-safe without manual synchronization work.

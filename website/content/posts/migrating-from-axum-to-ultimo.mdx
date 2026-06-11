@@ -1,0 +1,545 @@
+---
+title: "Migrating from Axum to Ultimo: A Practical Guide"
+description: "A hands-on guide to migrating your Axum application to Ultimo — concept mapping, side-by-side code translations, gradual adoption strategy, and what you gain (and lose) in the process."
+date: "2026-06-04"
+author: "Ultimo Team"
+tags: ["migration", "axum", "guide"]
+---
+
+# Migrating from Axum to Ultimo: A Practical Guide
+
+If you're building APIs in [Rust](https://www.rust-lang.org), there's a good chance you're using [Axum](https://github.com/tokio-rs/axum). It's well-designed, performant, and backed by the [Tokio](https://tokio.rs) team. So why would you consider moving to Ultimo?
+
+The short answer: **Ultimo gives you more out of the box.** [Automatic TypeScript client generation](/blog/how-typescript-codegen-works) from your Rust types, integrated authentication (JWT + API keys), sessions, CSRF protection, WebSocket pub/sub, and JSON-RPC — all without gluing together a dozen [Tower](https://docs.rs/tower) layers. If your team ships a Rust backend with a TypeScript frontend, Ultimo eliminates an entire class of integration work.
+
+This guide walks you through migrating an Axum application to Ultimo, concept by concept, with complete working code examples at each step. We'll also cover a gradual migration strategy so you don't have to rewrite everything at once. If you're new to Ultimo, you may want to start with our [getting started tutorial](/blog/build-your-first-api-with-ultimo) first.
+
+## Concept Mapping
+
+Before diving into code, here's how Axum concepts translate to Ultimo:
+
+| Axum | Ultimo | Notes |
+|------|--------|-------|
+| `Router::new()` | `Ultimo::new()` | App builder and router combined |
+| `.route("/path", get(handler))` | `.get("/path", handler)` | Methods directly on the builder |
+| `async fn handler(...)` with extractors | `async fn handler(ctx: Context) -> Result<impl Into<Response>>` | Single `Context` parameter |
+| `State(pool): State<DbPool>` | `ctx.state::<DbPool>()` | Method call instead of extractor |
+| `Path(id): Path<u64>` | `ctx.param("id")` | String-based, parse yourself |
+| `Query(params): Query<T>` | `ctx.query::<T>()` | Deserializes from query string |
+| `Json(body): Json<T>` | `ctx.json_body::<T>().await` | Async because it reads the body |
+| `impl IntoResponse` | `Result<impl Into<Response>>` | Error handling built into return type |
+| `(StatusCode, Json(val))` | `ctx.status(201).json(&val)` | Chainable response builder |
+| `Router::with_state(state)` | `.state(my_state)` | Method on the app builder |
+| Tower layers / `middleware::from_fn` | `.middleware(fn)` | Simple async function |
+| `axum::serve(listener, app)` | `app.listen("0.0.0.0:3000").await` | One-liner |
+| No equivalent | `RpcRegistry` + `.rpc("/rpc", registry)` | JSON-RPC with TS codegen |
+| No equivalent | Automatic TypeScript client generation | Zero-config from Rust types |
+
+## Basic Route Migration
+
+Let's start with the simplest case: a GET endpoint that returns JSON.
+
+**Axum:**
+
+```rust
+use axum::{routing::get, Json, Router};
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct HealthResponse {
+    status: String,
+    version: String,
+}
+
+async fn health() -> Json<HealthResponse> {
+    Json(HealthResponse {
+        status: "ok".to_string(),
+        version: "1.0.0".to_string(),
+    })
+}
+
+#[tokio::main]
+async fn main() {
+    let app = Router::new().route("/health", get(health));
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+```
+
+**Ultimo:**
+
+```rust
+use ultimo::prelude::*;
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct HealthResponse {
+    status: String,
+    version: String,
+}
+
+async fn health(ctx: Context) -> Result<impl Into<Response>> {
+    ctx.json(&HealthResponse {
+        status: "ok".to_string(),
+        version: "1.0.0".to_string(),
+    })
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    Ultimo::new()
+        .get("/health", health)
+        .listen("0.0.0.0:3000")
+        .await
+}
+```
+
+The key difference: Ultimo handlers always take a `Context` and return `Result`. There's no extractor magic in the function signature — everything comes from method calls on `ctx`.
+
+## Request Body Parsing
+
+Parsing JSON request bodies is where Axum's extractor pattern and Ultimo's context-method pattern diverge most clearly.
+
+**Axum:**
+
+```rust
+use axum::{routing::post, Json, Router};
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct CreateUser {
+    name: String,
+    email: String,
+}
+
+#[derive(Serialize)]
+struct User {
+    id: u64,
+    name: String,
+    email: String,
+}
+
+async fn create_user(Json(body): Json<CreateUser>) -> Json<User> {
+    Json(User {
+        id: 1,
+        name: body.name,
+        email: body.email,
+    })
+}
+```
+
+**Ultimo:**
+
+```rust
+use ultimo::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct CreateUser {
+    name: String,
+    email: String,
+}
+
+#[derive(Serialize)]
+struct User {
+    id: u64,
+    name: String,
+    email: String,
+}
+
+async fn create_user(ctx: Context) -> Result<impl Into<Response>> {
+    let body: CreateUser = ctx.json_body().await?;
+    ctx.status(201).json(&User {
+        id: 1,
+        name: body.name,
+        email: body.email,
+    })
+}
+```
+
+Notice that `ctx.json_body().await?` is async — it reads the request body from the socket. The `?` operator propagates deserialization errors as a 400 Bad Request automatically.
+
+## Path Parameters and Query Strings
+
+**Axum — Path Parameters:**
+
+```rust
+use axum::{extract::Path, routing::get, Json, Router};
+
+async fn get_user(Path(id): Path<u64>) -> Json<User> {
+    let user = find_user(id).await;
+    Json(user)
+}
+
+let app = Router::new().route("/users/:id", get(get_user));
+```
+
+**Ultimo — Path Parameters:**
+
+```rust
+use ultimo::prelude::*;
+
+async fn get_user(ctx: Context) -> Result<impl Into<Response>> {
+    let id: u64 = ctx.param("id").parse().map_err(|_| {
+        UltimoError::bad_request("Invalid user ID")
+    })?;
+    let user = find_user(id).await;
+    ctx.json(&user)
+}
+
+Ultimo::new().get("/users/:id", get_user)
+```
+
+**Axum — Query Strings:**
+
+```rust
+use axum::extract::Query;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct Pagination {
+    page: Option<u32>,
+    per_page: Option<u32>,
+}
+
+async fn list_users(Query(params): Query<Pagination>) -> Json<Vec<User>> {
+    let page = params.page.unwrap_or(1);
+    let per_page = params.per_page.unwrap_or(20);
+    Json(fetch_users(page, per_page).await)
+}
+```
+
+**Ultimo — Query Strings:**
+
+```rust
+use ultimo::prelude::*;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct Pagination {
+    page: Option<u32>,
+    per_page: Option<u32>,
+}
+
+async fn list_users(ctx: Context) -> Result<impl Into<Response>> {
+    let params: Pagination = ctx.query()?;
+    let page = params.page.unwrap_or(1);
+    let per_page = params.per_page.unwrap_or(20);
+    ctx.json(&fetch_users(page, per_page).await)
+}
+```
+
+Ultimo's `ctx.query::<T>()` works identically to Axum's `Query<T>` extractor under the hood — both use [serde](https://serde.rs) deserialization from the query string.
+
+## Error Handling
+
+This is where Ultimo's design philosophy diverges most from Axum. In Axum, you implement `IntoResponse` for your error types or return tuples. In Ultimo, you return `Result` and use typed errors.
+
+**Axum:**
+
+```rust
+use axum::{http::StatusCode, response::IntoResponse, Json};
+use serde_json::json;
+
+enum AppError {
+    NotFound(String),
+    BadRequest(String),
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> axum::response::Response {
+        match self {
+            AppError::NotFound(msg) => (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": msg })),
+            ).into_response(),
+            AppError::BadRequest(msg) => (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": msg })),
+            ).into_response(),
+        }
+    }
+}
+
+async fn get_user(Path(id): Path<u64>) -> Result<Json<User>, AppError> {
+    let user = find_user(id).await
+        .ok_or_else(|| AppError::NotFound(format!("User {} not found", id)))?;
+    Ok(Json(user))
+}
+```
+
+**Ultimo:**
+
+```rust
+use ultimo::prelude::*;
+
+async fn get_user(ctx: Context) -> Result<impl Into<Response>> {
+    let id: u64 = ctx.param("id").parse()
+        .map_err(|_| UltimoError::bad_request("Invalid user ID"))?;
+    let user = find_user(id).await
+        .ok_or_else(|| UltimoError::not_found(format!("User {} not found", id)))?;
+    ctx.json(&user)
+}
+```
+
+Ultimo provides `UltimoError` with factory methods for common HTTP errors: `bad_request`, `not_found`, `unauthorized`, `forbidden`, and `internal`. Each produces a properly formatted JSON error response with the correct status code. No boilerplate `IntoResponse` implementations needed.
+
+## State and Shared Data
+
+Both frameworks support injecting shared state (database pools, configuration, etc.) into handlers.
+
+**Axum:**
+
+```rust
+use axum::{extract::State, routing::get, Json, Router};
+use sqlx::PgPool;
+
+#[derive(Clone)]
+struct AppState {
+    db: PgPool,
+}
+
+async fn list_users(State(state): State<AppState>) -> Json<Vec<User>> {
+    let users = sqlx::query_as::<_, User>("SELECT * FROM users")
+        .fetch_all(&state.db)
+        .await
+        .unwrap();
+    Json(users)
+}
+
+#[tokio::main]
+async fn main() {
+    let pool = PgPool::connect("postgres://localhost/mydb").await.unwrap();
+    let state = AppState { db: pool };
+    let app = Router::new()
+        .route("/users", get(list_users))
+        .with_state(state);
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+```
+
+**Ultimo:**
+
+```rust
+use ultimo::prelude::*;
+use sqlx::PgPool;
+
+#[derive(Clone)]
+struct AppState {
+    db: PgPool,
+}
+
+async fn list_users(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let users = sqlx::query_as::<_, User>("SELECT * FROM users")
+        .fetch_all(&state.db)
+        .await
+        .map_err(|e| UltimoError::internal(e.to_string()))?;
+    ctx.json(&users)
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let pool = PgPool::connect("postgres://localhost/mydb").await?;
+    let state = AppState { db: pool };
+    Ultimo::new()
+        .state(state)
+        .get("/users", list_users)
+        .listen("0.0.0.0:3000")
+        .await
+}
+```
+
+The pattern is nearly identical. Axum uses `State(s): State<S>` as a function parameter; Ultimo uses `ctx.state::<S>()`. Both require the state to implement `Clone`.
+
+## Middleware
+
+This is where the frameworks differ most architecturally. Axum uses Tower — a powerful but complex middleware system with `Layer`, `Service`, and `ServiceBuilder`. Ultimo uses plain async functions.
+
+**Axum:**
+
+```rust
+use axum::{
+    extract::Request,
+    http::StatusCode,
+    middleware::{self, Next},
+    response::Response,
+    Router,
+};
+
+async fn auth_middleware(
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let auth_header = request.headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok());
+
+    match auth_header {
+        Some(token) if token.starts_with("Bearer ") => {
+            let response = next.run(request).await;
+            Ok(response)
+        }
+        _ => Err(StatusCode::UNAUTHORIZED),
+    }
+}
+
+let app = Router::new()
+    .route("/protected", get(protected_handler))
+    .route_layer(middleware::from_fn(auth_middleware));
+```
+
+**Ultimo:**
+
+```rust
+use ultimo::prelude::*;
+
+async fn auth_middleware(ctx: Context, next: Next) -> Result<Response> {
+    let auth_header = ctx.header("Authorization");
+
+    match auth_header {
+        Some(token) if token.starts_with("Bearer ") => {
+            next.run(ctx).await
+        }
+        _ => Err(UltimoError::unauthorized("Missing or invalid token")),
+    }
+}
+
+Ultimo::new()
+    .middleware(auth_middleware)
+    .get("/protected", protected_handler)
+```
+
+Ultimo's middleware is a regular async function that takes `Context` and `Next`. No [Tower](https://docs.rs/tower) layers, no service traits, no `Pin<Box<dyn Future>>`. You call `next.run(ctx).await` to continue the chain or return early with an error.
+
+## Adding JSON-RPC (New Capability)
+
+This is something you can't do with Axum at all without building it yourself. Ultimo includes a full JSON-RPC registry with automatic TypeScript client generation.
+
+```rust
+use ultimo::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct GetUserParams {
+    id: u64,
+}
+
+#[derive(Serialize)]
+struct UserResponse {
+    id: u64,
+    name: String,
+    email: String,
+}
+
+async fn get_user_rpc(ctx: Context, params: GetUserParams) -> Result<UserResponse> {
+    let state = ctx.state::<AppState>();
+    let user = find_user(&state.db, params.id).await?;
+    Ok(UserResponse {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+    })
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let registry = RpcRegistry::new()
+        .method("getUser", get_user_rpc);
+
+    Ultimo::new()
+        .state(app_state)
+        .rpc("/rpc", registry)
+        .listen("0.0.0.0:3000")
+        .await
+}
+```
+
+Run `ultimo generate --path src/ --output ./client/` and you get a fully-typed TypeScript client:
+
+```typescript
+const user = await client.getUser({ id: 42 });
+// user is typed as { id: number; name: string; email: string }
+```
+
+No OpenAPI spec writing, no code generation config, no manual client maintenance. Your TypeScript types stay in sync with your Rust types automatically. See [how TypeScript codegen works](/blog/how-typescript-codegen-works) for a deep dive into the generation process.
+
+## Gradual Migration Strategy
+
+You don't have to rewrite your entire Axum application at once. Here's a phased approach:
+
+**Phase 1: New Endpoints in Ultimo.** Start by writing new features in Ultimo. Run both servers on different ports, with a reverse proxy (nginx, Caddy) routing traffic. Your existing Axum endpoints keep working untouched.
+
+**Phase 2: Shared Types.** Extract your domain types (`User`, `Order`, etc.) into a shared crate. Both your Axum and Ultimo apps depend on it. This ensures consistency during the transition.
+
+**Phase 3: Move RPC.** If you have any internal service-to-service APIs or frontend-facing RPCs that would benefit from TypeScript codegen, build those in Ultimo first. This is where you'll see the most immediate value.
+
+**Phase 4: Migrate REST Endpoints.** Move REST handlers one group at a time — start with the simplest (health checks, static data), then move to CRUD endpoints. Each migration is mechanical: replace extractors with `ctx` methods, add `Result` to the return type, done.
+
+## What You Gain
+
+- **Automatic TypeScript clients** — Your frontend gets fully typed API clients generated directly from Rust types. No OpenAPI spec maintenance, no drift.
+- **Integrated authentication** — JWT validation and API key auth built in. No hunting for compatible Tower middleware.
+- **Sessions and cookies** — First-class session support with configurable backends.
+- **CSRF protection** — Token-based CSRF middleware included and tested.
+- **WebSocket pub/sub** — Built-in pub/sub patterns, not just raw WebSocket connections.
+- **OpenAPI generation** — Automatic spec generation from your route definitions.
+- **Static file serving** — Serve SPAs and static assets without additional dependencies.
+- **Compression** — Response compression middleware included.
+- **Simpler middleware** — Plain async functions instead of Tower's Layer/Service/Future traits.
+- **Less boilerplate** — No custom `IntoResponse` impls for errors, no extractor boilerplate.
+
+See the full list of [Ultimo's features](/features) for everything available out of the box.
+
+## What You Lose
+
+Being honest about trade-offs is important:
+
+- **Ecosystem size** — Axum has a larger ecosystem of [Tower-compatible middleware](https://docs.rs/tower). If you depend on a specific Tower layer that Ultimo doesn't replicate, you'll need to implement it yourself or find an alternative.
+- **Tower compatibility** — Axum plugs into any Tower service. Ultimo has its own middleware system. You can't drop Tower layers into Ultimo directly.
+- **Compile-time extraction** — Axum's extractor pattern catches certain misuse at compile time (e.g., extracting the body twice). Ultimo's runtime approach means some errors surface at request time instead.
+- **Maturity and stability guarantees** — Axum is backed by the Tokio team with strong SemVer guarantees. Ultimo is pre-1.0 and still evolving. API breakage between minor versions is possible.
+- **Community size** — Axum has more Stack Overflow answers, blog posts, and tutorials. You'll find fewer community resources for Ultimo-specific patterns.
+- **Compile-time route type checking** — Axum's type system ensures handler signatures match route patterns. Ultimo validates this at runtime.
+
+For a more detailed breakdown, see our [Ultimo vs Axum comparison](/blog/ultimo-vs-axum-comparison).
+
+## Can You Run Both Simultaneously?
+
+Yes. Both Axum and Ultimo run on [Hyper 1.0](https://hyper.rs) + [Tokio](https://tokio.rs). You can run both servers in the same binary, sharing a database pool and other resources:
+
+```rust
+use std::sync::Arc;
+use sqlx::PgPool;
+
+#[tokio::main]
+async fn main() {
+    let pool = PgPool::connect("postgres://localhost/mydb").await.unwrap();
+    let pool = Arc::new(pool);
+
+    let pool_axum = pool.clone();
+    let axum_handle = tokio::spawn(async move {
+        let app = axum_app(pool_axum);
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let pool_ultimo = pool.clone();
+    let ultimo_handle = tokio::spawn(async move {
+        ultimo_app(pool_ultimo).listen("0.0.0.0:3001").await.unwrap();
+    });
+
+    tokio::try_join!(axum_handle, ultimo_handle).unwrap();
+}
+```
+
+This lets you run new Ultimo endpoints alongside your existing Axum application during migration. A reverse proxy routes traffic to the correct port based on path prefixes.
+
+## Conclusion
+
+Migrating from Axum to Ultimo is a trade of ecosystem breadth for integrated depth. If your application is a Rust API serving a TypeScript frontend — and you're tired of maintaining OpenAPI specs, wiring up auth middleware, and keeping client types in sync — Ultimo eliminates that entire class of work.
+
+The migration itself is mechanical. The mental model shift is small: extractors-as-parameters becomes methods-on-context. The biggest win isn't any single feature — it's that sessions, auth, CSRF, WebSocket, and [TypeScript codegen](/blog/how-typescript-codegen-works) all work together out of the box, tested and documented as a cohesive system rather than a stack of independent crates.
+
+Start with new endpoints. Run both frameworks side by side. Migrate at your own pace. The [Tokio](https://tokio.rs) runtime doesn't care which HTTP framework hands it futures — they're all just async functions at the end of the day. Check out the [examples in the Ultimo repository](https://github.com/ultimo-rs/ultimo) and the [official documentation](https://docs.ultimo.dev) to get started.
