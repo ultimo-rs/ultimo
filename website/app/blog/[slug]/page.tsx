@@ -45,6 +45,9 @@ export default async function BlogPostPage({ params }: PageProps) {
     notFound();
   }
 
+  // Strip the first H1 from content since we render it in the header
+  const content = post.content.replace(/^#\s+.+\n+/, "");
+
   return (
     <div className="min-h-screen selection:bg-orange-500/30">
       <div className="container mx-auto px-4 py-24 max-w-6xl">
@@ -92,7 +95,7 @@ export default async function BlogPostPage({ params }: PageProps) {
 
             <div className="prose prose-invert prose-orange max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-orange-400 prose-a:no-underline hover:prose-a:underline prose-code:text-orange-300 prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-border/50 prose-img:rounded-lg">
               <MDXRemote
-                source={post.content}
+                source={content}
                 options={{
                   mdxOptions: {
                     rehypePlugins: [
@@ -117,7 +120,7 @@ export default async function BlogPostPage({ params }: PageProps) {
 
           <aside className="hidden lg:block">
             <div className="sticky top-24">
-              <TableOfContents content={post.content} />
+              <TableOfContents content={content} />
             </div>
           </aside>
         </div>
