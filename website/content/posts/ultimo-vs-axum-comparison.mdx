@@ -10,7 +10,7 @@ tags: ["comparison", "axum", "rust"]
 
 If you're building a web service in [Rust](https://www.rust-lang.org) in 2026, you've likely narrowed your choices to a handful of frameworks. Two that frequently appear side-by-side are **[Axum](https://github.com/tokio-rs/axum)** and **Ultimo**. Both are built on **[Hyper](https://hyper.rs) 1.0 + [Tokio](https://tokio.rs)**, both prioritize type safety, and both produce extremely fast HTTP services. But they take fundamentally different approaches to developer experience, abstraction, and what belongs "in the box."
 
-This post is an honest, feature-by-feature comparison. We build Ultimo, so we obviously believe in its approach — but we also genuinely respect Axum and use it ourselves in certain contexts. Our goal isn't to declare a winner; it's to help you choose the right tool for *your* project.
+This post is an honest, feature-by-feature comparison. We build Ultimo, so we obviously believe in its approach — but we also genuinely respect Axum and use it ourselves in certain contexts. Our goal isn't to declare a winner; it's to help you choose the right tool for _your_ project.
 
 ## Architecture: Same Engine, Different Chassis
 
@@ -20,7 +20,7 @@ Under the hood, Ultimo and Axum share the same async runtime stack:
 - **[Hyper](https://hyper.rs) 1.0** for the HTTP/1.1 and HTTP/2 implementation
 - **[Tower](https://docs.rs/tower)** (Axum) or function-based middleware (Ultimo) for the middleware layer
 
-Because the performance-critical layer — connection handling, request parsing, response serialization — is identical between the two, raw throughput differences are negligible. The frameworks diverge in what they build *on top* of that shared core.
+Because the performance-critical layer — connection handling, request parsing, response serialization — is identical between the two, raw throughput differences are negligible. The frameworks diverge in what they build _on top_ of that shared core.
 
 **Axum** follows a composition-first philosophy. It provides minimal built-in functionality and relies on the Tower ecosystem for middleware, the broader crate ecosystem for sessions/auth/CSRF, and extractors for type-safe request parsing. This makes Axum extremely flexible — you can swap almost any component.
 
@@ -141,14 +141,14 @@ async fn create_user(
 
 ### Tradeoffs
 
-| Aspect | Ultimo (Context) | Axum (Extractors) |
-|--------|-----------------|-------------------|
-| **Compile-time checking** | Runtime access | Compile-time type checking via generics |
-| **Discoverability** | IDE autocomplete on `ctx.` | Must know available extractors |
-| **Flexibility** | Access anything, anywhere | Order-dependent extraction |
-| **Refactoring** | Add features without changing signature | Adding data requires signature changes |
-| **Learning curve** | One concept to learn | Multiple extractor types to learn |
-| **Error messages** | Clear runtime errors | Sometimes cryptic trait bound errors |
+| Aspect                    | Ultimo (Context)                        | Axum (Extractors)                       |
+| ------------------------- | --------------------------------------- | --------------------------------------- |
+| **Compile-time checking** | Runtime access                          | Compile-time type checking via generics |
+| **Discoverability**       | IDE autocomplete on `ctx.`              | Must know available extractors          |
+| **Flexibility**           | Access anything, anywhere               | Order-dependent extraction              |
+| **Refactoring**           | Add features without changing signature | Adding data requires signature changes  |
+| **Learning curve**        | One concept to learn                    | Multiple extractor types to learn       |
+| **Error messages**        | Clear runtime errors                    | Sometimes cryptic trait bound errors    |
 
 Axum's extractors provide stronger compile-time guarantees — if your handler compiles, the extraction will succeed (barring runtime data issues). This is a genuine advantage for large teams. Ultimo's Context trades some compile-time safety for a flatter learning curve and less ceremony when prototyping.
 
@@ -172,6 +172,7 @@ ultimo generate --path ./src --output ./frontend/src/api
 The generated client includes full TypeScript types matching your Rust structs, proper error handling, and method signatures. Your frontend developers get autocomplete, type checking, and zero manual API client maintenance.
 
 **With Axum**, you'd typically:
+
 1. Manually write OpenAPI specs (or use `utoipa` to derive them)
 2. Run a separate code generator like `openapi-typescript-codegen`
 3. Maintain synchronization between your Rust types and the generated client
@@ -297,48 +298,48 @@ Ultimo's middleware is simpler to write (it's just an async function), but the e
 
 Let's be direct: **Axum has a larger ecosystem and is more mature.** It reached [version 0.8.x](https://docs.rs/axum) with a post-1.0 stability promise, has hundreds of community crates, extensive documentation, and is used in production by major companies.
 
-| Metric | Ultimo | Axum |
-|--------|--------|------|
-| **Current version** | [0.5.0](/blog/introducing-ultimo-v0-5) (pre-1.0) | 0.8.x (post-1.0 stability) |
-| **First release** | 2024 | 2021 |
-| **Community crates** | Growing | Hundreds |
-| **Production users** | Early adopters | Major companies |
-| **Documentation** | [Complete](https://docs.ultimo.dev), improving | Extensive |
-| **Breaking changes** | Possible (pre-1.0) | Rare, well-managed |
-| **Tower compatibility** | No (own middleware) | Full |
-| **GitHub stars** | Growing | 20,000+ |
+| Metric                  | Ultimo                                           | Axum                       |
+| ----------------------- | ------------------------------------------------ | -------------------------- |
+| **Current version**     | [0.5.0](/blog/introducing-ultimo-v0-5) (pre-1.0) | 0.8.x (post-1.0 stability) |
+| **First release**       | 2024                                             | 2021                       |
+| **Community crates**    | Growing                                          | Hundreds                   |
+| **Production users**    | Early adopters                                   | Major companies            |
+| **Documentation**       | [Complete](https://docs.ultimo.dev), improving   | Extensive                  |
+| **Breaking changes**    | Possible (pre-1.0)                               | Rare, well-managed         |
+| **Tower compatibility** | No (own middleware)                              | Full                       |
+| **GitHub stars**        | Growing                                          | 20,000+                    |
 
 If stability and ecosystem breadth are your top priorities, Axum is the safer choice today. If integrated features and developer velocity matter more, Ultimo offers a compelling alternative.
 
 ## Comprehensive Feature Comparison
 
-| Feature | Ultimo | Axum |
-|---------|--------|------|
-| HTTP/1.1 + HTTP/2 | ✅ | ✅ |
-| Async (Tokio) | ✅ | ✅ |
-| JSON serialization | ✅ (built-in) | ✅ (via serde) |
-| Path parameters | ✅ | ✅ |
-| Query parameters | ✅ | ✅ |
-| Request body parsing | ✅ | ✅ |
-| Static file serving | ✅ (built-in) | Via `tower-http` |
-| Response compression | ✅ (built-in) | Via `tower-http` |
-| WebSocket | ✅ (with pub/sub) | ✅ (raw) |
-| JSON-RPC | ✅ (first-class) | ❌ |
-| TypeScript client gen | ✅ (automatic) | ❌ |
-| OpenAPI generation | ✅ (built-in) | Via `utoipa` |
-| Sessions | ✅ (built-in) | Via `tower-sessions` |
-| CSRF protection | ✅ (built-in) | Manual |
-| JWT auth | ✅ (built-in) | Via ecosystem |
-| API-key auth | ✅ (built-in) | Manual |
-| Authorization guards | ✅ (built-in) | Manual / `axum-extra` |
-| Rate limiting | ✅ (built-in) | Via `tower-governor` |
-| Nested routers | Basic | ✅ (advanced) |
-| Tower middleware | ❌ | ✅ |
-| Compile-time extraction | ❌ (runtime Context) | ✅ |
-| `#![forbid(unsafe_code)]` | ✅ | ❌ (some unsafe) |
-| Routing complexity | O(1) hash | O(log n) trie |
-| Hot reload (dev) | ✅ (CLI) | Via `cargo-watch` |
-| Project scaffolding | ✅ (CLI templates) | Manual |
+| Feature                   | Ultimo               | Axum                  |
+| ------------------------- | -------------------- | --------------------- |
+| HTTP/1.1 + HTTP/2         | ✅                   | ✅                    |
+| Async (Tokio)             | ✅                   | ✅                    |
+| JSON serialization        | ✅ (built-in)        | ✅ (via serde)        |
+| Path parameters           | ✅                   | ✅                    |
+| Query parameters          | ✅                   | ✅                    |
+| Request body parsing      | ✅                   | ✅                    |
+| Static file serving       | ✅ (built-in)        | Via `tower-http`      |
+| Response compression      | ✅ (built-in)        | Via `tower-http`      |
+| WebSocket                 | ✅ (with pub/sub)    | ✅ (raw)              |
+| JSON-RPC                  | ✅ (first-class)     | ❌                    |
+| TypeScript client gen     | ✅ (automatic)       | ❌                    |
+| OpenAPI generation        | ✅ (built-in)        | Via `utoipa`          |
+| Sessions                  | ✅ (built-in)        | Via `tower-sessions`  |
+| CSRF protection           | ✅ (built-in)        | Manual                |
+| JWT auth                  | ✅ (built-in)        | Via ecosystem         |
+| API-key auth              | ✅ (built-in)        | Manual                |
+| Authorization guards      | ✅ (built-in)        | Manual / `axum-extra` |
+| Rate limiting             | ✅ (built-in)        | Via `tower-governor`  |
+| Nested routers            | Basic                | ✅ (advanced)         |
+| Tower middleware          | ❌                   | ✅                    |
+| Compile-time extraction   | ❌ (runtime Context) | ✅                    |
+| `#![forbid(unsafe_code)]` | ✅                   | ❌ (some unsafe)      |
+| Routing complexity        | O(1) hash            | O(log n) trie         |
+| Hot reload (dev)          | ✅ (CLI)             | Via `cargo-watch`     |
+| Project scaffolding       | ✅ (CLI templates)   | Manual                |
 
 ## When to Choose Ultimo
 
@@ -385,4 +386,4 @@ The Rust web ecosystem is richer for having both.
 
 ---
 
-*Ready to try Ultimo? Check out our [getting started guide](/blog/build-your-first-api-with-ultimo) or explore the [examples repository](https://github.com/ultimo-rs/ultimo/tree/main/examples).*
+_Ready to try Ultimo? Check out our [getting started guide](/blog/build-your-first-api-with-ultimo) or explore the [examples repository](https://github.com/ultimo-rs/ultimo/tree/main/examples)._

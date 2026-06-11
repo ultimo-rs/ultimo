@@ -118,23 +118,23 @@ This pulls in [`ts-rs`](https://github.com/Aleph-Alpha/ts-rs) as a dependency an
 
 When you derive `TS`, each Rust type maps to a TypeScript equivalent. Here's the complete mapping table for common types:
 
-| Rust Type | TypeScript Type | Notes |
-|-----------|----------------|-------|
-| `bool` | `boolean` | |
-| `u8`, `u16`, `u32`, `i8`, `i16`, `i32` | `number` | |
-| `u64`, `i64`, `u128`, `i128` | `number` | Consider `bigint` for large values |
-| `f32`, `f64` | `number` | |
-| `String`, `&str` | `string` | |
-| `Option<T>` | `T \| null` | |
-| `Vec<T>` | `T[]` | |
-| `HashMap<K, V>` | `Record<K, V>` | K must be string-like |
-| `HashSet<T>` | `T[]` | |
-| `(A, B)` | `[A, B]` | Tuple types preserved |
-| `chrono::NaiveDateTime` | `string` | With `ts-rs` chrono feature |
-| `uuid::Uuid` | `string` | With `ts-rs` uuid feature |
-| Enums (unit variants) | `"A" \| "B" \| "C"` | String literal union |
-| Enums (data variants) | Tagged union | `{ type: "A", data: ... }` |
-| `serde_json::Value` | `any` | Escape hatch |
+| Rust Type                              | TypeScript Type     | Notes                              |
+| -------------------------------------- | ------------------- | ---------------------------------- |
+| `bool`                                 | `boolean`           |                                    |
+| `u8`, `u16`, `u32`, `i8`, `i16`, `i32` | `number`            |                                    |
+| `u64`, `i64`, `u128`, `i128`           | `number`            | Consider `bigint` for large values |
+| `f32`, `f64`                           | `number`            |                                    |
+| `String`, `&str`                       | `string`            |                                    |
+| `Option<T>`                            | `T \| null`         |                                    |
+| `Vec<T>`                               | `T[]`               |                                    |
+| `HashMap<K, V>`                        | `Record<K, V>`      | K must be string-like              |
+| `HashSet<T>`                           | `T[]`               |                                    |
+| `(A, B)`                               | `[A, B]`            | Tuple types preserved              |
+| `chrono::NaiveDateTime`                | `string`            | With `ts-rs` chrono feature        |
+| `uuid::Uuid`                           | `string`            | With `ts-rs` uuid feature          |
+| Enums (unit variants)                  | `"A" \| "B" \| "C"` | String literal union               |
+| Enums (data variants)                  | Tagged union        | `{ type: "A", data: ... }`         |
+| `serde_json::Value`                    | `any`               | Escape hatch                       |
 
 Nested structs are resolved transitively — if `UserOutput` contains a `Vec<Role>` and `Role` derives `TS`, the generated client emits the `Role` type declaration automatically.
 

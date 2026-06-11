@@ -5,8 +5,8 @@ import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import rehypePrettyCode from "rehype-pretty-code";
 import rehypeSlug from "rehype-slug";
-import { getAllPosts, getPostBySlug } from "@/lib/blog";
 import { TableOfContents } from "@/components/table-of-contents";
+import { getAllPosts, getPostBySlug } from "@/lib/blog";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -46,7 +46,7 @@ export default async function BlogPostPage({ params }: PageProps) {
   }
 
   // Strip the first H1 from content since we render it in the header
-  const content = post.content.replace(/^#\s+.+\n+/, "");
+  const content = post.content.replace(/^\s*#\s+.+\n+/, "");
 
   return (
     <div className="min-h-screen selection:bg-orange-500/30">

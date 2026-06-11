@@ -5,21 +5,21 @@ import path from "path";
 const postsDirectory = path.join(process.cwd(), "content/posts");
 
 export interface PostMeta {
-	slug: string;
-	title: string;
-	description: string;
-	date: string;
-	author: string;
-	tags: string[];
-	image?: string;
+  slug: string;
+  title: string;
+  description: string;
+  date: string;
+  author: string;
+  tags: string[];
+  image?: string;
 }
 
 export function getAllPosts(): PostMeta[] {
-	if (!fs.existsSync(postsDirectory)) {
-		return [];
-	}
+  if (!fs.existsSync(postsDirectory)) {
+    return [];
+  }
 
-	const files = fs
+  const files = fs
     .readdirSync(postsDirectory)
     .filter((f) => f.endsWith(".mdx"));
 
@@ -46,25 +46,25 @@ export function getAllPosts(): PostMeta[] {
 }
 
 export function getPostBySlug(slug: string) {
-	const filePath = path.join(postsDirectory, `${slug}.mdx`);
+  const filePath = path.join(postsDirectory, `${slug}.mdx`);
 
-	if (!fs.existsSync(filePath)) {
-		return null;
-	}
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
 
-	const fileContents = fs.readFileSync(filePath, "utf8");
-	const { data, content } = matter(fileContents);
+  const fileContents = fs.readFileSync(filePath, "utf8");
+  const { data, content } = matter(fileContents);
 
-	return {
-		meta: {
-			slug,
-			title: data.title ?? slug,
-			description: data.description ?? "",
-			date: data.date ?? "",
-			author: data.author ?? "Ultimo Team",
-			tags: data.tags ?? [],
-			image: data.image,
-		} satisfies PostMeta,
-		content,
-	};
+  return {
+    meta: {
+      slug,
+      title: data.title ?? slug,
+      description: data.description ?? "",
+      date: data.date ?? "",
+      author: data.author ?? "Ultimo Team",
+      tags: data.tags ?? [],
+      image: data.image,
+    } satisfies PostMeta,
+    content,
+  };
 }
