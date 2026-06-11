@@ -5,8 +5,9 @@ import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import rehypePrettyCode from "rehype-pretty-code";
 import rehypeSlug from "rehype-slug";
-import { getAllPosts, getPostBySlug } from "@/lib/blog";
+import remarkGfm from "remark-gfm";
 import { TableOfContents } from "@/components/table-of-contents";
+import { getAllPosts, getPostBySlug } from "@/lib/blog";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -46,7 +47,7 @@ export default async function BlogPostPage({ params }: PageProps) {
   }
 
   // Strip the first H1 from content since we render it in the header
-  const content = post.content.replace(/^#\s+.+\n+/, "");
+  const content = post.content.replace(/^\s*#\s+.+\n+/, "");
 
   return (
     <div className="min-h-screen selection:bg-orange-500/30">
@@ -93,11 +94,12 @@ export default async function BlogPostPage({ params }: PageProps) {
               </div>
             </header>
 
-            <div className="prose prose-invert prose-orange max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-orange-400 prose-a:no-underline hover:prose-a:underline prose-code:text-orange-300 prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-border/50 prose-img:rounded-lg">
+            <div className="prose prose-invert prose-orange max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-orange-400 prose-a:no-underline prose-a:hover:underline prose-code:text-orange-300 prose-pre:bg-[#0d1117] prose-pre:border prose-pre:border-border/50 prose-img:rounded-lg">
               <MDXRemote
                 source={content}
                 options={{
                   mdxOptions: {
+                    remarkPlugins: [remarkGfm],
                     rehypePlugins: [
                       rehypeSlug,
                       [rehypePrettyCode, { theme: "github-dark-dimmed" }],

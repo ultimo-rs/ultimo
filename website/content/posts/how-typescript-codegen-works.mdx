@@ -145,6 +145,7 @@ Running `ultimo generate --path ./src --output ./client` triggers a multi-phase 
 **Phase 4: Deduplication.** Multiple methods might share types (e.g., several endpoints return `User`). The generator deduplicates by type name, ensuring each interface appears exactly once in the output.
 
 **Phase 5: Code Emission.** The generator writes a self-contained TypeScript module with:
+
 - All interface/type definitions (topologically sorted so dependencies appear before dependents)
 - A typed function for each RPC method
 - A configurable base client with error handling
@@ -238,7 +239,7 @@ export class RpcError extends Error {
   constructor(
     public code: number,
     message: string,
-    public data?: unknown
+    public data?: unknown,
   ) {
     super(message);
     this.name = "RpcError";
@@ -359,28 +360,28 @@ export interface PaginatedUser {
 
 Here is the complete mapping from Rust types to TypeScript types:
 
-| Rust Type | TypeScript Type |
-|-----------|----------------|
-| `String`, `&str` | `string` |
-| `u8`, `u16`, `u32`, `i8`, `i16`, `i32` | `number` |
-| `u64`, `i64`, `u128`, `i128` | `number` |
-| `f32`, `f64` | `number` |
-| `bool` | `boolean` |
-| `()` | `null` |
-| `Vec<T>` | `T[]` |
-| `Option<T>` | `T \| null` |
-| `HashMap<K, V>` | `Record<K, V>` |
-| `BTreeMap<K, V>` | `Record<K, V>` |
-| `HashSet<T>` | `T[]` |
-| `(A, B, C)` | `[A, B, C]` |
-| `Box<T>`, `Arc<T>`, `Rc<T>` | `T` (transparent) |
-| `Uuid` | `string` |
-| `DateTime<Utc>` (chrono) | `string` |
-| `NaiveDate` | `string` |
-| Unit enum variants | String literal union |
-| Tagged enum | Discriminated union |
-| Untagged enum | Union type |
-| Struct | Interface |
+| Rust Type                              | TypeScript Type      |
+| -------------------------------------- | -------------------- |
+| `String`, `&str`                       | `string`             |
+| `u8`, `u16`, `u32`, `i8`, `i16`, `i32` | `number`             |
+| `u64`, `i64`, `u128`, `i128`           | `number`             |
+| `f32`, `f64`                           | `number`             |
+| `bool`                                 | `boolean`            |
+| `()`                                   | `null`               |
+| `Vec<T>`                               | `T[]`                |
+| `Option<T>`                            | `T \| null`          |
+| `HashMap<K, V>`                        | `Record<K, V>`       |
+| `BTreeMap<K, V>`                       | `Record<K, V>`       |
+| `HashSet<T>`                           | `T[]`                |
+| `(A, B, C)`                            | `[A, B, C]`          |
+| `Box<T>`, `Arc<T>`, `Rc<T>`            | `T` (transparent)    |
+| `Uuid`                                 | `string`             |
+| `DateTime<Utc>` (chrono)               | `string`             |
+| `NaiveDate`                            | `string`             |
+| Unit enum variants                     | String literal union |
+| Tagged enum                            | Discriminated union  |
+| Untagged enum                          | Union type           |
+| Struct                                 | Interface            |
 
 Smart pointer types (`Box`, `Arc`, `Rc`) are transparent — the generated TypeScript sees only the inner type. This matches how serde serializes them.
 

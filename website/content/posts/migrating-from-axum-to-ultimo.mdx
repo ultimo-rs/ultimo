@@ -18,22 +18,22 @@ This guide walks you through migrating an Axum application to Ultimo, concept by
 
 Before diving into code, here's how Axum concepts translate to Ultimo:
 
-| Axum | Ultimo | Notes |
-|------|--------|-------|
-| `Router::new()` | `Ultimo::new()` | App builder and router combined |
-| `.route("/path", get(handler))` | `.get("/path", handler)` | Methods directly on the builder |
-| `async fn handler(...)` with extractors | `async fn handler(ctx: Context) -> Result<impl Into<Response>>` | Single `Context` parameter |
-| `State(pool): State<DbPool>` | `ctx.state::<DbPool>()` | Method call instead of extractor |
-| `Path(id): Path<u64>` | `ctx.param("id")` | String-based, parse yourself |
-| `Query(params): Query<T>` | `ctx.query::<T>()` | Deserializes from query string |
-| `Json(body): Json<T>` | `ctx.json_body::<T>().await` | Async because it reads the body |
-| `impl IntoResponse` | `Result<impl Into<Response>>` | Error handling built into return type |
-| `(StatusCode, Json(val))` | `ctx.status(201).json(&val)` | Chainable response builder |
-| `Router::with_state(state)` | `.state(my_state)` | Method on the app builder |
-| Tower layers / `middleware::from_fn` | `.middleware(fn)` | Simple async function |
-| `axum::serve(listener, app)` | `app.listen("0.0.0.0:3000").await` | One-liner |
-| No equivalent | `RpcRegistry` + `.rpc("/rpc", registry)` | JSON-RPC with TS codegen |
-| No equivalent | Automatic TypeScript client generation | Zero-config from Rust types |
+| Axum                                    | Ultimo                                                          | Notes                                 |
+| --------------------------------------- | --------------------------------------------------------------- | ------------------------------------- |
+| `Router::new()`                         | `Ultimo::new()`                                                 | App builder and router combined       |
+| `.route("/path", get(handler))`         | `.get("/path", handler)`                                        | Methods directly on the builder       |
+| `async fn handler(...)` with extractors | `async fn handler(ctx: Context) -> Result<impl Into<Response>>` | Single `Context` parameter            |
+| `State(pool): State<DbPool>`            | `ctx.state::<DbPool>()`                                         | Method call instead of extractor      |
+| `Path(id): Path<u64>`                   | `ctx.param("id")`                                               | String-based, parse yourself          |
+| `Query(params): Query<T>`               | `ctx.query::<T>()`                                              | Deserializes from query string        |
+| `Json(body): Json<T>`                   | `ctx.json_body::<T>().await`                                    | Async because it reads the body       |
+| `impl IntoResponse`                     | `Result<impl Into<Response>>`                                   | Error handling built into return type |
+| `(StatusCode, Json(val))`               | `ctx.status(201).json(&val)`                                    | Chainable response builder            |
+| `Router::with_state(state)`             | `.state(my_state)`                                              | Method on the app builder             |
+| Tower layers / `middleware::from_fn`    | `.middleware(fn)`                                               | Simple async function                 |
+| `axum::serve(listener, app)`            | `app.listen("0.0.0.0:3000").await`                              | One-liner                             |
+| No equivalent                           | `RpcRegistry` + `.rpc("/rpc", registry)`                        | JSON-RPC with TS codegen              |
+| No equivalent                           | Automatic TypeScript client generation                          | Zero-config from Rust types           |
 
 ## Basic Route Migration
 
