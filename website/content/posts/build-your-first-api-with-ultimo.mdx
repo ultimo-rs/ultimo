@@ -1,155 +1,693 @@
 ---
 title: "Build Your First API with Ultimo in 10 Minutes"
-description: "A step-by-step tutorial to create a REST API with Ultimo, add JSON-RPC endpoints, and generate a TypeScript client — all in under 10 minutes."
+description: "A step-by-step tutorial to create a REST API with Ultimo, add JSON-RPC endpoints, and generate a fully typed TypeScript client — from cargo init to working frontend."
 date: "2026-06-10"
 author: "Ultimo Team"
 tags: ["tutorial", "getting-started", "api"]
 ---
 
-Ultimo lets you build a production-ready API in Rust with automatic TypeScript client generation. In this tutorial, you'll create a REST + JSON-RPC API from scratch and generate a fully typed TypeScript client.
+# Build Your First API with Ultimo in 10 Minutes
+
+Ultimo lets you build REST and JSON-RPC APIs in Rust with automatic TypeScript client generation. In this tutorial, you'll create a fully functional Todo API, expose it via both REST and JSON-RPC, and generate a typed TypeScript client that a frontend can consume immediately.
+
+By the end, you'll have a running API server, curl commands to test it, and a generated TypeScript client ready to drop into any React, Vue, or Svelte project.
 
 ## Prerequisites
 
-- Rust 1.86+ installed (`rustup update stable`)
-- Node.js 18+ (for the generated TypeScript client)
+Before we start, make sure you have:
+
+- **Rust 1.86+** — install via [rustup](https://rustup.rs) (`rustup update stable`)
+- **Node.js 18+** — needed for the TypeScript client generation step
+- **cargo** and **npm/pnpm** available in your PATH
+
+Verify your setup:
+
+```bash
+rustc --version   # should be 1.86.0 or newer
+node --version    # should be v18 or newer
+```
 
 ## Step 1: Create Your Project
 
+Start by creating a new Rust project and installing the Ultimo CLI:
+
 ```bash
+cargo new todo-api
+cd todo-api
 cargo install ultimo-cli
-ultimo new my-api --template api-only
-cd my-api
 ```
 
-This scaffolds a project with the correct dependencies and a basic `main.rs`.
+Alternatively, you can scaffold with the CLI directly:
 
-## Step 2: Define Your Types
+```bash
+ultimo new todo-api --template api-only
+cd todo-api
+```
 
-Open `src/main.rs` and define your data types:
+## Step 2: Configure Dependencies
+
+Replace your `Cargo.toml` with the following:
+
+```toml
+[package]
+name = "todo-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ultimo = { version = "0.5", features = ["websocket", "session"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+```
+
+Run `cargo build` to fetch dependencies. This will take a moment on the first run as it compiles Ultimo and its dependencies.
+
+## Step 3: Define Your Data Types
+
+Open `src/main.rs` and start by defining the data structures for our Todo API. Ultimo uses standard Serde derives plus its own `TS` derive macro for TypeScript generation:
 
 ```rust
-use ultimo::prelude::*;
-use ultimo::rpc::TS;
 use serde::{Deserialize, Serialize};
+use ultimo::prelude::*;
+use uuid::Uuid;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
-#[derive(Serialize, Deserialize, TS, Clone)]
-struct Todo {
-    id: u64,
-    title: String,
-    completed: bool,
+/// A single todo item
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct Todo {
+    pub id: String,
+    pub title: String,
+    pub completed: bool,
 }
 
-#[derive(Deserialize, TS)]
-struct CreateTodo {
-    title: String,
+/// Request body for creating a new todo
+#[derive(Debug, Deserialize, TS)]
+pub struct CreateTodo {
+    pub title: String,
+}
+
+/// Request body for updating an existing todo
+#[derive(Debug, Deserialize, TS)]
+pub struct UpdateTodo {
+    pub title: Option<String>,
+    pub completed: Option<bool>,
+}
+
+/// Shared application state
+#[derive(Clone)]
+pub struct AppState {
+    pub todos: Arc<RwLock<Vec<Todo>>>,
 }
 ```
 
-## Step 3: Create REST Handlers
+The `TS` derive macro tells Ultimo's code generator to include these types in the generated TypeScript client. You don't need to write TypeScript interfaces manually — they're produced automatically from your Rust types.
+
+## Step 4: Create REST Handlers
+
+Now let's write the handler functions. Each handler receives a `Context` that provides access to request data, application state, path parameters, and response builders.
+
+### List All Todos
 
 ```rust
 async fn list_todos(ctx: Context) -> Result<impl Into<Response>> {
-    // In a real app, you'd query a database
-    let todos = vec![
-        Todo { id: 1, title: "Learn Ultimo".into(), completed: false },
-        Todo { id: 2, title: "Build an API".into(), completed: true },
-    ];
-    ctx.json(&todos)
-}
-
-async fn create_todo(ctx: Context) -> Result<impl Into<Response>> {
-    let input: CreateTodo = ctx.json_body().await?;
-    let todo = Todo {
-        id: 3,
-        title: input.title,
-        completed: false,
-    };
-    ctx.json(&todo)
+    let state = ctx.state::<AppState>();
+    let todos = state.todos.read().await;
+    ctx.json(&*todos)
 }
 ```
 
-## Step 4: Add JSON-RPC Endpoints
-
-Ultimo supports both REST and JSON-RPC in the same application:
+### Create a Todo
 
 ```rust
-async fn get_todo(ctx: Context, input: RpcRequest<u64>) -> Result<Todo> {
-    let id = input.params;
-    Ok(Todo {
-        id,
-        title: format!("Todo #{id}"),
+async fn create_todo(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let body: CreateTodo = ctx.json_body().await?;
+
+    let todo = Todo {
+        id: Uuid::new_v4().to_string(),
+        title: body.title,
         completed: false,
-    })
+    };
+
+    state.todos.write().await.push(todo.clone());
+    ctx.status(201).json(&todo)
 }
 ```
 
-## Step 5: Wire It All Together
+### Get a Single Todo
+
+```rust
+async fn get_todo(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let id = ctx.param("id")?;
+    let todos = state.todos.read().await;
+
+    let todo = todos.iter().find(|t| t.id == id);
+
+    match todo {
+        Some(t) => ctx.json(t),
+        None => Err(UltimoError::not_found("Todo not found")),
+    }
+}
+```
+
+### Update a Todo
+
+```rust
+async fn update_todo(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let id = ctx.param("id")?;
+    let body: UpdateTodo = ctx.json_body().await?;
+
+    let mut todos = state.todos.write().await;
+    let todo = todos.iter_mut().find(|t| t.id == id);
+
+    match todo {
+        Some(t) => {
+            if let Some(title) = body.title {
+                t.title = title;
+            }
+            if let Some(completed) = body.completed {
+                t.completed = completed;
+            }
+            ctx.json(t)
+        }
+        None => Err(UltimoError::not_found("Todo not found")),
+    }
+}
+```
+
+### Delete a Todo
+
+```rust
+async fn delete_todo(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let id = ctx.param("id")?;
+
+    let mut todos = state.todos.write().await;
+    let len_before = todos.len();
+    todos.retain(|t| t.id != id);
+
+    if todos.len() == len_before {
+        Err(UltimoError::not_found("Todo not found"))
+    } else {
+        ctx.status(204).text("")
+    }
+}
+```
+
+Each handler follows the same pattern: extract state, parse input, perform logic, return a response. Ultimo's `Context` handles serialization, content-type headers, and error formatting automatically.
+
+## Step 5: Add JSON-RPC Endpoints
+
+One of Ultimo's standout features is serving JSON-RPC alongside REST from the same application. JSON-RPC is ideal for frontend clients because it uses a single endpoint and maps cleanly to generated TypeScript functions.
+
+Define an RPC registry with query (read) and mutation (write) methods:
+
+```rust
+fn build_rpc() -> RpcRegistry {
+    let mut rpc = RpcRegistry::new();
+
+    // Queries (read-only operations)
+    rpc.query("todos.list", |ctx: Context, _params: ()| async move {
+        let state = ctx.state::<AppState>();
+        let todos = state.todos.read().await;
+        Ok(serde_json::to_value(&*todos)?)
+    });
+
+    rpc.query("todos.get", |ctx: Context, params: serde_json::Value| async move {
+        let id = params["id"].as_str().unwrap_or_default();
+        let state = ctx.state::<AppState>();
+        let todos = state.todos.read().await;
+
+        todos
+            .iter()
+            .find(|t| t.id == id)
+            .map(|t| serde_json::to_value(t).unwrap())
+            .ok_or_else(|| UltimoError::not_found("Todo not found"))
+    });
+
+    // Mutations (write operations)
+    rpc.mutation("todos.create", |ctx: Context, params: CreateTodo| async move {
+        let state = ctx.state::<AppState>();
+        let todo = Todo {
+            id: Uuid::new_v4().to_string(),
+            title: params.title,
+            completed: false,
+        };
+        state.todos.write().await.push(todo.clone());
+        Ok(serde_json::to_value(&todo)?)
+    });
+
+    rpc.mutation("todos.toggle", |ctx: Context, params: serde_json::Value| async move {
+        let id = params["id"].as_str().unwrap_or_default();
+        let state = ctx.state::<AppState>();
+        let mut todos = state.todos.write().await;
+
+        let todo = todos.iter_mut().find(|t| t.id == id)
+            .ok_or_else(|| UltimoError::not_found("Todo not found"))?;
+
+        todo.completed = !todo.completed;
+        Ok(serde_json::to_value(&todo)?)
+    });
+
+    rpc
+}
+```
+
+The distinction between `query` and `mutation` is semantic — queries are safe to cache and retry, mutations are not. The TypeScript client generator uses this distinction to produce appropriately typed function signatures.
+
+## Step 6: Wire Everything Together
+
+Now let's assemble the application in `main()`:
 
 ```rust
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut rpc = RpcRegistry::new();
-    rpc.query("getTodo", get_todo);
+    let state = AppState {
+        todos: Arc::new(RwLock::new(vec![])),
+    };
+
+    let rpc = build_rpc();
 
     let app = Ultimo::new()
+        .state(state)
+        .rpc(rpc)
+        // REST routes
         .get("/api/todos", list_todos)
         .post("/api/todos", create_todo)
-        .rpc("/rpc", rpc)
-        .port(3000);
+        .get("/api/todos/:id", get_todo)
+        .put("/api/todos/:id", update_todo)
+        .delete("/api/todos/:id", delete_todo)
+        // Middleware
+        .middleware(ultimo::middleware::Logger::new())
+        .middleware(ultimo::middleware::Cors::permissive())
+        .bind("127.0.0.1:3000")
+        .await?;
 
-    println!("Server running at http://localhost:3000");
+    println!("🚀 Server running at http://127.0.0.1:3000");
+    println!("   REST:     http://127.0.0.1:3000/api/todos");
+    println!("   JSON-RPC: http://127.0.0.1:3000/rpc");
+
     app.run().await
 }
 ```
 
-## Step 6: Generate Your TypeScript Client
+The `Ultimo` builder chains everything together: shared state, RPC registry, REST routes, and middleware. The JSON-RPC endpoint is automatically mounted at `/rpc` when you attach an `RpcRegistry`.
 
-With your server running, open another terminal:
+## Step 7: Run and Test
+
+Start the server:
+
+```bash
+cargo run
+```
+
+Now test with curl. Create a todo:
+
+```bash
+curl -X POST http://127.0.0.1:3000/api/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Learn Ultimo"}'
+```
+
+Response:
+
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "title": "Learn Ultimo",
+  "completed": false
+}
+```
+
+List all todos:
+
+```bash
+curl http://127.0.0.1:3000/api/todos
+```
+
+Update a todo (replace the ID with your actual ID):
+
+```bash
+curl -X PUT http://127.0.0.1:3000/api/todos/a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
+  -H "Content-Type: application/json" \
+  -d '{"completed": true}'
+```
+
+Test the JSON-RPC endpoint:
+
+```bash
+curl -X POST http://127.0.0.1:3000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "todos.create", "params": {"title": "Ship it"}, "id": 1}'
+```
+
+Response:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "id": "f7e8d9c0-b1a2-3456-7890-abcdef123456",
+    "title": "Ship it",
+    "completed": false
+  },
+  "id": 1
+}
+```
+
+## Step 8: Generate the TypeScript Client
+
+This is where Ultimo truly shines. Run the CLI generator to produce a fully typed TypeScript client from your Rust API:
 
 ```bash
 ultimo generate --path ./src --output ./client
 ```
 
-This produces a fully typed TypeScript client:
+This scans your Rust source files, finds all types annotated with `TS` and all registered RPC methods, and generates a typed client. The output in `./client/index.ts` looks like this:
 
 ```typescript
-// client/index.ts (auto-generated)
-export type Todo = {
-  id: number;
+// Auto-generated by ultimo-cli — do not edit manually
+
+export interface Todo {
+  id: string;
   title: string;
   completed: boolean;
-};
+}
 
-export type CreateTodo = {
+export interface CreateTodo {
   title: string;
-};
+}
 
-export const api = {
-  async getTodo(id: number): Promise<Todo> { /* ... */ },
-};
+export interface UpdateTodo {
+  title?: string;
+  completed?: boolean;
+}
+
+export class TodoApiClient {
+  private baseUrl: string;
+
+  constructor(baseUrl: string = "http://127.0.0.1:3000") {
+    this.baseUrl = baseUrl;
+  }
+
+  // Queries
+  async todosList(): Promise<Todo[]> {
+    return this.rpcCall("todos.list", {});
+  }
+
+  async todosGet(params: { id: string }): Promise<Todo> {
+    return this.rpcCall("todos.get", params);
+  }
+
+  // Mutations
+  async todosCreate(params: CreateTodo): Promise<Todo> {
+    return this.rpcCall("todos.create", params);
+  }
+
+  async todosToggle(params: { id: string }): Promise<Todo> {
+    return this.rpcCall("todos.toggle", params);
+  }
+
+  private async rpcCall<T>(method: string, params: unknown): Promise<T> {
+    const res = await fetch(`${this.baseUrl}/rpc`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method,
+        params,
+        id: Date.now(),
+      }),
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error.message);
+    return json.result as T;
+  }
+}
 ```
 
-## Step 7: Use the Client in Your Frontend
+Every type is correct, every method signature matches your Rust definitions, and the client handles JSON-RPC framing for you.
+
+## Step 9: Use the Client in a Frontend
+
+Drop the generated client into any TypeScript project:
 
 ```typescript
-import { api } from "./client";
+import { TodoApiClient } from "./client";
 
-const todo = await api.getTodo(1);
-console.log(todo.title); // Fully typed!
+const api = new TodoApiClient("http://localhost:3000");
+
+// Create a todo — fully typed, autocompletion works
+const newTodo = await api.todosCreate({ title: "Write docs" });
+console.log(newTodo.id); // string, not any
+
+// List all todos
+const todos = await api.todosList();
+todos.forEach((todo) => {
+  console.log(`${todo.completed ? "✓" : "○"} ${todo.title}`);
+});
+
+// Toggle completion
+const updated = await api.todosToggle({ id: newTodo.id });
+console.log(updated.completed); // true
 ```
 
-## What You Built
+No manual API wiring, no fetch boilerplate, no type mismatches between frontend and backend. Change a field in your Rust struct, re-run `ultimo generate`, and the TypeScript compiler immediately flags any frontend code that uses the old shape.
 
-In under 10 minutes, you have:
+For continuous development, use watch mode:
 
-- **REST endpoints** (`GET /api/todos`, `POST /api/todos`)
-- **JSON-RPC endpoint** (`/rpc` with `getTodo` method)
-- **Automatic TypeScript client** with full type safety
-- **Request validation** via Rust's type system — invalid requests won't compile
+```bash
+ultimo generate --path ./src --output ./client --watch
+```
+
+This regenerates the client whenever your Rust source files change.
+
+## Step 10: Add Middleware
+
+Ultimo ships with built-in middleware for common needs. You already saw `Logger` and `Cors` in the main function. Here's how to add more:
+
+```rust
+use ultimo::middleware::{Logger, Cors, RateLimit, SecurityHeaders};
+use std::time::Duration;
+
+let app = Ultimo::new()
+    .state(state)
+    .rpc(rpc)
+    // Logging — prints method, path, status, and duration
+    .middleware(Logger::new())
+    // CORS — permissive for development, restrict in production
+    .middleware(Cors::permissive())
+    // Rate limiting — 100 requests per minute per IP
+    .middleware(RateLimit::new(100, Duration::from_secs(60)))
+    // Security headers — X-Content-Type-Options, X-Frame-Options, etc.
+    .middleware(SecurityHeaders::new())
+    // ... routes ...
+    .bind("127.0.0.1:3000")
+    .await?;
+```
+
+You can also write custom middleware. A middleware is any async function that wraps the next handler:
+
+```rust
+async fn auth_middleware(ctx: Context, next: Next) -> Result<impl Into<Response>> {
+    let token = ctx.header("Authorization").unwrap_or_default();
+
+    if !token.starts_with("Bearer ") {
+        return Err(UltimoError::unauthorized("Missing token"));
+    }
+
+    // Token is valid — continue to the handler
+    next.run(ctx).await
+}
+```
+
+Apply it to specific routes or route groups as needed.
+
+## Complete Source Code
+
+Here's the full `src/main.rs` for reference — you can copy this directly and have a working API:
+
+```rust
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use ultimo::prelude::*;
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct Todo {
+    pub id: String,
+    pub title: String,
+    pub completed: bool,
+}
+
+#[derive(Debug, Deserialize, TS)]
+pub struct CreateTodo {
+    pub title: String,
+}
+
+#[derive(Debug, Deserialize, TS)]
+pub struct UpdateTodo {
+    pub title: Option<String>,
+    pub completed: Option<bool>,
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    pub todos: Arc<RwLock<Vec<Todo>>>,
+}
+
+async fn list_todos(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let todos = state.todos.read().await;
+    ctx.json(&*todos)
+}
+
+async fn create_todo(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let body: CreateTodo = ctx.json_body().await?;
+    let todo = Todo {
+        id: Uuid::new_v4().to_string(),
+        title: body.title,
+        completed: false,
+    };
+    state.todos.write().await.push(todo.clone());
+    ctx.status(201).json(&todo)
+}
+
+async fn get_todo(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let id = ctx.param("id")?;
+    let todos = state.todos.read().await;
+    match todos.iter().find(|t| t.id == id) {
+        Some(t) => ctx.json(t),
+        None => Err(UltimoError::not_found("Todo not found")),
+    }
+}
+
+async fn update_todo(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let id = ctx.param("id")?;
+    let body: UpdateTodo = ctx.json_body().await?;
+    let mut todos = state.todos.write().await;
+    match todos.iter_mut().find(|t| t.id == id) {
+        Some(t) => {
+            if let Some(title) = body.title {
+                t.title = title;
+            }
+            if let Some(completed) = body.completed {
+                t.completed = completed;
+            }
+            ctx.json(t)
+        }
+        None => Err(UltimoError::not_found("Todo not found")),
+    }
+}
+
+async fn delete_todo(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let id = ctx.param("id")?;
+    let mut todos = state.todos.write().await;
+    let len_before = todos.len();
+    todos.retain(|t| t.id != id);
+    if todos.len() == len_before {
+        Err(UltimoError::not_found("Todo not found"))
+    } else {
+        ctx.status(204).text("")
+    }
+}
+
+fn build_rpc() -> RpcRegistry {
+    let mut rpc = RpcRegistry::new();
+
+    rpc.query("todos.list", |ctx: Context, _params: ()| async move {
+        let state = ctx.state::<AppState>();
+        let todos = state.todos.read().await;
+        Ok(serde_json::to_value(&*todos)?)
+    });
+
+    rpc.query("todos.get", |ctx: Context, params: serde_json::Value| async move {
+        let id = params["id"].as_str().unwrap_or_default();
+        let state = ctx.state::<AppState>();
+        let todos = state.todos.read().await;
+        todos
+            .iter()
+            .find(|t| t.id == id)
+            .map(|t| serde_json::to_value(t).unwrap())
+            .ok_or_else(|| UltimoError::not_found("Todo not found"))
+    });
+
+    rpc.mutation("todos.create", |ctx: Context, params: CreateTodo| async move {
+        let state = ctx.state::<AppState>();
+        let todo = Todo {
+            id: Uuid::new_v4().to_string(),
+            title: params.title,
+            completed: false,
+        };
+        state.todos.write().await.push(todo.clone());
+        Ok(serde_json::to_value(&todo)?)
+    });
+
+    rpc.mutation("todos.toggle", |ctx: Context, params: serde_json::Value| async move {
+        let id = params["id"].as_str().unwrap_or_default();
+        let state = ctx.state::<AppState>();
+        let mut todos = state.todos.write().await;
+        let todo = todos.iter_mut().find(|t| t.id == id)
+            .ok_or_else(|| UltimoError::not_found("Todo not found"))?;
+        todo.completed = !todo.completed;
+        Ok(serde_json::to_value(&todo)?)
+    });
+
+    rpc
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let state = AppState {
+        todos: Arc::new(RwLock::new(vec![])),
+    };
+
+    let rpc = build_rpc();
+
+    let app = Ultimo::new()
+        .state(state)
+        .rpc(rpc)
+        .get("/api/todos", list_todos)
+        .post("/api/todos", create_todo)
+        .get("/api/todos/:id", get_todo)
+        .put("/api/todos/:id", update_todo)
+        .delete("/api/todos/:id", delete_todo)
+        .middleware(ultimo::middleware::Logger::new())
+        .middleware(ultimo::middleware::Cors::permissive())
+        .bind("127.0.0.1:3000")
+        .await?;
+
+    println!("Server running at http://127.0.0.1:3000");
+    app.run().await
+}
+```
 
 ## Next Steps
 
-- Add a database with `ultimo`'s SQLx or Diesel integration
-- Enable WebSocket support for real-time features
-- Add JWT authentication with the `jwt` feature
-- Read the full docs at [docs.ultimo.dev](https://docs.ultimo.dev)
+You now have a working API with both REST and JSON-RPC interfaces, plus a generated TypeScript client. Here's where to go from here:
+
+- **Add a database** — Ultimo supports SQLx (Postgres, MySQL, SQLite) and Diesel out of the box. Enable the `sqlx-sqlite` feature and replace the in-memory `Vec` with a real database. See the [database guide](https://docs.ultimo.dev/database).
+
+- **Add authentication** — Use JWT tokens or API keys with Ultimo's auth guards. The `jwt-auth` example in the repository shows the full pattern including token issuance, validation middleware, and protected routes.
+
+- **Add WebSocket** — Enable the `websocket` feature for real-time updates. Ultimo's pub/sub system lets you broadcast todo changes to connected clients with just a few lines of code.
+
+- **Add validation** — Use Ultimo's `validate` function to enforce constraints on request bodies before processing them.
+
+- **Deploy** — Ultimo compiles to a single static binary. Build with `ultimo build --profile release`, copy the binary to your server, and run it. No runtime dependencies needed.
+
+Check out the [full documentation](https://docs.ultimo.dev) and the [examples directory](https://github.com/ultimo-rs/ultimo/tree/main/examples) for more patterns and real-world usage.
+
+---
+
+*Have questions? Open an issue on [GitHub](https://github.com/ultimo-rs/ultimo) or join the discussion in the repository's Discussions tab.*
