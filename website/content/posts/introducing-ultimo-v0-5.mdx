@@ -1,0 +1,97 @@
+---
+title: "Introducing Ultimo v0.5.0: Derive Your TypeScript Types from Rust"
+description: "Ultimo v0.5.0 ships automatic TypeScript type derivation via #[derive(TS)], static file serving, response compression, and breaking RPC improvements."
+date: "2026-06-09"
+author: "Ultimo Team"
+tags: ["release", "typescript", "rpc"]
+---
+
+We're excited to announce **Ultimo v0.5.0** — the biggest release since the framework's launch. This version introduces automatic TypeScript type derivation from your Rust types, eliminates hand-written type strings, and ships two major new features: static file serving and response compression.
+
+## TypeScript Client Type Derivation
+
+The headline feature of v0.5.0 is the new `client-gen` Cargo feature. Previously, you had to manually specify TypeScript type strings when registering RPC methods. Now, just derive `TS` on your Rust structs:
+
+```rust
+use ultimo::prelude::*;
+use ultimo::rpc::TS;
+
+#[derive(Deserialize, TS)]
+struct CreateUserInput {
+    name: String,
+    email: String,
+}
+
+#[derive(Serialize, TS)]
+struct UserOutput {
+    id: u64,
+    name: String,
+    email: String,
+}
+```
+
+When you register your RPC handlers, Ultimo automatically derives the TypeScript types:
+
+```rust
+let mut rpc = RpcRegistry::new();
+rpc.mutation("createUser", create_user_handler);
+// Generated client now emits:
+// type CreateUserInput = { name: string; email: string }
+// type UserOutput = { id: number; name: string; email: string }
+```
+
+No more dangling type references. No more mismatched interfaces. The generated TypeScript client emits real `type X = {...}` declarations derived directly from your Rust source of truth.
+
+## Breaking Change: RPC Registration
+
+`RpcRegistry::query` and `mutation` now take `(name, handler)` and derive TypeScript types from the Rust types (bounds `I: TS, O: TS`). The previous string-typed signatures are preserved as `query_with_types` / `mutation_with_types` for migration.
+
+```rust
+// Before (0.4.x)
+rpc.query_with_types("getUser", get_user, "GetUserInput", "UserOutput");
+
+// After (0.5.0) — types derived automatically
+rpc.query("getUser", get_user);
+```
+
+## Static File Serving (from v0.4.1)
+
+The new `static-files` feature adds `serve_static` and `serve_spa`:
+
+```rust
+use ultimo::static_files::{serve_static, serve_spa};
+
+let app = Ultimo::new()
+    .get("/assets/*name", serve_static("./public"))
+    .get("/*name", serve_spa("./dist", "index.html"));
+```
+
+Features include automatic `Content-Type` detection, `ETag` headers, `304 Not Modified` responses, and path-traversal protection at the filesystem level.
+
+## Response Compression (from v0.4.1)
+
+Automatic gzip/brotli compression with zero configuration:
+
+```rust
+use ultimo::compression::Compression;
+
+let app = Ultimo::new()
+    .middleware(Compression::default());
+```
+
+Brotli is preferred when the client supports it. The middleware skips binary content types, already-encoded responses, and small bodies. Always sets `Vary: Accept-Encoding`.
+
+## Upgrading
+
+Update your `Cargo.toml`:
+
+```toml
+[dependencies]
+ultimo = { version = "0.5", features = ["client-gen"] }
+```
+
+If you were using the old string-typed RPC registration, rename `query`/`mutation` calls to `query_with_types`/`mutation_with_types`, then migrate at your own pace.
+
+## What's Next
+
+We're working on v0.6.0 which will bring an MCP server for AI-assisted development, multi-language client generation, and deployment guides. Follow our [roadmap](https://docs.ultimo.dev/roadmap) for details.

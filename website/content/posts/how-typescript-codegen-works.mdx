@@ -1,0 +1,197 @@
+---
+title: "How TypeScript Codegen Works in Ultimo"
+description: "A deep dive into Ultimo's TypeScript client generation pipeline — from Rust type definitions through the RPC registry to fully typed TypeScript output."
+date: "2026-06-06"
+author: "Ultimo Team"
+tags: ["architecture", "typescript", "deep-dive"]
+---
+
+One of Ultimo's defining features is automatic TypeScript client generation from Rust types. This post explains exactly how it works under the hood — from `#[derive(TS)]` on your structs to a fully typed TypeScript client your frontend can import.
+
+## The Pipeline at a Glance
+
+```
+Rust Types (#[derive(TS)])
+    ↓
+RpcRegistry (collects type metadata)
+    ↓
+ultimo-cli generate (reads registry output)
+    ↓
+TypeScript Client (types + API functions)
+```
+
+## Step 1: Type Metadata via ts-rs
+
+When you derive `TS` on a Rust struct, the `ts-rs` crate generates a TypeScript representation at compile time:
+
+```rust
+use ultimo::rpc::TS;
+
+#[derive(Serialize, Deserialize, TS)]
+struct CreateUserInput {
+    name: String,
+    email: String,
+    #[ts(optional)]
+    avatar_url: Option<String>,
+}
+```
+
+The `TS` trait provides:
+- `TS::name()` → `"CreateUserInput"`
+- `TS::inline()` → `"{ name: string; email: string; avatar_url?: string }"`
+- `TS::dependencies()` → nested types that also need generation
+
+## Step 2: The RPC Registry
+
+When you register handlers with `RpcRegistry`, Ultimo captures type information:
+
+```rust
+let mut rpc = RpcRegistry::new();
+rpc.query("getUser", get_user);
+//  └─ Reads I::name(), O::name(), I::inline(), O::inline()
+```
+
+The `query` and `mutation` methods have trait bounds `I: DeserializeOwned + TS` and `O: Serialize + TS`. At registration time, Ultimo stores:
+
+- Method name (`"getUser"`)
+- Input type name and definition
+- Output type name and definition
+- Whether it's a query or mutation
+
+This metadata is stored in a `Vec<RpcMethodMeta>` inside the registry.
+
+## Step 3: The CLI Generator
+
+`ultimo-cli generate` reads the collected metadata and emits TypeScript:
+
+```bash
+ultimo generate --path ./src --output ./client
+```
+
+The generator:
+
+1. **Scans** your source files for `RpcRegistry` usage
+2. **Compiles** your crate (triggering `#[derive(TS)]` expansion)
+3. **Reads** exported type definitions from `ts-rs`
+4. **Deduplicates** types (a struct used in multiple RPC methods is emitted once)
+5. **Emits** the client file with types, interfaces, and API functions
+
+## Step 4: Generated Output
+
+The output is a self-contained TypeScript module:
+
+```typescript
+// client/index.ts (auto-generated — do not edit)
+
+// Types derived from Rust structs
+export type CreateUserInput = {
+  name: string;
+  email: string;
+  avatar_url?: string;
+};
+
+export type User = {
+  id: number;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+};
+
+// RPC client
+export const rpc = {
+  async getUser(input: { id: number }): Promise<User> {
+    const res = await fetch("/rpc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "getUser",
+        params: input,
+        id: 1,
+      }),
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error.message);
+    return json.result;
+  },
+
+  async createUser(input: CreateUserInput): Promise<User> {
+    // ...same pattern
+  },
+};
+```
+
+## Type Mapping: Rust → TypeScript
+
+The `ts-rs` crate handles the mapping:
+
+| Rust | TypeScript |
+|------|-----------|
+| `String` | `string` |
+| `u8`, `u16`, `u32`, `i8`...`i32` | `number` |
+| `u64`, `i64` | `number` (configurable to `bigint`) |
+| `f32`, `f64` | `number` |
+| `bool` | `boolean` |
+| `Vec<T>` | `T[]` |
+| `Option<T>` | `T \| null` |
+| `HashMap<K, V>` | `Record<K, V>` |
+| `()` | `void` |
+| Enums | Discriminated unions |
+
+## Handling Complex Types
+
+Nested types are resolved automatically:
+
+```rust
+#[derive(Serialize, TS)]
+struct Address {
+    street: String,
+    city: String,
+    country: String,
+}
+
+#[derive(Serialize, TS)]
+struct User {
+    name: String,
+    address: Address,  // Generates Address type too
+}
+```
+
+Enums become TypeScript discriminated unions:
+
+```rust
+#[derive(Serialize, TS)]
+#[serde(tag = "type")]
+enum Event {
+    UserCreated { user_id: u64 },
+    UserDeleted { user_id: u64 },
+}
+```
+
+```typescript
+export type Event =
+  | { type: "UserCreated"; user_id: number }
+  | { type: "UserDeleted"; user_id: number };
+```
+
+## Watch Mode
+
+During development, `ultimo generate --watch` re-generates the client whenever your Rust types change:
+
+```bash
+ultimo generate --path ./src --output ../frontend/src/api --watch
+```
+
+This gives you a tight feedback loop: change a Rust struct, save, and your frontend immediately shows type errors if the contract changed.
+
+## Design Decisions
+
+**Why ts-rs over custom codegen?** We evaluated writing our own proc macro, but `ts-rs` is battle-tested, handles edge cases (generics, lifetimes, serde attributes), and stays current with TypeScript evolution. Ultimo re-exports it as `ultimo::rpc::TS` so you don't interact with the crate directly.
+
+**Why not OpenAPI?** OpenAPI is great for REST, but JSON-RPC methods don't map cleanly to it. Ultimo generates OpenAPI specs separately for REST endpoints. The TypeScript client codegen handles both REST and RPC in a unified interface.
+
+**Why not gRPC/protobuf?** Protobuf requires a separate schema language and build step. Ultimo's approach keeps Rust as the single source of truth — no `.proto` files, no `protoc`, no schema drift.
+
+## Summary
+
+Ultimo's TypeScript codegen eliminates the most error-prone part of full-stack development: keeping frontend types in sync with the backend. By deriving types at compile time and generating the client from Rust's type system, you get end-to-end type safety with zero maintenance overhead.

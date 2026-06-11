@@ -1,3 +1,4 @@
+import { BlogSection } from "@/components/blog-section";
 import { ComparisonSection } from "@/components/comparison-section";
 import { CTASection } from "@/components/cta-section";
 import { FeaturesSection } from "@/components/features-section";
@@ -16,6 +17,7 @@ export default function Home() {
         <SecuritySection />
         <TypeSafeSection />
         <ComparisonSection />
+        <BlogSection />
         <CTASection />
       </main>
     </div>

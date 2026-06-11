@@ -1,0 +1,155 @@
+---
+title: "Build Your First API with Ultimo in 10 Minutes"
+description: "A step-by-step tutorial to create a REST API with Ultimo, add JSON-RPC endpoints, and generate a TypeScript client — all in under 10 minutes."
+date: "2026-06-10"
+author: "Ultimo Team"
+tags: ["tutorial", "getting-started", "api"]
+---
+
+Ultimo lets you build a production-ready API in Rust with automatic TypeScript client generation. In this tutorial, you'll create a REST + JSON-RPC API from scratch and generate a fully typed TypeScript client.
+
+## Prerequisites
+
+- Rust 1.86+ installed (`rustup update stable`)
+- Node.js 18+ (for the generated TypeScript client)
+
+## Step 1: Create Your Project
+
+```bash
+cargo install ultimo-cli
+ultimo new my-api --template api-only
+cd my-api
+```
+
+This scaffolds a project with the correct dependencies and a basic `main.rs`.
+
+## Step 2: Define Your Types
+
+Open `src/main.rs` and define your data types:
+
+```rust
+use ultimo::prelude::*;
+use ultimo::rpc::TS;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, TS, Clone)]
+struct Todo {
+    id: u64,
+    title: String,
+    completed: bool,
+}
+
+#[derive(Deserialize, TS)]
+struct CreateTodo {
+    title: String,
+}
+```
+
+## Step 3: Create REST Handlers
+
+```rust
+async fn list_todos(ctx: Context) -> Result<impl Into<Response>> {
+    // In a real app, you'd query a database
+    let todos = vec![
+        Todo { id: 1, title: "Learn Ultimo".into(), completed: false },
+        Todo { id: 2, title: "Build an API".into(), completed: true },
+    ];
+    ctx.json(&todos)
+}
+
+async fn create_todo(ctx: Context) -> Result<impl Into<Response>> {
+    let input: CreateTodo = ctx.json_body().await?;
+    let todo = Todo {
+        id: 3,
+        title: input.title,
+        completed: false,
+    };
+    ctx.json(&todo)
+}
+```
+
+## Step 4: Add JSON-RPC Endpoints
+
+Ultimo supports both REST and JSON-RPC in the same application:
+
+```rust
+async fn get_todo(ctx: Context, input: RpcRequest<u64>) -> Result<Todo> {
+    let id = input.params;
+    Ok(Todo {
+        id,
+        title: format!("Todo #{id}"),
+        completed: false,
+    })
+}
+```
+
+## Step 5: Wire It All Together
+
+```rust
+#[tokio::main]
+async fn main() -> Result<()> {
+    let mut rpc = RpcRegistry::new();
+    rpc.query("getTodo", get_todo);
+
+    let app = Ultimo::new()
+        .get("/api/todos", list_todos)
+        .post("/api/todos", create_todo)
+        .rpc("/rpc", rpc)
+        .port(3000);
+
+    println!("Server running at http://localhost:3000");
+    app.run().await
+}
+```
+
+## Step 6: Generate Your TypeScript Client
+
+With your server running, open another terminal:
+
+```bash
+ultimo generate --path ./src --output ./client
+```
+
+This produces a fully typed TypeScript client:
+
+```typescript
+// client/index.ts (auto-generated)
+export type Todo = {
+  id: number;
+  title: string;
+  completed: boolean;
+};
+
+export type CreateTodo = {
+  title: string;
+};
+
+export const api = {
+  async getTodo(id: number): Promise<Todo> { /* ... */ },
+};
+```
+
+## Step 7: Use the Client in Your Frontend
+
+```typescript
+import { api } from "./client";
+
+const todo = await api.getTodo(1);
+console.log(todo.title); // Fully typed!
+```
+
+## What You Built
+
+In under 10 minutes, you have:
+
+- **REST endpoints** (`GET /api/todos`, `POST /api/todos`)
+- **JSON-RPC endpoint** (`/rpc` with `getTodo` method)
+- **Automatic TypeScript client** with full type safety
+- **Request validation** via Rust's type system — invalid requests won't compile
+
+## Next Steps
+
+- Add a database with `ultimo`'s SQLx or Diesel integration
+- Enable WebSocket support for real-time features
+- Add JWT authentication with the `jwt` feature
+- Read the full docs at [docs.ultimo.dev](https://docs.ultimo.dev)

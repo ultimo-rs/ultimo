@@ -1,0 +1,177 @@
+---
+title: "Migrating from Axum to Ultimo"
+description: "A practical guide to migrating your Axum application to Ultimo — concept mapping, side-by-side code examples, and a gradual adoption strategy."
+date: "2026-06-04"
+author: "Ultimo Team"
+tags: ["migration", "axum", "guide"]
+---
+
+If you're considering moving from Axum to Ultimo — whether for TypeScript codegen, built-in JSON-RPC, or the integrated feature set — this guide shows you how. We'll map Axum concepts to Ultimo equivalents and demonstrate a gradual migration strategy.
+
+## Concept Mapping
+
+| Axum | Ultimo | Notes |
+|------|--------|-------|
+| `Router` | `Ultimo` (builder) | Same role, different API |
+| `Handler` fn | `async fn(Context) -> Result<...>` | Context instead of extractors |
+| `extract::State<T>` | `ctx.state::<T>()` | Runtime lookup vs compile-time |
+| `extract::Json<T>` | `ctx.json_body::<T>().await` | Method on Context |
+| `extract::Path<T>` | `ctx.param("name")` | String-based |
+| `extract::Query<T>` | `ctx.query::<T>()` | Same idea |
+| `IntoResponse` | `impl Into<Response>` | Similar trait |
+| `middleware::from_fn` | `.middleware(fn)` | Function-based |
+| `Extension<T>` | `ctx.state::<T>()` | Shared state |
+| `axum::serve` | `app.run().await` | Built into the builder |
+
+## Basic Route Migration
+
+**Axum:**
+
+```rust
+use axum::{extract::Path, routing::get, Json, Router};
+
+async fn get_user(Path(id): Path<u64>) -> Json<User> {
+    let user = find_user(id).await;
+    Json(user)
+}
+
+let app = Router::new()
+    .route("/users/:id", get(get_user));
+```
+
+**Ultimo:**
+
+```rust
+use ultimo::prelude::*;
+
+async fn get_user(ctx: Context) -> Result<impl Into<Response>> {
+    let id: u64 = ctx.param("id").parse().unwrap_or(0);
+    let user = find_user(id).await;
+    ctx.json(&user)
+}
+
+let app = Ultimo::new()
+    .get("/users/:id", get_user);
+```
+
+Key differences:
+- Parameters come from `ctx.param()` instead of extractor types
+- JSON responses use `ctx.json()` instead of wrapping in `Json<T>`
+- Error handling uses Ultimo's `Result` type
+
+## State / Shared Data
+
+**Axum:**
+
+```rust
+#[derive(Clone)]
+struct AppState { db: Pool }
+
+async fn handler(State(state): State<AppState>) -> impl IntoResponse {
+    let conn = state.db.acquire().await?;
+    // ...
+}
+
+let app = Router::new()
+    .route("/", get(handler))
+    .with_state(AppState { db: pool });
+```
+
+**Ultimo:**
+
+```rust
+#[derive(Clone)]
+struct AppState { db: Pool }
+
+async fn handler(ctx: Context) -> Result<impl Into<Response>> {
+    let state = ctx.state::<AppState>();
+    let conn = state.db.acquire().await?;
+    // ...
+    ctx.json(&result)
+}
+
+let app = Ultimo::new()
+    .state(AppState { db: pool })
+    .get("/", handler);
+```
+
+## Middleware
+
+**Axum:**
+
+```rust
+use axum::middleware::{self, Next};
+use axum::extract::Request;
+
+async fn auth(req: Request, next: Next) -> impl IntoResponse {
+    // validate token
+    next.run(req).await
+}
+
+let app = Router::new()
+    .route("/protected", get(handler))
+    .layer(middleware::from_fn(auth));
+```
+
+**Ultimo:**
+
+```rust
+use ultimo::middleware::Next;
+
+async fn auth(ctx: Context, next: Next) -> Result<Response> {
+    // validate token
+    let token = ctx.header("authorization").unwrap_or_default();
+    if !is_valid(token) {
+        return Err(UltimoError::unauthorized("Invalid token"));
+    }
+    next.run(ctx).await
+}
+
+let app = Ultimo::new()
+    .middleware(auth)
+    .get("/protected", handler);
+```
+
+## Gradual Migration Strategy
+
+You don't have to migrate everything at once. Here's a phased approach:
+
+### Phase 1: New endpoints in Ultimo
+
+Run both servers in your cluster. New features go in Ultimo, existing routes stay in Axum. Use a reverse proxy (nginx, Cloudflare) to route traffic.
+
+### Phase 2: Shared types
+
+Extract your domain types into a shared crate. Add `#[derive(TS)]` to types used in new Ultimo endpoints. The TypeScript client covers the Ultimo routes while your existing frontend keeps calling Axum routes directly.
+
+### Phase 3: Move RPC-style endpoints
+
+JSON-RPC methods are the easiest to migrate — they're already function-call-shaped. Move your "action" endpoints to Ultimo's RPC registry and generate the TypeScript client.
+
+### Phase 4: Migrate REST routes
+
+Move REST routes one at a time. Since both frameworks use Hyper, you can even share connection pools and state between them during migration.
+
+## What You Gain
+
+After migration, you get:
+
+- **Automatic TypeScript clients** — no more hand-written API types
+- **Built-in auth** — JWT + API keys + authorization guards
+- **Sessions + CSRF** — first-party, no extra crates
+- **WebSocket pub/sub** — built into the framework
+- **OpenAPI generation** — automatic from your routes
+- **Static file serving + compression** — no extra middleware crates
+
+## What You Lose
+
+Be honest about trade-offs:
+
+- **Ecosystem breadth** — Axum has more third-party middleware
+- **Compile-time extraction** — Axum's extractor pattern catches more errors at compile time
+- **Stability guarantees** — Ultimo is pre-1.0; API may change between minor versions
+- **Tower compatibility** — Ultimo doesn't use Tower layers directly
+
+## Conclusion
+
+Migration from Axum to Ultimo is straightforward because both share the Hyper + Tokio foundation. The biggest mindset shift is from "extractors as function params" to "Context as a swiss-army knife." Start with new endpoints, prove the value of TypeScript codegen, then migrate incrementally.
