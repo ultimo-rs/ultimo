@@ -29,6 +29,10 @@ export const metadata: Metadata = {
     template: "%s | Ultimo",
   },
   description,
+  alternates: {
+    canonical: siteUrl,
+    types: { "application/rss+xml": "/blog/feed.xml" },
+  },
   keywords: [
     "Rust web framework",
     "TypeScript client generation",
