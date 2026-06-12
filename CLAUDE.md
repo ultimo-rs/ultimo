@@ -147,3 +147,19 @@ The `ship-feature` skill walks these — summary of the rules:
 - Use Makefile targets, not raw cargo, where one exists.
 - Breaking public-API changes must be deliberate and version-bumped; `cargo-semver-checks` runs in CI — respect its verdict.
 - Run `cargo fmt --all` and `cargo clippy` before committing (`.githooks/` may enforce this).
+
+## Website SEO conventions (`website/`)
+Every new page on ultimo.dev MUST include:
+
+1. **Canonical URL** — `alternates: { canonical: "https://ultimo.dev/<path>" }` in the page's `metadata` export.
+2. **Structured data (JSON-LD)** — pick the appropriate schema:
+   - Blog post → `BlogPosting` + `BreadcrumbList` (already automatic via `app/blog/[slug]/page.tsx`)
+   - Tutorial/guide → add `HowTo` with steps
+   - Feature/product page → `FAQPage` if it has Q&A, otherwise `WebPage`
+   - Landing page → `Organization` / `SoftwareApplication` (already in root layout)
+3. **Open Graph + Twitter meta** — title, description, `og:type`, image. Use the `metadata` export.
+4. **Internal links** — link to at least 2-3 other pages on the site from new content.
+5. **External links** — link to authoritative sources (docs.rs, rust-lang.org, tokio.rs, etc.) where relevant.
+6. **Sitemap entry** — new routes are auto-included via `app/sitemap.ts`; blog posts via `getAllPosts()`. Static pages must be added manually to the sitemap array.
+
+Validate schemas after deploy: https://search.google.com/test/rich-results
