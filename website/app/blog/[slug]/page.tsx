@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, User } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, User } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,7 +7,7 @@ import rehypePrettyCode from "rehype-pretty-code";
 import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
 import { TableOfContents } from "@/components/table-of-contents";
-import { getAllPosts, getPostBySlug } from "@/lib/blog";
+import { getAllPosts, getPostBySlug, getRelatedPosts } from "@/lib/blog";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -25,15 +25,20 @@ export async function generateMetadata({
   const post = getPostBySlug(slug);
   if (!post) return {};
 
+  const url = `https://ultimo.dev/blog/${slug}`;
+
   return {
     title: `${post.meta.title} - Ultimo Blog`,
     description: post.meta.description,
+    alternates: { canonical: url },
     openGraph: {
       title: post.meta.title,
       description: post.meta.description,
       type: "article",
+      url,
       publishedTime: post.meta.date,
       authors: [post.meta.author],
+      tags: post.meta.tags,
     },
   };
 }
@@ -48,9 +53,31 @@ export default async function BlogPostPage({ params }: PageProps) {
 
   // Strip the first H1 from content since we render it in the header
   const content = post.content.replace(/^\s*#\s+.+\n+/, "");
+  const relatedPosts = getRelatedPosts(slug, 3);
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.meta.title,
+    description: post.meta.description,
+    datePublished: post.meta.date,
+    author: { "@type": "Person", name: post.meta.author },
+    publisher: {
+      "@type": "Organization",
+      name: "Ultimo",
+      url: "https://ultimo.dev",
+    },
+    url: `https://ultimo.dev/blog/${slug}`,
+    wordCount: content.split(/\s+/).length,
+    keywords: post.meta.tags.join(", "),
+  };
 
   return (
     <div className="min-h-screen selection:bg-orange-500/30">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="container mx-auto px-4 py-24 max-w-6xl">
         <Link
           href="/blog"
@@ -91,6 +118,10 @@ export default async function BlogPostPage({ params }: PageProps) {
                     })}
                   </time>
                 </span>
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4" />
+                  {post.meta.readingTime} min read
+                </span>
               </div>
             </header>
 
@@ -110,6 +141,27 @@ export default async function BlogPostPage({ params }: PageProps) {
             </div>
 
             <footer className="mt-16 pt-8 border-t border-border/50">
+              {relatedPosts.length > 0 && (
+                <div className="mb-12">
+                  <h2 className="text-lg font-semibold mb-4">Related Posts</h2>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {relatedPosts.map((related) => (
+                      <Link
+                        key={related.slug}
+                        href={`/blog/${related.slug}`}
+                        className="group block p-4 rounded-lg border border-border/50 hover:border-orange-500/30 transition-colors"
+                      >
+                        <h3 className="text-sm font-medium group-hover:text-orange-400 transition-colors line-clamp-2">
+                          {related.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {related.readingTime} min read
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
               <Link
                 href="/blog"
                 className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-orange-400 transition-colors"
