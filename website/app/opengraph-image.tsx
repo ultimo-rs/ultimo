@@ -12,92 +12,131 @@ export default async function OGImage() {
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
+          flexDirection: "row",
           backgroundColor: "#0a0a0a",
-          padding: "60px",
           fontFamily: "system-ui, sans-serif",
-          gap: "32px",
         }}
       >
-        {/* Logo */}
+        {/* Left content area */}
         <div
           style={{
-            width: "80px",
-            height: "80px",
-            backgroundColor: "#ca3500",
-            borderRadius: "16px",
             display: "flex",
-            alignItems: "center",
+            flexDirection: "column",
             justifyContent: "center",
-            color: "#fff",
-            fontSize: 44,
-            fontWeight: 800,
+            padding: "70px",
+            flex: 1,
+            gap: "28px",
           }}
         >
-          U
+          {/* Logo + wordmark */}
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <svg
+              width="52"
+              height="52"
+              viewBox="410 360 205 310"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill="#ca3500"
+                d="M607.332275,504.000061 C607.325745,531.494995 607.294312,558.489929 607.346252,585.484680 C607.351990,588.464844 606.914429,590.793030 604.239502,592.809204 C575.249878,614.659729 546.324097,636.595459 517.486328,658.645813 C514.470093,660.952148 512.407349,661.220764 509.285217,658.787476 C494.437103,647.215515 479.397339,635.889526 464.437622,624.460449 C463.270294,623.568604 461.866394,622.863892 461.402832,621.199707 C461.738007,619.164734 463.596191,618.413269 464.984375,617.332886 C489.177490,598.504211 513.360962,579.662415 537.663940,560.976318 C540.631287,558.694763 541.737915,556.304565 541.728333,552.592651 C541.612427,507.601562 541.702087,462.609955 541.577271,417.618927 C541.565918,413.511108 542.902283,410.948853 546.220398,408.520691 C564.773193,394.943878 583.144592,381.119385 601.604858,367.415741 C603.020752,366.364716 604.223633,364.783966 607.331726,364.954742 C607.331726,411.126068 607.331726,457.313049 607.332275,504.000061z"
+              />
+              <path
+                fill="#f97316"
+                d="M417.910645,580.828491 C417.870483,526.066223 417.848480,471.781677 417.742920,417.497284 C417.737000,414.448486 418.320068,412.166351 420.967529,410.233887 C440.600891,395.902435 460.139252,381.440887 479.722198,367.040222 C480.904022,366.171112 482.017792,365.067322 483.750183,365.120819 C485.773468,366.494324 485.143219,368.668732 485.145294,370.546783 C485.213379,432.657867 485.214691,494.769012 485.334961,556.879944 C485.339996,559.500427 484.560120,561.430542 482.468536,563.040771 C462.575134,578.363281 442.731476,593.751099 422.868835,609.114136 C421.372742,610.271667 419.836029,611.377991 417.910645,580.828491z"
+              />
+            </svg>
+            <div style={{ display: "flex", fontSize: 32, fontWeight: 800, color: "#ffffff" }}>
+              Ultimo
+            </div>
+          </div>
+
+          {/* Headline */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
+            <div style={{ display: "flex", fontSize: 54, fontWeight: 800, color: "#ffffff", lineHeight: 1.1 }}>
+              The Rust Framework
+            </div>
+            <div style={{ display: "flex", fontSize: 54, fontWeight: 800, color: "#f97316", lineHeight: 1.1 }}>
+              for Speed, Security
+            </div>
+            <div style={{ display: "flex", fontSize: 54, fontWeight: 800, color: "#f97316", lineHeight: 1.1 }}>
+              & Efficiency
+            </div>
+          </div>
+
+          {/* Subtitle */}
+          <div style={{ display: "flex", fontSize: 22, color: "#a1a1aa", maxWidth: "500px", lineHeight: 1.5 }}>
+            Type-safe APIs with automatic TypeScript generation for latency-sensitive systems.
+          </div>
+
+          {/* CTA */}
+          <div
+            style={{
+              display: "flex",
+              backgroundColor: "#f97316",
+              color: "#000",
+              padding: "14px 32px",
+              borderRadius: "8px",
+              fontSize: 20,
+              fontWeight: 700,
+            }}
+          >
+            Start Building → ultimo.dev
+          </div>
         </div>
 
-        {/* Title */}
+        {/* Right decorative area */}
         <div
           style={{
             display: "flex",
-            fontSize: 64,
-            fontWeight: 800,
-            color: "#ffffff",
-            textAlign: "center",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            width: "380px",
+            position: "relative",
           }}
         >
-          <div style={{ display: "flex" }}>The&nbsp;</div>
-          <div style={{ display: "flex", color: "#f97316" }}>Rust Framework</div>
-        </div>
+          {/* Large logo watermark */}
+          <svg
+            width="280"
+            height="280"
+            viewBox="410 360 205 310"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ opacity: 0.15 }}
+          >
+            <path
+              fill="#ca3500"
+              d="M607.332275,504.000061 C607.325745,531.494995 607.294312,558.489929 607.346252,585.484680 C607.351990,588.464844 606.914429,590.793030 604.239502,592.809204 C575.249878,614.659729 546.324097,636.595459 517.486328,658.645813 C514.470093,660.952148 512.407349,661.220764 509.285217,658.787476 C494.437103,647.215515 479.397339,635.889526 464.437622,624.460449 C463.270294,623.568604 461.866394,622.863892 461.402832,621.199707 C461.738007,619.164734 463.596191,618.413269 464.984375,617.332886 C489.177490,598.504211 513.360962,579.662415 537.663940,560.976318 C540.631287,558.694763 541.737915,556.304565 541.728333,552.592651 C541.612427,507.601562 541.702087,462.609955 541.577271,417.618927 C541.565918,413.511108 542.902283,410.948853 546.220398,408.520691 C564.773193,394.943878 583.144592,381.119385 601.604858,367.415741 C603.020752,366.364716 604.223633,364.783966 607.331726,364.954742 C607.331726,411.126068 607.331726,457.313049 607.332275,504.000061z"
+            />
+            <path
+              fill="#f97316"
+              d="M417.910645,580.828491 C417.870483,526.066223 417.848480,471.781677 417.742920,417.497284 C417.737000,414.448486 418.320068,412.166351 420.967529,410.233887 C440.600891,395.902435 460.139252,381.440887 479.722198,367.040222 C480.904022,366.171112 482.017792,365.067322 483.750183,365.120819 C485.773468,366.494324 485.143219,368.668732 485.145294,370.546783 C485.213379,432.657867 485.214691,494.769012 485.334961,556.879944 C485.339996,559.500427 484.560120,561.430542 482.468536,563.040771 C462.575134,578.363281 442.731476,593.751099 422.868835,609.114136 C421.372742,610.271667 419.836029,611.377991 417.910645,580.828491z"
+            />
+          </svg>
 
-        {/* Subtitle */}
-        <div
-          style={{
-            display: "flex",
-            fontSize: 32,
-            color: "#a1a1aa",
-            textAlign: "center",
-          }}
-        >
-          for Speed, Security & Efficiency
-        </div>
-
-        {/* CTA */}
-        <div
-          style={{
-            display: "flex",
-            backgroundColor: "#f97316",
-            color: "#000",
-            padding: "16px 40px",
-            borderRadius: "10px",
-            fontSize: 22,
-            fontWeight: 700,
-            marginTop: "16px",
-          }}
-        >
-          Start Building → ultimo.dev
-        </div>
-
-        {/* Pillars */}
-        <div
-          style={{
-            display: "flex",
-            gap: "40px",
-            marginTop: "8px",
-            color: "#71717a",
-            fontSize: 18,
-          }}
-        >
-          <div style={{ display: "flex" }}>Zero GC</div>
-          <div style={{ display: "flex" }}>•</div>
-          <div style={{ display: "flex" }}>100% Safe Rust</div>
-          <div style={{ display: "flex" }}>•</div>
-          <div style={{ display: "flex" }}>Auto TypeScript</div>
-          <div style={{ display: "flex" }}>•</div>
-          <div style={{ display: "flex" }}>Single Binary</div>
+          {/* Pillars */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              position: "absolute",
+              bottom: "70px",
+              right: "50px",
+              fontSize: 15,
+              color: "#52525b",
+            }}
+          >
+            <div style={{ display: "flex" }}>▪ Zero GC pauses</div>
+            <div style={{ display: "flex" }}>▪ 100% safe Rust</div>
+            <div style={{ display: "flex" }}>▪ Single binary deploy</div>
+            <div style={{ display: "flex" }}>▪ Auto TypeScript codegen</div>
+          </div>
         </div>
       </div>
     ),
