@@ -66,7 +66,7 @@ export function TypeSafeSection() {
               <span className="text-sm font-medium text-foreground">
                 frontend/src/client.ts
               </span>
-              <div className="px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-500 border border-blue-500/20">
+              <div className="px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20">
                 Generated
               </div>
             </div>
@@ -82,7 +82,7 @@ export function TypeSafeSection() {
                   {"    "}email: <span className="text-blue-400">string</span>;{" "}
                   {"\n"}
                   {"}"} {"\n\n"}
-                  <span className="text-zinc-500">// Fully typed!</span> {"\n"}
+                  <span className="text-zinc-400">// Fully typed!</span> {"\n"}
                   <span className="text-blue-400">const</span> user ={" "}
                   <span className="text-purple-400">await</span> client.
                   <span className="text-yellow-300">getUser</span>(1); {"\n"}

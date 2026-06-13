@@ -32,9 +32,9 @@ export function StatsSection() {
                   <Zap className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-foreground">
+                  <h3 className="text-lg font-semibold text-foreground">
                     O(1) routing
-                  </h4>
+                  </h3>
                   <p className="text-muted-foreground text-sm">
                     Constant-time route lookup — 10 routes or 10,000, the same
                     cost.
@@ -47,9 +47,9 @@ export function StatsSection() {
                   <Layers className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-foreground">
+                  <h3 className="text-lg font-semibold text-foreground">
                     Built on Hyper + Tokio
-                  </h4>
+                  </h3>
                   <p className="text-muted-foreground text-sm">
                     The proven async HTTP core of the Rust ecosystem — no
                     re-implementation.
@@ -62,9 +62,9 @@ export function StatsSection() {
                   <GitCompareArrows className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-semibold text-foreground">
+                  <h3 className="text-lg font-semibold text-foreground">
                     Regression-guarded
-                  </h4>
+                  </h3>
                   <p className="text-muted-foreground text-sm">
                     Every framework change is benchmarked in CI — we don't get
                     slower by accident.

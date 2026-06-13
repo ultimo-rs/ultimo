@@ -75,7 +75,7 @@ export function HeroSection() {
               <div className="h-3 w-3 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
               <div className="h-3 w-3 rounded-full bg-green-500/20 border border-green-500/50" />
             </div>
-            <div className="mx-auto text-xs font-mono text-zinc-500">
+            <div className="mx-auto text-xs font-mono text-zinc-400">
               server.rs
             </div>
           </div>
@@ -91,13 +91,13 @@ export function HeroSection() {
                 <span className="text-yellow-300">main</span>() {"->"}{" "}
                 <span className="text-zinc-100">ultimo::Result{"<()>"}</span>{" "}
                 {"{"}
-                {"\n"} <span className="text-zinc-500">// Initialize app</span>
+                {"\n"} <span className="text-zinc-400">// Initialize app</span>
                 {"\n"} <span className="text-blue-400">let</span>{" "}
                 <span className="text-blue-400">mut</span> app ={" "}
                 <span className="text-green-400">Ultimo</span>::
                 <span className="text-yellow-300">new</span>();
                 {"\n\n"}
-                {"\n"} <span className="text-zinc-500">// Define a route</span>
+                {"\n"} <span className="text-zinc-400">// Define a route</span>
                 {"\n"} app.<span className="text-yellow-300">get</span>(
                 <span className="text-orange-300">"/hello"</span>, |ctx|{" "}
                 <span className="text-blue-400">async move</span> {"{"}
@@ -109,7 +109,7 @@ export function HeroSection() {
                 <span className="text-blue-400">await</span>
                 {"\n"} {"}"});
                 {"\n\n"}
-                {"\n"} <span className="text-zinc-500">// Start server</span>
+                {"\n"} <span className="text-zinc-400">// Start server</span>
                 {"\n"} app.<span className="text-yellow-300">listen</span>(
                 <span className="text-orange-300">"127.0.0.1:3000"</span>).
                 <span className="text-blue-400">await</span>
