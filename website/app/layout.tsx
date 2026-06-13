@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 const siteUrl = "https://ultimo.dev";
 const title = "Ultimo - The Rust Framework for Speed, Security & Efficiency";
 const description =
-  "The Rust web framework built for speed, security, and efficiency. Type-safe APIs with automatic TypeScript client generation for trading platforms, AI backends, and latency-sensitive systems.";
+  "The Rust web framework for speed, security, and efficiency. Type-safe APIs with automatic TypeScript generation for latency-sensitive systems.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

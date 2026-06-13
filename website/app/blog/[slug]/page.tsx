@@ -36,9 +36,18 @@ export async function generateMetadata({
       description: post.meta.description,
       type: "article",
       url,
+      siteName: "Ultimo",
       publishedTime: post.meta.date,
       authors: [post.meta.author],
       tags: post.meta.tags,
+      images: [
+        {
+          url: "https://ultimo.dev/og-image.png",
+          width: 1200,
+          height: 630,
+          alt: post.meta.title,
+        },
+      ],
     },
   };
 }
