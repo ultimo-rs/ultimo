@@ -1,0 +1,511 @@
+---
+title: "Session Authentication in Rust: Cookies, Sessions, and CSRF Protection with Ultimo"
+description: "A practical guide to implementing session-based authentication in Rust — covering cookie configuration, session storage, CSRF protection, login/logout flows, and security best practices using Ultimo's built-in session middleware."
+date: "2026-06-11"
+author: "Ultimo Team"
+tags: ["tutorial", "authentication", "sessions", "security"]
+---
+
+# Session Authentication in Rust: Cookies, Sessions, and CSRF Protection
+
+Session-based authentication is the workhorse of web application security. Despite the hype around JWTs and token-based auth, server-side sessions remain the most practical choice for web applications with browser-based frontends: they are revocable instantly, don't expose sensitive data client-side, and integrate naturally with CSRF protection.
+
+This guide walks through implementing session auth in Rust using [Ultimo](/)'s built-in session and CSRF middleware. No external crates to assemble. No manual cookie parsing. No reinventing the security wheel.
+
+## Why Sessions Over JWTs (for Browser Frontends)
+
+Before diving into implementation, a brief case for sessions over JWTs for browser-based applications:
+
+| Concern | Sessions | JWTs |
+|---|---|---|
+| **Revocation** | Instant — delete the session server-side | Impossible until expiry (unless you maintain a blocklist, which is just a session store) |
+| **Data exposure** | Session ID is opaque — no user data in the cookie | JWT payload is base64-encoded (not encrypted) — user data is readable |
+| **Size** | Cookie is ~32 bytes (session ID) | JWT can be 500+ bytes (header + payload + signature) |
+| **Storage** | Server-side (memory, Redis, database) | Client-side (cookie or localStorage) |
+| **CSRF protection** | Natural fit (SameSite + CSRF token) | Requires custom headers or SameSite cookies anyway |
+
+JWTs shine for stateless service-to-service authentication and short-lived tokens. For a web application where users log in through a browser, sessions are simpler and more secure by default.
+
+## Ultimo's Session System
+
+Ultimo provides session management as a built-in feature (behind the `session` Cargo feature). Enable it:
+
+```toml
+[dependencies]
+ultimo = { version = "0.5", features = ["session", "csrf"] }
+```
+
+The session system provides:
+- Secure cookie configuration (HttpOnly, SameSite, Secure flags)
+- Server-side session storage (in-memory by default, extensible to Redis/DB)
+- Automatic session ID generation with cryptographic randomness
+- Session expiry and renewal
+- CSRF token generation and validation
+
+## Setting Up Session Middleware
+
+```rust
+use ultimo::prelude::*;
+use ultimo::session::SessionConfig;
+use ultimo::csrf::CsrfConfig;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let mut app = Ultimo::new();
+
+    // Configure sessions
+    app.with(SessionConfig::new()
+        .cookie_name("session_id")
+        .max_age(Duration::from_secs(24 * 60 * 60))  // 24 hours
+        .same_site(SameSite::Strict)
+        .secure(true)   // HTTPS only in production
+        .http_only(true) // Not accessible via JavaScript
+    );
+
+    // Configure CSRF protection
+    app.with(CsrfConfig::new()
+        .token_length(32)
+        .header_name("X-CSRF-Token")
+    );
+
+    app.post("/login", login_handler);
+    app.post("/logout", logout_handler);
+    app.get("/me", auth_required(profile_handler));
+    app.get("/dashboard", auth_required(dashboard_handler));
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+### Cookie Security Flags Explained
+
+Every cookie flag in the configuration exists for a security reason:
+
+- **`HttpOnly`** — the cookie is not accessible via `document.cookie` in JavaScript. This prevents XSS attacks from stealing session cookies.
+- **`SameSite::Strict`** — the cookie is only sent with requests originating from the same site. This prevents CSRF attacks from external domains.
+- **`Secure`** — the cookie is only sent over HTTPS connections. This prevents session hijacking via network sniffing.
+- **`max_age`** — sessions expire after a fixed duration. This limits the window for stolen cookies.
+
+Never omit these flags in production. A session cookie without HttpOnly is an XSS liability. A cookie without Secure is a network sniffing liability.
+
+## Login Flow
+
+Authentication typically validates credentials against a database and creates a session:
+
+```rust
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
+
+#[derive(Deserialize)]
+struct LoginRequest {
+    email: String,
+    password: String,
+}
+
+async fn login_handler(ctx: Context) -> ultimo::Result<()> {
+    let body: LoginRequest = ctx.body_json().await?;
+
+    // 1. Find user by email
+    let user = db::find_user_by_email(&body.email).await
+        .map_err(|_| UltimoError::unauthorized("Invalid credentials"))?;
+
+    // 2. Verify password with Argon2
+    let parsed_hash = PasswordHash::new(&user.password_hash)
+        .map_err(|_| UltimoError::internal("Hash parse error"))?;
+    Argon2::default()
+        .verify_password(body.password.as_bytes(), &parsed_hash)
+        .map_err(|_| UltimoError::unauthorized("Invalid credentials"))?;
+
+    // 3. Create session
+    let session = ctx.session();
+    session.set("user_id", user.id).await;
+    session.set("email", user.email.clone()).await;
+    session.set("role", user.role.clone()).await;
+
+    // 4. Regenerate session ID (prevents session fixation)
+    session.regenerate().await;
+
+    ctx.json(json!({
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name
+        }
+    })).await
+}
+```
+
+### Key Security Details
+
+**Constant-time comparison** — Argon2's `verify_password` uses constant-time comparison internally, preventing timing attacks that could reveal whether an email exists.
+
+**Generic error messages** — "Invalid credentials" for both wrong email and wrong password. Never reveal which part of the credentials was wrong.
+
+**Session regeneration** — after authentication, `session.regenerate()` creates a new session ID. This prevents [session fixation attacks](https://owasp.org/www-community/attacks/Session_fixation) where an attacker pre-sets a session cookie before the user logs in.
+
+## Logout Flow
+
+Logout destroys the session server-side and clears the cookie:
+
+```rust
+async fn logout_handler(ctx: Context) -> ultimo::Result<()> {
+    let session = ctx.session();
+    session.destroy().await;
+
+    ctx.json(json!({"message": "Logged out"})).await
+}
+```
+
+This is the advantage of server-side sessions: revocation is instant. The session data is deleted from the store, and even if the client presents the old cookie, the server will reject it because the session no longer exists.
+
+With JWTs, you cannot revoke a token without maintaining a server-side blocklist — which is effectively a session store, negating the "stateless" benefit.
+
+## Authentication Middleware
+
+Protect routes that require authentication with middleware that checks for a valid session:
+
+```rust
+fn auth_required<F, Fut>(handler: F) -> impl Fn(Context) -> Fut
+where
+    F: Fn(Context) -> Fut + Clone,
+    Fut: std::future::Future<Output = ultimo::Result<()>>,
+{
+    move |ctx: Context| {
+        let handler = handler.clone();
+        async move {
+            let session = ctx.session();
+            let user_id: Option<i64> = session.get("user_id").await;
+
+            match user_id {
+                Some(_) => handler(ctx).await,
+                None => Err(UltimoError::unauthorized("Authentication required")),
+            }
+        }
+    }
+}
+```
+
+Protected handlers can access session data freely:
+
+```rust
+async fn profile_handler(ctx: Context) -> ultimo::Result<()> {
+    let session = ctx.session();
+    let user_id: i64 = session.get("user_id").await.unwrap();
+    let email: String = session.get("email").await.unwrap();
+
+    let user = db::get_user(user_id).await?;
+
+    ctx.json(json!({
+        "id": user.id,
+        "email": email,
+        "name": user.name,
+        "role": user.role
+    })).await
+}
+```
+
+## CSRF Protection
+
+Cross-Site Request Forgery (CSRF) attacks trick a user's browser into making requests to your server from a malicious site — using the user's cookies. `SameSite::Strict` cookies mitigate most CSRF, but a defense-in-depth approach adds CSRF tokens.
+
+Ultimo's CSRF middleware generates and validates tokens automatically:
+
+```rust
+// Generate a CSRF token for forms
+async fn get_csrf_token(ctx: Context) -> ultimo::Result<()> {
+    let token = ctx.csrf_token().await;
+    ctx.json(json!({"csrf_token": token})).await
+}
+
+// The CSRF middleware automatically validates tokens on state-changing requests
+// (POST, PUT, PATCH, DELETE) by checking the X-CSRF-Token header
+```
+
+### Frontend Integration
+
+The frontend fetches a CSRF token and includes it in subsequent requests:
+
+```typescript
+// Fetch CSRF token on page load
+const { csrf_token } = await fetch("/csrf-token").then(r => r.json());
+
+// Include token in state-changing requests
+await fetch("/api/transfer", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrf_token,
+    },
+    credentials: "include",  // Send cookies
+    body: JSON.stringify({ to: "account_456", amount: 100 }),
+});
+```
+
+If the token is missing or invalid, Ultimo returns a `403 Forbidden` response automatically.
+
+## Role-Based Authorization
+
+Once authentication is in place, authorization controls what authenticated users can do:
+
+```rust
+fn require_role(role: &'static str) -> impl Fn(Context) -> _ {
+    move |ctx: Context| async move {
+        let session = ctx.session();
+        let user_role: Option<String> = session.get("role").await;
+
+        match user_role {
+            Some(r) if r == role => Ok(()),
+            _ => Err(UltimoError::forbidden("Insufficient permissions")),
+        }
+    }
+}
+
+// Admin-only endpoint
+app.delete("/api/users/:id", |ctx: Context| async move {
+    require_role("admin")(ctx.clone()).await?;
+    let user_id: i64 = ctx.param("id")?;
+    db::delete_user(user_id).await?;
+    ctx.json(json!({"deleted": true})).await
+});
+```
+
+For more complex authorization (resource-level permissions, team membership), query the database within the middleware:
+
+```rust
+async fn require_team_access(ctx: &Context, team_id: i64) -> ultimo::Result<()> {
+    let session = ctx.session();
+    let user_id: i64 = session.get("user_id").await
+        .ok_or(UltimoError::unauthorized("Not authenticated"))?;
+
+    let is_member = db::is_team_member(user_id, team_id).await?;
+    if !is_member {
+        return Err(UltimoError::forbidden("Not a team member"));
+    }
+    Ok(())
+}
+```
+
+## Session Storage Options
+
+The in-memory session store works for single-server deployments and development. For production with multiple server instances, you need a shared session store.
+
+### In-Memory (Default)
+
+```rust
+app.with(SessionConfig::new());
+// Sessions stored in a HashMap — fast, but lost on restart
+```
+
+Suitable for: development, single-server deployments, services that can tolerate session loss on restart.
+
+### Redis
+
+```rust
+app.with(SessionConfig::new()
+    .store(RedisSessionStore::new("redis://127.0.0.1:6379"))
+    .max_age(Duration::from_secs(86400))
+);
+```
+
+Suitable for: multi-instance deployments, horizontal scaling, persistent sessions across restarts.
+
+Redis is the most common choice for session storage in production:
+- Sub-millisecond reads and writes
+- Built-in TTL (time-to-live) for automatic session expiry
+- Pub/sub for session invalidation across instances
+- Persistence options (RDB/AOF) for durability
+
+### Database (PostgreSQL/SQLite)
+
+```rust
+app.with(SessionConfig::new()
+    .store(DatabaseSessionStore::new(&pool))
+    .max_age(Duration::from_secs(86400))
+);
+```
+
+Suitable for: applications that already use a database and want to avoid adding Redis as infrastructure.
+
+## Security Hardening Checklist
+
+Beyond the basics, a production session system should implement:
+
+### 1. Rate Limit Login Attempts
+
+Prevent brute-force attacks by limiting login attempts per IP or per account:
+
+```rust
+app.post("/login", RateLimiter::new(5, Duration::from_secs(300)), login_handler);
+// Max 5 login attempts per 5 minutes per client IP
+```
+
+### 2. Session Inactivity Timeout
+
+Expire sessions not just by absolute age, but by inactivity:
+
+```rust
+app.with(SessionConfig::new()
+    .max_age(Duration::from_secs(86400))        // Absolute: 24 hours
+    .idle_timeout(Duration::from_secs(3600))    // Inactive: 1 hour
+);
+```
+
+A session unused for 1 hour is destroyed, even if it hasn't reached the 24-hour absolute limit.
+
+### 3. Concurrent Session Limits
+
+For sensitive applications, limit users to one active session:
+
+```rust
+async fn login_handler(ctx: Context) -> ultimo::Result<()> {
+    // ... validate credentials ...
+
+    // Invalidate existing sessions for this user
+    session_store.destroy_all_for_user(user.id).await;
+
+    // Create new session
+    let session = ctx.session();
+    session.set("user_id", user.id).await;
+    session.regenerate().await;
+
+    // ...
+}
+```
+
+### 4. Secure Password Storage
+
+Always use Argon2id for password hashing — it's the current recommendation from [OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html):
+
+```rust
+use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
+use rand_core::OsRng;
+
+fn hash_password(password: &str) -> String {
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    argon2.hash_password(password.as_bytes(), &salt)
+        .unwrap()
+        .to_string()
+}
+```
+
+Never use MD5, SHA-256, or bcrypt for new applications. Argon2id is memory-hard, making GPU-based brute-force attacks impractical.
+
+### 5. Secure Headers
+
+Ultimo includes security header middleware:
+
+```rust
+app.with(SecurityHeaders::new()
+    .strict_transport_security(Duration::from_secs(31536000))  // HSTS
+    .content_type_nosniff()
+    .frame_deny()  // Prevent clickjacking
+    .xss_protection()
+);
+```
+
+These headers complement session security by preventing related attack vectors.
+
+## Complete Example: Login Page with Session Auth
+
+Here is a minimal but complete application with login, logout, and a protected dashboard:
+
+```rust
+use ultimo::prelude::*;
+use ultimo::session::SessionConfig;
+use ultimo::csrf::CsrfConfig;
+use std::time::Duration;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let mut app = Ultimo::new();
+
+    app.with(SessionConfig::new()
+        .cookie_name("app_session")
+        .max_age(Duration::from_secs(86400))
+        .same_site(SameSite::Strict)
+        .secure(cfg!(not(debug_assertions)))  // Secure in release, not in dev
+        .http_only(true)
+    );
+    app.with(CsrfConfig::new());
+
+    app.get("/", |ctx: Context| async move {
+        ctx.html(include_str!("../templates/login.html")).await
+    });
+
+    app.post("/login", login_handler);
+    app.post("/logout", logout_handler);
+    app.get("/dashboard", dashboard_handler);
+    app.get("/api/me", me_handler);
+
+    println!("Running on http://127.0.0.1:3000");
+    app.listen("127.0.0.1:3000").await
+}
+
+async fn login_handler(ctx: Context) -> ultimo::Result<()> {
+    let body: LoginRequest = ctx.body_json().await?;
+
+    // In production: validate against database with Argon2
+    if body.email == "admin@example.com" && body.password == "password" {
+        let session = ctx.session();
+        session.set("user_id", 1i64).await;
+        session.set("email", body.email).await;
+        session.regenerate().await;
+
+        ctx.json(json!({"success": true})).await
+    } else {
+        Err(UltimoError::unauthorized("Invalid credentials"))
+    }
+}
+
+async fn logout_handler(ctx: Context) -> ultimo::Result<()> {
+    ctx.session().destroy().await;
+    ctx.json(json!({"success": true})).await
+}
+
+async fn dashboard_handler(ctx: Context) -> ultimo::Result<()> {
+    let session = ctx.session();
+    let user_id: Option<i64> = session.get("user_id").await;
+
+    match user_id {
+        Some(_) => ctx.html(include_str!("../templates/dashboard.html")).await,
+        None => ctx.redirect("/").await,
+    }
+}
+
+async fn me_handler(ctx: Context) -> ultimo::Result<()> {
+    let session = ctx.session();
+    let user_id: Option<i64> = session.get("user_id").await;
+
+    match user_id {
+        Some(id) => {
+            let email: String = session.get("email").await.unwrap_or_default();
+            ctx.json(json!({"id": id, "email": email})).await
+        }
+        None => Err(UltimoError::unauthorized("Not authenticated")),
+    }
+}
+```
+
+The [session-auth example](https://github.com/ultimo-rs/ultimo/tree/main/examples/session-auth) in the Ultimo repository contains a complete working version with HTML templates and a JavaScript frontend.
+
+---
+
+## Summary
+
+Session-based authentication remains the most practical choice for web applications with browser frontends. It provides instant revocation, minimal cookie size, and natural CSRF protection.
+
+Ultimo's session middleware handles the hard parts — secure cookie configuration, session storage, CSRF token generation, and session lifecycle — so you can focus on authentication logic instead of security infrastructure.
+
+Key takeaways:
+- Always set HttpOnly, Secure, and SameSite on session cookies
+- Regenerate session IDs after login (prevents fixation attacks)
+- Use Argon2id for password hashing
+- Add CSRF tokens for defense-in-depth beyond SameSite cookies
+- Rate limit login endpoints to prevent brute force
+- Use Redis or a database for session storage in multi-instance deployments
+
+**Related reading:**
+- [session-auth example](https://github.com/ultimo-rs/ultimo/tree/main/examples/session-auth) — complete working code
+- [Latency-sensitive backends](/blog/rust-for-latency-sensitive-backends) — session performance in high-throughput systems
+- [Build your first API](/blog/build-your-first-api-with-ultimo) — getting started with Ultimo
+- [Ultimo features](/features) — full feature list including auth and security

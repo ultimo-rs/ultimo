@@ -1,0 +1,290 @@
+---
+title: "JSON-RPC vs REST: Why Type-Safe APIs Win in Complex Applications"
+description: "A technical comparison of JSON-RPC and REST API styles — when each shines, where REST breaks down in complex applications, and how Ultimo's hybrid approach gives you both with automatic TypeScript client generation."
+date: "2026-06-12"
+author: "Ultimo Team"
+tags: ["architecture", "rpc", "rest", "api-design"]
+---
+
+# JSON-RPC vs REST: Why Type-Safe APIs Win in Complex Applications
+
+Every backend developer has an opinion about REST. Fewer have worked with JSON-RPC. And almost nobody has built a system that uses both in the same application — choosing the right paradigm per endpoint based on what the endpoint actually does.
+
+This post compares REST and [JSON-RPC](https://www.jsonrpc.org/specification) honestly, explains where each breaks down, and shows how [Ultimo](/)'s hybrid approach lets you use both — with generated TypeScript clients that make the distinction invisible to frontend developers.
+
+## What REST Gets Right
+
+REST (Representational State Transfer) maps well to CRUD operations on resources:
+
+```
+GET    /users/42        → read user 42
+POST   /users           → create a user
+PUT    /users/42        → replace user 42
+PATCH  /users/42        → partially update user 42
+DELETE /users/42        → delete user 42
+```
+
+The mapping between HTTP verbs and database operations is intuitive. URLs represent resources. Status codes communicate outcome. Caching works naturally (GET responses are cacheable by default). API gateways, documentation tools, and monitoring systems all understand HTTP semantics.
+
+For CRUD-heavy applications — content management systems, e-commerce catalogs, social media feeds — REST is the right choice. The resource model fits naturally and tools like [OpenAPI](https://swagger.io/specification/) generate documentation, client SDKs, and mock servers from your spec.
+
+## Where REST Breaks Down
+
+REST's resource model becomes strained when operations don't map cleanly to "create, read, update, delete a noun":
+
+### 1. Actions That Aren't CRUD
+
+```
+POST /users/42/send-verification-email
+POST /orders/99/cancel
+POST /portfolios/7/rebalance
+POST /builds/trigger
+```
+
+These are actions (verbs), not resource modifications. REST forces you to model them as resource creation (`POST /verification-emails`) or sub-resource operations (`POST /users/42/actions`). Both feel like the API design is fighting the natural structure of the operation.
+
+### 2. Complex Queries
+
+```
+GET /users?role=admin&created_after=2026-01-01&sort=name&include=posts,comments&page=2&limit=20
+```
+
+When a "read" requires multiple filter parameters, sorting, pagination, included relations, and field selection — the URL becomes unwieldy. You end up with custom query parameter conventions that each API implements differently.
+
+### 3. Batch and Transactional Operations
+
+REST has no built-in concept of "execute these three operations atomically." You either:
+- Make three separate HTTP requests (with partial failure risk)
+- Design a custom batch endpoint (`POST /batch` with a body array)
+- Nest the operations in a transaction resource
+
+All three feel like workarounds.
+
+### 4. Type Safety at the Boundary
+
+REST endpoints return JSON. The shape of that JSON is documented externally (OpenAPI spec, README, Postman collection) but not enforced by the protocol. The client trusts that the server returns the documented shape. If the server changes the response format, the client breaks at runtime — not at compile time.
+
+## What JSON-RPC Offers
+
+[JSON-RPC 2.0](https://www.jsonrpc.org/specification) is a simple protocol for remote procedure calls over JSON:
+
+```json
+// Request
+{"jsonrpc": "2.0", "method": "getUser", "params": {"id": 42}, "id": 1}
+
+// Response
+{"jsonrpc": "2.0", "result": {"id": 42, "name": "Alice"}, "id": 1}
+```
+
+The model is straightforward:
+- **Methods** are named procedures (functions)
+- **Params** are the function arguments
+- **Result** is the return value
+- **Errors** are structured with codes and messages
+
+### RPC Naturally Maps to Function Calls
+
+```
+getUser({id: 42})
+cancelOrder({orderId: 99, reason: "customer_request"})
+rebalancePortfolio({portfolioId: 7, strategy: "target_weight"})
+triggerBuild({branch: "main", environment: "staging"})
+```
+
+These read naturally as function calls — because they are. There is no pretense of resource modeling for operations that are inherently procedural.
+
+### Batching Is Built In
+
+JSON-RPC supports request batching natively:
+
+```json
+[
+  {"jsonrpc": "2.0", "method": "getUser", "params": {"id": 1}, "id": 1},
+  {"jsonrpc": "2.0", "method": "getUser", "params": {"id": 2}, "id": 2},
+  {"jsonrpc": "2.0", "method": "getPortfolio", "params": {"userId": 1}, "id": 3}
+]
+```
+
+The server processes all three and returns an array of responses. One HTTP round-trip, multiple operations, structured error handling per operation.
+
+### Type Safety With Code Generation
+
+Because RPC methods have explicit input and output types, code generation produces type-safe clients naturally:
+
+```typescript
+// Generated by Ultimo
+const user = await client.getUser({ id: 42 });
+//    ^? User — fully typed, IDE autocomplete works
+
+const result = await client.cancelOrder({ orderId: 99, reason: "customer_request" });
+//    ^? CancelResult — typed response
+```
+
+No URL construction. No response parsing. No manual type assertions. The function signature tells you exactly what goes in and what comes out.
+
+## Where JSON-RPC Falls Short
+
+### No HTTP Semantic Caching
+
+HTTP caches understand GET requests and Cache-Control headers. JSON-RPC sends everything as POST to a single endpoint (`/rpc`). CDNs, browser caches, and reverse proxies cannot cache JSON-RPC responses without custom logic.
+
+For publicly cacheable data (product catalogs, blog content, static configurations), REST's integration with HTTP caching infrastructure is a real advantage.
+
+### Tooling and Documentation
+
+OpenAPI (Swagger) has massive ecosystem support — API gateways, documentation generators, mock servers, testing tools. JSON-RPC tooling exists but is smaller. If your API consumers expect Swagger UI or Postman collections, REST + OpenAPI is the path of least resistance.
+
+### Not Discoverable
+
+A REST API's URL structure is (ideally) discoverable — you can guess that users live at `/users` and individual users at `/users/:id`. JSON-RPC methods are an opaque list until you read the documentation. There is no URL structure to explore.
+
+### Monitoring and Observability
+
+API gateways and monitoring tools parse HTTP methods and paths to produce per-endpoint metrics. A JSON-RPC API appears as a single endpoint (`POST /rpc`) in most monitoring systems unless you instrument at the method level yourself.
+
+## Ultimo's Hybrid Approach
+
+[Ultimo](/) takes the position that REST and JSON-RPC serve different purposes and both belong in the same application. You choose the paradigm per endpoint based on what it does:
+
+```rust
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let mut app = Ultimo::new();
+    let mut rpc = RpcRegistry::new();
+
+    // REST for resources — CRUD, cacheable, browseable
+    app.get("/api/products/:id", get_product);
+    app.get("/api/products", list_products);
+    app.post("/api/products", create_product);
+
+    // RPC for operations — procedures, typed, batch-friendly
+    rpc.query("getPortfolioSummary", get_portfolio_summary);
+    rpc.mutation("rebalancePortfolio", rebalance_portfolio);
+    rpc.mutation("cancelOrder", cancel_order);
+    rpc.query("calculateRisk", calculate_risk);
+
+    app.rpc("/rpc", rpc);
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+### REST Endpoints Get OpenAPI
+
+Ultimo generates [OpenAPI 3.0 specifications](/getting-started) from your REST routes, giving you Swagger UI, Postman imports, and API gateway integration:
+
+```rust
+app.get("/api/products/:id", get_product);
+// → OpenAPI: GET /api/products/{id} with response schema
+```
+
+### RPC Endpoints Get TypeScript Clients
+
+RPC methods generate a fully typed TypeScript client:
+
+```rust
+#[derive(Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PortfolioSummary {
+    pub total_value: f64,
+    pub positions: Vec<Position>,
+    pub daily_pnl: f64,
+}
+
+rpc.query("getPortfolioSummary", |input: PortfolioQuery| async move {
+    let summary = calculate_summary(&input).await?;
+    Ok(summary)
+});
+```
+
+Run `ultimo generate` and the TypeScript client appears:
+
+```typescript
+// Generated — do not edit
+export interface PortfolioSummary {
+  total_value: number;
+  positions: Position[];
+  daily_pnl: number;
+}
+
+export const client = {
+  getPortfolioSummary(input: PortfolioQuery): Promise<PortfolioSummary>,
+  rebalancePortfolio(input: RebalanceInput): Promise<RebalanceResult>,
+  cancelOrder(input: CancelInput): Promise<CancelResult>,
+  calculateRisk(input: RiskInput): Promise<RiskAssessment>,
+};
+```
+
+Frontend developers call typed functions. They never construct URLs, parse JSON manually, or wonder what shape the response will have.
+
+## The Type Safety Argument
+
+The strongest case for RPC over REST is type safety at the API boundary.
+
+In a REST API, the client makes assumptions about response shapes:
+
+```typescript
+// REST — you hope this matches the actual response
+const response = await fetch("/api/users/42");
+const user = await response.json() as User; // Trust-based type assertion
+```
+
+If the server changes the response shape (adds a field, renames one, changes a type from string to number), the client breaks at runtime. The TypeScript compiler cannot help because the assertion is a lie — it tells the compiler "trust me, this is a User" without runtime validation.
+
+In a generated RPC client, the types are derived from the server's Rust structs. If the server changes `PortfolioSummary`, the generated TypeScript client changes too. Any frontend code that doesn't match the new shape gets a compile error immediately — before deployment, before production, before users see it.
+
+This is the same value proposition as GraphQL's type system or tRPC's inferred types — but without the GraphQL runtime overhead or the requirement that both client and server be TypeScript.
+
+## When to Use Each
+
+| Use REST when... | Use JSON-RPC when... |
+|---|---|
+| The operation maps to CRUD on a resource | The operation is a procedure (verb) |
+| HTTP caching matters (public, CDN-friendly data) | The response is user-specific and uncacheable |
+| External consumers expect OpenAPI/Swagger | Consumers are your own TypeScript frontends |
+| Discoverability of URL structure is valuable | Type-safe generated clients handle discovery |
+| API gateways need per-path routing/metrics | You control the full stack |
+| The operation is simple (fetch/create/update/delete) | The operation involves complex inputs or batch processing |
+
+## A Practical Example: E-Commerce
+
+```rust
+// REST — product catalog (cacheable, public, discoverable)
+app.get("/api/products", list_products);
+app.get("/api/products/:id", get_product);
+app.get("/api/categories", list_categories);
+
+// RPC — user-specific operations (typed, uncacheable, complex)
+rpc.query("getCartSummary", get_cart_summary);
+rpc.mutation("checkout", process_checkout);
+rpc.mutation("applyDiscount", apply_discount);
+rpc.query("getOrderHistory", get_order_history);
+rpc.query("estimateShipping", estimate_shipping);
+```
+
+The product catalog is REST: it's cacheable, public, and indexed by search engines. Cart and checkout operations are RPC: they're user-specific, involve complex business logic, and benefit from typed client generation.
+
+## Migration Path
+
+You don't need to rewrite your REST API to adopt RPC. Ultimo supports both simultaneously:
+
+1. Keep existing REST endpoints as-is
+2. Add new complex operations as RPC methods
+3. Generate TypeScript clients for the RPC surface
+4. Over time, migrate REST endpoints that struggle with the resource model to RPC
+
+The frontend can use `fetch` for REST endpoints and the generated client for RPC methods — they coexist naturally.
+
+---
+
+## Summary
+
+REST is excellent for resource-oriented CRUD with HTTP caching and broad tooling support. JSON-RPC is excellent for typed procedure calls with complex inputs, batch operations, and generated clients. They are not competitors — they solve different problems.
+
+Ultimo lets you use both in one application, with OpenAPI for REST and TypeScript codegen for RPC. Choose the right paradigm per endpoint and let the tooling handle the rest.
+
+**Related reading:**
+- [How TypeScript codegen works in Ultimo](/blog/how-typescript-codegen-works) — the pipeline from Rust struct to TypeScript interface
+- [Build your first API with Ultimo](/blog/build-your-first-api-with-ultimo) — hands-on tutorial with both REST and RPC
+- [Ultimo vs Axum](/blog/ultimo-vs-axum-comparison) — why Ultimo includes RPC and TypeScript gen out of the box
