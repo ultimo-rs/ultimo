@@ -17,10 +17,13 @@ export function HeroSection() {
           v0.5.0 Now Available
         </div>
 
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl text-balance">
-          The <span className="text-gradient">Rust Framework</span>
-          <br />
-          for Speed, Security & Efficiency
+        <h1 className="font-bold tracking-tight mb-6 max-w-4xl">
+          <span className="block text-4xl sm:text-6xl md:text-7xl">
+            The <span className="text-gradient">Rust Framework</span>
+          </span>
+          <span className="block text-3xl sm:text-5xl md:text-6xl mt-2">
+            for Speed, Security & Efficiency
+          </span>
         </h1>
 
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10 text-balance leading-relaxed">
@@ -56,14 +59,8 @@ export function HeroSection() {
             alt="CI status"
             src="https://img.shields.io/github/actions/workflow/status/ultimo-rs/ultimo/ci.yml?branch=main&label=CI"
           />
-          <img
-            alt="license"
-            src="https://img.shields.io/crates/l/ultimo"
-          />
-          <img
-            alt="MSRV"
-            src="https://img.shields.io/badge/MSRV-1.86-blue"
-          />
+          <img alt="license" src="https://img.shields.io/crates/l/ultimo" />
+          <img alt="MSRV" src="https://img.shields.io/badge/MSRV-1.86-blue" />
           <img
             alt="unsafe forbidden"
             src="https://img.shields.io/badge/unsafe-forbidden-success"
