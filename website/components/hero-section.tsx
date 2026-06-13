@@ -17,11 +17,11 @@ export function HeroSection() {
           v0.5.0 Now Available
         </div>
 
-        <h1 className="font-bold tracking-tight mb-6 max-w-4xl">
+        <h1 className="font-bold tracking-tight mb-6 max-w-4xl text-center">
           <span className="block text-4xl sm:text-6xl md:text-7xl">
             The <span className="text-gradient">Rust Framework</span>
           </span>
-          <span className="block text-3xl sm:text-5xl md:text-6xl mt-2">
+          <span className="block text-2xl sm:text-4xl md:text-5xl mt-2 md:whitespace-nowrap">
             for Speed, Security & Efficiency
           </span>
         </h1>
