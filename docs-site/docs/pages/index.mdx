@@ -13,7 +13,7 @@ Build type-safe full-stack applications with Rust backend and TypeScript fronten
 
 ## ✨ Key Features
 
-- **⚡ Blazing Fast** - 158k+ req/sec, industry-leading performance
+- **⚡ Low-Latency by Design** - Built on Hyper + Tokio with O(1) routing
 - **🔒 Type-Safe** - End-to-end type safety from Rust to TypeScript
 - **🚀 Auto TypeScript** - Generate type-safe clients automatically
 - **📋 OpenAPI Built-in** - Generate specs for Swagger UI and API docs
@@ -39,16 +39,14 @@ async fn main() -> ultimo::Result<()> {
 
 ## 📊 Performance
 
-Ultimo delivers exceptional performance, matching industry-leading frameworks:
+Ultimo is designed for predictable low-latency backend workloads.
 
-| Framework   | Throughput       | Avg Latency |
-| ----------- | ---------------- | ----------- |
-| **Ultimo**  | **158k req/sec** | **0.6ms**   |
-| Axum (Rust) | 153k req/sec     | 0.6ms       |
-| Hono (Bun)  | 132k req/sec     | 0.8ms       |
-| FastAPI     | 10k req/sec      | 9.5ms       |
+- Built on Hyper 1.x + Tokio async runtime
+- O(1) constant-time route lookup
+- Continuous benchmarks in the repository to catch regressions
 
-**15x faster than FastAPI** with zero performance penalty for auto-generation.
+For reproducible numbers, run the benchmark suite in your own environment:
+[Benchmark examples](https://github.com/ultimo-rs/ultimo/tree/main/examples/benchmark)
 
 ## 🎯 Type-Safe Full Stack
 
