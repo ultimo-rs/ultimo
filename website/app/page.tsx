@@ -6,12 +6,14 @@ import { HeroSection } from "@/components/hero-section";
 import { SecuritySection } from "@/components/security-section";
 import { StatsSection } from "@/components/stats-section";
 import { TypeSafeSection } from "@/components/type-safe-section";
+import { UseCasesSection } from "@/components/use-cases-section";
 
 export default function Home() {
   return (
     <div className="min-h-screen selection:bg-orange-500/30">
       <main>
         <HeroSection />
+        <UseCasesSection />
         <FeaturesSection />
         <StatsSection />
         <SecuritySection />

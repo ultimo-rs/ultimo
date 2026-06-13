@@ -18,15 +18,15 @@ export function HeroSection() {
         </div>
 
         <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl text-balance">
-          The <span className="text-gradient">Rust Framework</span> for{" "}
+          The <span className="text-gradient">Rust Framework</span> Built for{" "}
           <br className="hidden md:block" />
-          Modern Web Development
+          Speed, Security & Efficiency
         </h1>
 
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10 text-balance leading-relaxed">
-          Secure by default, fast on the Hyper + Tokio core, and type-safe end
-          to end — with automatic TypeScript clients generated from your Rust
-          API.
+          Type-safe APIs for latency-sensitive systems — trading platforms, AI
+          inference services, real-time data pipelines, and backend
+          infrastructure where every millisecond counts.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
