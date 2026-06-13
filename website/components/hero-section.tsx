@@ -18,9 +18,9 @@ export function HeroSection() {
         </div>
 
         <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl text-balance">
-          The <span className="text-gradient">Rust Framework</span> Built for{" "}
-          <br className="hidden md:block" />
-          Speed, Security & Efficiency
+          The <span className="text-gradient">Rust Framework</span>
+          <br />
+          for Speed, Security & Efficiency
         </h1>
 
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10 text-balance leading-relaxed">
