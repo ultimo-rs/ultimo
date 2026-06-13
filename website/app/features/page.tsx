@@ -29,27 +29,33 @@ export const metadata: Metadata = {
 const faqs = [
   {
     question: "How does Ultimo compare to Axum in performance?",
-    answer: "Both Ultimo and Axum are built on Hyper 1.0 + Tokio, so raw throughput is nearly identical (150K+ req/s). The difference is in developer experience — Ultimo includes sessions, auth, TypeScript codegen, and WebSocket pub/sub out of the box.",
+    answer:
+      "Both Ultimo and Axum are built on Hyper 1.0 + Tokio, so baseline performance characteristics are similar. Ultimo focuses on developer experience with sessions, auth, TypeScript codegen, and WebSocket pub/sub built in.",
   },
   {
     question: "Does Ultimo support automatic TypeScript client generation?",
-    answer: "Yes. Add #[derive(TS)] to your Rust structs, register RPC handlers, and run 'ultimo generate'. You get a fully typed TypeScript client with zero manual type maintenance.",
+    answer:
+      "Yes. Add #[derive(TS)] to your Rust structs, register RPC handlers, and run 'ultimo generate'. You get a fully typed TypeScript client with zero manual type maintenance.",
   },
   {
     question: "Can I use Ultimo with my existing database setup?",
-    answer: "Absolutely. Ultimo is database-agnostic and works with SQLx, Diesel, SeaORM, or any Rust database library. It provides connection pooling and transaction middleware without vendor lock-in.",
+    answer:
+      "Absolutely. Ultimo is database-agnostic and works with SQLx, Diesel, SeaORM, or any Rust database library. It provides connection pooling and transaction middleware without vendor lock-in.",
   },
   {
     question: "Is Ultimo production-ready?",
-    answer: "Yes. Ultimo uses #![forbid(unsafe_code)] for memory safety, includes built-in security features (JWT, CSRF, rate limiting), and ships with testing utilities. It's benchmarked in CI to prevent performance regressions.",
+    answer:
+      "Yes. Ultimo uses #![forbid(unsafe_code)] for memory safety, includes built-in security features (JWT, CSRF, rate limiting), and ships with testing utilities. It's benchmarked in CI to prevent performance regressions.",
   },
   {
     question: "How do I deploy an Ultimo application?",
-    answer: "Ultimo compiles to a single static binary with no runtime dependencies. Deploy anywhere Rust runs: Docker containers, Kubernetes, bare metal servers, or edge computing platforms.",
+    answer:
+      "Ultimo compiles to a single static binary with no runtime dependencies. Deploy anywhere Rust runs: Docker containers, Kubernetes, bare metal servers, or edge computing platforms.",
   },
   {
     question: "Does Ultimo support WebSocket?",
-    answer: "Yes. Ultimo includes RFC 6455 WebSocket support with built-in pub/sub channels, making real-time features like chat, notifications, and live updates straightforward to implement.",
+    answer:
+      "Yes. Ultimo includes RFC 6455 WebSocket support with built-in pub/sub channels, making real-time features like chat, notifications, and live updates straightforward to implement.",
   },
 ];
 
@@ -322,9 +328,14 @@ export default function FeaturesPage() {
           </h2>
           <div className="space-y-6">
             {faqs.map((faq, index) => (
-              <div key={index} className="rounded-xl border border-border bg-card p-6">
+              <div
+                key={index}
+                className="rounded-xl border border-border bg-card p-6"
+              >
                 <h3 className="font-semibold text-lg mb-2">{faq.question}</h3>
-                <p className="text-muted-foreground leading-relaxed">{faq.answer}</p>
+                <p className="text-muted-foreground leading-relaxed">
+                  {faq.answer}
+                </p>
               </div>
             ))}
           </div>

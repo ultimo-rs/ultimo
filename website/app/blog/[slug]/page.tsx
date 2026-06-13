@@ -76,30 +76,88 @@ export default async function BlogPostPage({ params }: PageProps) {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: "https://ultimo.dev" },
-      { "@type": "ListItem", position: 2, name: "Blog", item: "https://ultimo.dev/blog" },
-      { "@type": "ListItem", position: 3, name: post.meta.title, item: `https://ultimo.dev/blog/${slug}` },
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: "https://ultimo.dev",
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Blog",
+        item: "https://ultimo.dev/blog",
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: post.meta.title,
+        item: `https://ultimo.dev/blog/${slug}`,
+      },
     ],
   };
 
   // HowTo schema for the tutorial post
-  const howToLd = slug === "build-your-first-api-with-ultimo" ? {
-    "@context": "https://schema.org",
-    "@type": "HowTo",
-    name: "Build Your First API with Ultimo in 10 Minutes",
-    description: post.meta.description,
-    totalTime: "PT10M",
-    step: [
-      { "@type": "HowToStep", position: 1, name: "Create Your Project", text: "Create a new Rust project and install the Ultimo CLI with cargo." },
-      { "@type": "HowToStep", position: 2, name: "Configure Dependencies", text: "Add ultimo, tokio, and serde to your Cargo.toml." },
-      { "@type": "HowToStep", position: 3, name: "Define Your Data Model", text: "Create Rust structs with Serialize, Deserialize, and TS derives." },
-      { "@type": "HowToStep", position: 4, name: "Create REST Endpoints", text: "Define route handlers for CRUD operations using Ultimo's Context API." },
-      { "@type": "HowToStep", position: 5, name: "Add JSON-RPC Methods", text: "Register RPC query and mutation handlers in the RPC registry." },
-      { "@type": "HowToStep", position: 6, name: "Wire Up the Server", text: "Configure the Ultimo app with routes, RPC, and start listening." },
-      { "@type": "HowToStep", position: 7, name: "Test Your API", text: "Use curl to test REST and JSON-RPC endpoints." },
-      { "@type": "HowToStep", position: 8, name: "Generate TypeScript Client", text: "Run ultimo generate to create a fully typed TypeScript client." },
-    ],
-  } : null;
+  const howToLd =
+    slug === "build-your-first-api-with-ultimo"
+      ? {
+          "@context": "https://schema.org",
+          "@type": "HowTo",
+          name: "Build Your First API with Ultimo in 10 Minutes",
+          description: post.meta.description,
+          totalTime: "PT10M",
+          step: [
+            {
+              "@type": "HowToStep",
+              position: 1,
+              name: "Create Your Project",
+              text: "Create a new Rust project and install the Ultimo CLI with cargo.",
+            },
+            {
+              "@type": "HowToStep",
+              position: 2,
+              name: "Configure Dependencies",
+              text: "Add ultimo, tokio, and serde to your Cargo.toml.",
+            },
+            {
+              "@type": "HowToStep",
+              position: 3,
+              name: "Define Your Data Model",
+              text: "Create Rust structs with Serialize, Deserialize, and TS derives.",
+            },
+            {
+              "@type": "HowToStep",
+              position: 4,
+              name: "Create REST Endpoints",
+              text: "Define route handlers for CRUD operations using Ultimo's Context API.",
+            },
+            {
+              "@type": "HowToStep",
+              position: 5,
+              name: "Add JSON-RPC Methods",
+              text: "Register RPC query and mutation handlers in the RPC registry.",
+            },
+            {
+              "@type": "HowToStep",
+              position: 6,
+              name: "Wire Up the Server",
+              text: "Configure the Ultimo app with routes, RPC, and start listening.",
+            },
+            {
+              "@type": "HowToStep",
+              position: 7,
+              name: "Test Your API",
+              text: "Use curl to test REST and JSON-RPC endpoints.",
+            },
+            {
+              "@type": "HowToStep",
+              position: 8,
+              name: "Generate TypeScript Client",
+              text: "Run ultimo generate to create a fully typed TypeScript client.",
+            },
+          ],
+        }
+      : null;
 
   return (
     <div className="min-h-screen selection:bg-orange-500/30">
