@@ -1,23 +1,31 @@
 ---
 title: Ultimo
-description: Modern Rust web framework with automatic TypeScript generation
+description: The Rust web framework built for speed, security, and efficiency
 ---
 
 # Ultimo
 
-**Modern Rust web framework with automatic TypeScript client generation**
+**The Rust web framework built for speed, security, and efficiency**
 
-Build type-safe full-stack applications with Rust backend and TypeScript frontend, automatically synced.
+Type-safe APIs for latency-sensitive systems — trading platforms, AI inference services, real-time data pipelines, and backend infrastructure where every millisecond counts.
 
 [Get Started →](/getting-started)
 
+## 🏗️ Built For
+
+- **Financial Services** — trading systems, risk engines, payment processing
+- **AI & ML Backends** — inference serving, model orchestration, feature pipelines
+- **Bot Execution** — trading bots, automation engines, webhook processors
+- **Real-Time Systems** — live data feeds, notifications, collaborative tools
+- **Backend Infrastructure** — API gateways, microservices, data pipelines
+
 ## ✨ Key Features
 
-- **⚡ Low-Latency by Design** - Built on Hyper + Tokio with O(1) routing
-- **🔒 Type-Safe** - End-to-end type safety from Rust to TypeScript
+- **⚡ Speed** - Zero GC, O(1) routing, Hyper + Tokio async runtime
+- **🔒 Security** - `#![forbid(unsafe_code)]`, type-safe contracts, built-in auth & CSRF
+- **📦 Efficiency** - Single binary, minimal memory, predictable resource usage
 - **🚀 Auto TypeScript** - Generate type-safe clients automatically
-- **📋 OpenAPI Built-in** - Generate specs for Swagger UI and API docs
-- **🎯 Hybrid API** - Support both REST and RPC-style endpoints
+- **🎯 Hybrid API** - REST + JSON-RPC in one application
 - **🔧 CLI Tools** - Build, develop, and generate clients with ease
 
 ## 🚀 Quick Example
@@ -78,8 +86,8 @@ console.log(user.name); // ✅ Fully type-safe!
 
 ## 🌟 Why Ultimo?
 
-✅ **Single Source of Truth** - Types defined in Rust, auto-sync to TypeScript  
-✅ **Zero Boilerplate** - No manual API typing or client code  
-✅ **Production Ready** - Built-in validation, auth, CORS  
-✅ **Great DX** - Full IDE autocomplete and type checking  
-✅ **Performance** - Rust speed with modern async runtime
+✅ **Speed** - Zero GC, O(1) routing, Tokio multi-threaded async runtime  
+✅ **Security** - `#![forbid(unsafe_code)]`, type-safe contracts, built-in auth & CSRF  
+✅ **Efficiency** - Single binary, minimal memory, predictable resource usage  
+✅ **Type Safety** - Types defined in Rust, auto-sync to TypeScript  
+✅ **Great DX** - Full IDE autocomplete, hybrid REST + RPC, CLI tooling
