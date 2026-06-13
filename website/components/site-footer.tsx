@@ -27,6 +27,7 @@ export function SiteFooter() {
                 href={siteConfig.links.github}
                 target="_blank"
                 className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="GitHub"
               >
                 <Github className="h-5 w-5" />
               </Link>
@@ -34,6 +35,7 @@ export function SiteFooter() {
                 href={siteConfig.links.twitter}
                 target="_blank"
                 className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Twitter"
               >
                 <Twitter className="h-5 w-5" />
               </Link>
@@ -41,6 +43,7 @@ export function SiteFooter() {
                 href={siteConfig.links.discord}
                 target="_blank"
                 className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Discord"
               >
                 <Disc className="h-5 w-5" />
               </Link>
@@ -48,7 +51,7 @@ export function SiteFooter() {
           </div>
 
           <div>
-            <h4 className="font-semibold text-foreground mb-4">Product</h4>
+            <h3 className="font-semibold text-foreground mb-4">Product</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <Link
@@ -86,7 +89,7 @@ export function SiteFooter() {
           </div>
 
           <div>
-            <h4 className="font-semibold text-foreground mb-4">Resources</h4>
+            <h3 className="font-semibold text-foreground mb-4">Resources</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <Link
@@ -124,7 +127,7 @@ export function SiteFooter() {
           </div>
 
           <div>
-            <h4 className="font-semibold text-foreground mb-4">Community</h4>
+            <h3 className="font-semibold text-foreground mb-4">Community</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <Link

@@ -92,6 +92,7 @@ export function SiteHeader() {
             variant="ghost"
             size="icon"
             className="md:hidden text-muted-foreground"
+            aria-label="Open menu"
           >
             <Menu className="h-6 w-6" />
           </Button>
