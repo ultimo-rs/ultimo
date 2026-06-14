@@ -549,11 +549,17 @@ async fn main() -> Result<()> {
     app.post("/rpc", move |ctx: Context| {
         let rpc = rpc.clone();
         async move {
-            let body = ctx.req.body_bytes().await?;
+            let body = ctx.req.bytes().await?;
             let output = rpc.handle_request(&body).await;
             match output.into_body() {
-                Some(bytes) => ctx.json_bytes(bytes).await,
-                None => ctx.status(204).send().await,
+                Some(bytes) => {
+                    let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+                    ctx.json(value).await
+                }
+                None => {
+                    ctx.status(204).await;
+                    ctx.text("").await
+                }
             }
         }
     });
