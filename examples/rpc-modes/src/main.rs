@@ -201,18 +201,34 @@ async fn main() -> ultimo::Result<()> {
     println!("   - POST /rpc (all methods)");
     println!();
 
-    // Mount JSON-RPC endpoint
+    // Mount JSON-RPC 2.0 endpoint (supports single, batch, and notifications)
     let rpc_handler = jsonrpc_rpc.clone();
     jsonrpc_app.post("/rpc", move |ctx: Context| {
         let rpc = rpc_handler.clone();
         async move {
-            let req: RpcRequest = ctx.req.json().await?;
-            let result = rpc.call(&req.method, req.params).await?;
-            ctx.json(result).await
+            let body = ctx.req.bytes().await?;
+            let output = rpc.handle_request(&body).await;
+            match output.into_body() {
+                Some(bytes) => {
+                    let value: serde_json::Value = serde_json::from_slice(&bytes)
+                        .map_err(|e| ultimo::UltimoError::Internal(e.to_string()))?;
+                    ctx.json(value).await
+                }
+                None => {
+                    ctx.status(204).await;
+                    ctx.text("").await
+                }
+            }
         }
     });
 
     println!("JSON-RPC Mode: Would listen on http://localhost:3000");
+    println!();
+    println!("  Supports:");
+    println!("  - Single: {{\"jsonrpc\":\"2.0\",\"method\":\"getUser\",\"params\":{{\"id\":1}},\"id\":1}}");
+    println!("  - Batch:  [{{...}}, {{...}}] — executed concurrently");
+    println!("  - Notify: {{\"jsonrpc\":\"2.0\",\"method\":\"...\",\"params\":{{}}}} (no id = no response)");
+    println!("  - Legacy: {{\"method\":\"getUser\",\"params\":{{\"id\":1}}}} (backward compatible)");
     println!();
 
     // ============================================
@@ -226,10 +242,12 @@ async fn main() -> ultimo::Result<()> {
     println!("  ✅ RESTful conventions");
     println!("  ⚠️  More complex routing");
     println!();
-    println!("JSON-RPC Mode:");
+    println!("JSON-RPC 2.0 Mode:");
     println!("  ✅ Simple routing (one endpoint)");
-    println!("  ✅ Easy batching");
-    println!("  ✅ Single middleware point");
+    println!("  ✅ Batch multiple calls in one request");
+    println!("  ✅ Notifications (fire-and-forget)");
+    println!("  ✅ Standard error codes");
+    println!("  ✅ Backward compatible with legacy format");
     println!("  ⚠️  All requests look same in Network tab");
     println!();
     println!("Choose based on your needs! 🎯");
