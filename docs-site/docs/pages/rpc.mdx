@@ -526,3 +526,155 @@ rpc.register_with_types(
     // types...
 );
 ```
+
+## JSON-RPC 2.0 Protocol
+
+Ultimo's JSON-RPC mode is fully compliant with the [JSON-RPC 2.0 specification](https://www.jsonrpc.org/specification). Use `handle_request()` for spec-compliant dispatch with batch support, notifications, and structured errors.
+
+### Basic Setup
+
+```rust
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let mut app = Ultimo::new();
+    let rpc = RpcRegistry::new();
+
+    rpc.register_with_types("add", |input: AddInput| async move {
+        Ok(AddOutput { sum: input.a + input.b })
+    }, "{ a: number; b: number }".to_string(), "{ sum: number }".to_string());
+
+    // Use handle_request for full JSON-RPC 2.0 support
+    app.post("/rpc", move |ctx: Context| {
+        let rpc = rpc.clone();
+        async move {
+            let body = ctx.req.body_bytes().await?;
+            let output = rpc.handle_request(&body).await;
+            match output.into_body() {
+                Some(bytes) => ctx.json_bytes(bytes).await,
+                None => ctx.status(204).send().await,
+            }
+        }
+    });
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+### Single Request
+
+```json
+// Request
+{"jsonrpc": "2.0", "method": "add", "params": {"a": 3, "b": 4}, "id": 1}
+
+// Response
+{"jsonrpc": "2.0", "result": {"sum": 7}, "id": 1}
+```
+
+### Batch Requests
+
+Send multiple calls in a single HTTP request — all execute concurrently:
+
+```json
+// Request (array)
+[
+  {"jsonrpc": "2.0", "method": "add", "params": {"a": 1, "b": 2}, "id": 1},
+  {"jsonrpc": "2.0", "method": "add", "params": {"a": 10, "b": 20}, "id": 2},
+  {"jsonrpc": "2.0", "method": "getUser", "params": {"id": 42}, "id": 3}
+]
+
+// Response (array, correlated by id)
+[
+  {"jsonrpc": "2.0", "result": {"sum": 3}, "id": 1},
+  {"jsonrpc": "2.0", "result": {"sum": 30}, "id": 2},
+  {"jsonrpc": "2.0", "result": {"id": 42, "name": "Alice"}, "id": 3}
+]
+```
+
+### Notifications
+
+A request without an `id` field is a notification — the server processes it but sends no response:
+
+```json
+// Notification (no response)
+{ "jsonrpc": "2.0", "method": "logEvent", "params": { "event": "page_view" } }
+```
+
+You can mix notifications with regular requests in a batch:
+
+```json
+[
+  {"jsonrpc": "2.0", "method": "add", "params": {"a": 1, "b": 1}, "id": 1},
+  {"jsonrpc": "2.0", "method": "logEvent", "params": {"event": "calc"}},
+  {"jsonrpc": "2.0", "method": "add", "params": {"a": 2, "b": 2}, "id": 2}
+]
+// Response only contains results for requests with id:
+[
+  {"jsonrpc": "2.0", "result": {"sum": 2}, "id": 1},
+  {"jsonrpc": "2.0", "result": {"sum": 4}, "id": 2}
+]
+```
+
+### Error Responses
+
+Errors follow the JSON-RPC 2.0 error format with standard codes:
+
+```json
+// Method not found
+{"jsonrpc": "2.0", "error": {"code": -32601, "message": "Procedure 'unknown' not found"}, "id": 1}
+
+// Invalid params
+{"jsonrpc": "2.0", "error": {"code": -32602, "message": "Invalid input: ..."}, "id": 2}
+
+// Parse error (invalid JSON)
+{"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}, "id": null}
+```
+
+| Code   | Meaning                                   |
+| ------ | ----------------------------------------- |
+| -32700 | Parse error (invalid JSON)                |
+| -32600 | Invalid request (missing required fields) |
+| -32601 | Method not found                          |
+| -32602 | Invalid params                            |
+| -32603 | Internal error                            |
+
+### TypeScript Client with Batch
+
+The generated TypeScript client includes batch and notification support:
+
+```typescript
+import { UltimoRpcClient } from "./lib/client";
+
+const client = new UltimoRpcClient("/rpc");
+
+// Single call (fully typed)
+const result = await client.add({ a: 3, b: 4 });
+
+// Batch multiple calls in one HTTP request
+const results = await client.batch([
+  { method: "add", params: { a: 1, b: 2 } },
+  { method: "add", params: { a: 10, b: 20 } },
+  { method: "getUser", params: { id: 42 } },
+]);
+// results[0].result === { sum: 3 }
+// results[1].result === { sum: 30 }
+// results[2].result === { id: 42, name: "Alice" }
+
+// Fire-and-forget notification
+await client.notify("logEvent", { event: "button_click" });
+```
+
+### Backward Compatibility
+
+If you send a request without the `jsonrpc: "2.0"` field, Ultimo responds in the legacy format:
+
+```json
+// Legacy request
+{"method": "add", "params": {"a": 1, "b": 2}}
+
+// Legacy response
+{"result": {"sum": 3}}
+```
+
+This means existing clients continue to work without changes.

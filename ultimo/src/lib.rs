@@ -67,6 +67,7 @@ pub use app::Ultimo;
 pub use context::Context;
 pub use error::{Result, UltimoError};
 pub use rpc::{RpcRegistry, RpcRequest, RpcResponse};
+pub use rpc::{JsonRpcRequest, JsonRpcResponse, JsonRpcError, JsonRpcErrorResponse, JsonRpcOutput, error_code};
 pub use validation::validate;
 
 /// Prelude module for convenient imports
@@ -76,6 +77,7 @@ pub mod prelude {
     pub use crate::error::{Result, UltimoError};
     pub use crate::middleware;
     pub use crate::rpc::{RpcRegistry, RpcRequest, RpcResponse};
+    pub use crate::rpc::{JsonRpcRequest, JsonRpcResponse, JsonRpcError, JsonRpcErrorResponse, JsonRpcOutput};
     pub use crate::validation::validate;
     pub use serde::{Deserialize, Serialize};
     pub use serde_json::json;

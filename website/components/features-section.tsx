@@ -44,13 +44,13 @@ const featureCategories = [
       {
         title: "Hybrid Design",
         description:
-          "Support both REST endpoints and JSON-RPC procedures in the same application.",
+          "REST + JSON-RPC 2.0 in one app with batch requests and notifications.",
         icon: Layers,
         details: [
           "RESTful routing",
-          "JSON-RPC procedures",
-          "Mix and match freely",
-          "Flexible configuration",
+          "JSON-RPC 2.0 with batch",
+          "Notifications (fire-and-forget)",
+          "Standard error codes",
         ],
       },
       {
