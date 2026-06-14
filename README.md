@@ -36,7 +36,7 @@ the framework is 100% safe Rust (`#![forbid(unsafe_code)]`).
 ## Why Ultimo
 
 - 🚀 **Automatic TypeScript clients** — define your API in Rust, get a fully typed TS client generated for you.
-- 🔄 **REST + JSON-RPC in one app** — plain HTTP routes and RPC procedures side by side.
+- 🔄 **REST + JSON-RPC 2.0 in one app** — plain HTTP routes and RPC procedures side by side, with batch requests and notifications.
 - 🔌 **WebSockets** — RFC 6455 with a built-in pub/sub system (zero extra deps).
 - 🔐 **Auth, built in** — JWT and API-key middleware plus scope-based [authorization guards](https://docs.ultimo.dev/authorization).
 - 🛡️ **Secure by default** — 100% safe Rust, secure sessions/cookies, CSRF, security-headers middleware, request body-size limits, and supply-chain CI.
@@ -104,20 +104,20 @@ See [TypeScript Clients](https://docs.ultimo.dev/typescript) for the full workfl
 
 Everything is opt-in (`default = []`):
 
-| Feature | What it enables |
-|---|---|
-| `websocket` | RFC 6455 WebSocket support + pub/sub |
-| `session` | Cookie-based session management |
-| `jwt` | JWT authentication middleware (HS256) |
-| `api-key` | API-key authentication with a pluggable store |
-| `csrf` | CSRF protection (double-submit cookie) |
-| `static-files` | Static file serving + SPA fallback (`serve_static`, `serve_spa`) |
-| `compression` | Automatic gzip/brotli response compression (pure Rust, no C deps) |
-| `client-gen` | Derive RPC client TypeScript types from Rust types (via `ts-rs`) |
-| `testing` | In-process `TestClient`, assertions, fixtures |
-| `test-helpers` | WebSocket test helpers (for integration tests) |
-| `sqlx-postgres` · `sqlx-mysql` · `sqlx-sqlite` | SQLx integration per backend |
-| `diesel-postgres` · `diesel-mysql` · `diesel-sqlite` | Diesel integration per backend |
+| Feature                                              | What it enables                                                   |
+| ---------------------------------------------------- | ----------------------------------------------------------------- |
+| `websocket`                                          | RFC 6455 WebSocket support + pub/sub                              |
+| `session`                                            | Cookie-based session management                                   |
+| `jwt`                                                | JWT authentication middleware (HS256)                             |
+| `api-key`                                            | API-key authentication with a pluggable store                     |
+| `csrf`                                               | CSRF protection (double-submit cookie)                            |
+| `static-files`                                       | Static file serving + SPA fallback (`serve_static`, `serve_spa`)  |
+| `compression`                                        | Automatic gzip/brotli response compression (pure Rust, no C deps) |
+| `client-gen`                                         | Derive RPC client TypeScript types from Rust types (via `ts-rs`)  |
+| `testing`                                            | In-process `TestClient`, assertions, fixtures                     |
+| `test-helpers`                                       | WebSocket test helpers (for integration tests)                    |
+| `sqlx-postgres` · `sqlx-mysql` · `sqlx-sqlite`       | SQLx integration per backend                                      |
+| `diesel-postgres` · `diesel-mysql` · `diesel-sqlite` | Diesel integration per backend                                    |
 
 ```toml
 ultimo = { version = "0.5", features = ["websocket", "jwt", "sqlx-postgres"] }

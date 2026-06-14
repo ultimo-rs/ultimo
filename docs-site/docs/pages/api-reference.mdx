@@ -505,9 +505,37 @@ pub enum RpcMode {
     Rest,
 
     /// All procedures use a single POST endpoint
-    /// POST /rpc with JSON-RPC protocol
+    /// POST /rpc with JSON-RPC 2.0 protocol
     JsonRpc,
 }
+```
+
+#### JSON-RPC 2.0 Protocol
+
+##### `handle_request(&self, body: &[u8]) -> JsonRpcOutput`
+
+Full JSON-RPC 2.0 dispatch. Parses the body, validates, dispatches (concurrently for batch), and returns spec-compliant responses.
+
+```rust
+let output = registry.handle_request(&body).await;
+match output.into_body() {
+    Some(bytes) => ctx.json_bytes(bytes).await,
+    None => ctx.status(204).send().await, // notification
+}
+```
+
+Supports:
+
+- **Single requests**: `{"jsonrpc": "2.0", "method": "...", "params": {...}, "id": 1}`
+- **Batch requests**: Array of requests, executed concurrently
+- **Notifications**: Requests without `id` produce no response
+- **Standard error codes**: -32700 (parse), -32601 (method not found), etc.
+- **Backward compatible**: Legacy `{method, params}` format still works
+
+##### JSON-RPC 2.0 Types
+
+```rust
+use ultimo::rpc::{JsonRpcRequest, JsonRpcResponse, JsonRpcErrorResponse, JsonRpcError, JsonRpcOutput, error_code};
 ```
 
 ---

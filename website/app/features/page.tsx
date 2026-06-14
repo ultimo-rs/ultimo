@@ -100,16 +100,16 @@ const features = [
     ],
   },
   {
-    title: "Hybrid REST + RPC Design",
+    title: "Hybrid REST + JSON-RPC 2.0",
     description:
-      "Support both traditional REST endpoints and efficient JSON-RPC procedures in the same application. Choose the right paradigm for each use case without architectural compromises.",
+      "Support both traditional REST endpoints and JSON-RPC 2.0 procedures in the same application. Batch multiple calls in one request, fire notifications, and get structured error codes — all spec-compliant.",
     icon: Layers,
     highlights: [
-      "REST and JSON-RPC in one app",
-      "Flexible routing system",
-      "Consistent middleware pipeline",
-      "Choose the best tool for each job",
-      "Gradual migration path",
+      "Full JSON-RPC 2.0 compliance",
+      "Batch requests (concurrent execution)",
+      "Notifications (fire-and-forget)",
+      "Standard error codes",
+      "Backward compatible with legacy format",
     ],
   },
   {

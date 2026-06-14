@@ -25,6 +25,9 @@ ts-rs = { workspace = true, optional = true }
 tracing = { workspace = true }
 bytes = { workspace = true }
 
+# JSON-RPC 2.0 batch support
+futures-util = "0.3"
+
 # WebSocket support (zero additional dependencies - built on hyper)
 uuid = { version = "1.0", features = ["v4"] }
 sha1 = "0.10"
