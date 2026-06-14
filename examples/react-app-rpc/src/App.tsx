@@ -1,3 +1,4 @@
+import { BatchExample } from "./pages/BatchExample";
 import { RpcExample } from "./pages/RpcExample";
 
 function App() {
@@ -13,8 +14,9 @@ function App() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 space-y-8">
         <RpcExample />
+        <BatchExample />
       </main>
     </div>
   );
