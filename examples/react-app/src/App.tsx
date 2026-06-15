@@ -12,26 +12,33 @@ import { RpcExample } from "./pages/RpcExample";
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-blue-600">
-              ⚡ Ultimo Framework
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-100">
+      <header className="border-b bg-background/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+              Ultimo Examples
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+              REST + RPC Showcase
             </h1>
-            <nav className="flex gap-4">
-              <Link to="/rest">
-                <Button variant="outline">REST API</Button>
-              </Link>
-              <Link to="/rpc">
-                <Button variant="outline">RPC Client</Button>
-              </Link>
-            </nav>
           </div>
+          <nav className="flex gap-3">
+            <Link to="/rest">
+              <Button variant="outline">REST API</Button>
+            </Link>
+            <Link to="/rpc">
+              <Button variant="outline">RPC Client</Button>
+            </Link>
+          </nav>
+          <p className="max-w-md text-sm text-muted-foreground">
+            Unified shadcn interface demonstrating both request styles with
+            colored code snippets.
+          </p>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="mx-auto w-full max-w-5xl px-4 py-8">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/rest" element={<RestExample />} />
@@ -44,8 +51,8 @@ function App() {
 
 function HomePage() {
   return (
-    <div className="max-w-4xl mx-auto">
-      <Card className="mb-8">
+    <div className="space-y-6">
+      <Card>
         <CardHeader>
           <CardTitle>Welcome to Ultimo Framework Example</CardTitle>
           <CardDescription>
@@ -53,9 +60,9 @@ function HomePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
+          <div className="rounded-lg border bg-card p-4">
             <h3 className="font-semibold mb-2">🔄 REST API Example</h3>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="mb-3 text-sm text-muted-foreground">
               Traditional REST endpoints with TanStack Query for data fetching,
               caching, and mutations.
             </p>
@@ -64,9 +71,9 @@ function HomePage() {
             </Link>
           </div>
 
-          <div className="border-t pt-4">
+          <div className="rounded-lg border bg-card p-4">
             <h3 className="font-semibold mb-2">⚡ RPC Client Example</h3>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="mb-3 text-sm text-muted-foreground">
               Type-safe RPC calls with auto-generated TypeScript client from
               Rust types.
             </p>
