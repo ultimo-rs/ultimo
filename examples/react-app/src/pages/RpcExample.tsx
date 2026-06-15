@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Code, Loader2, Plus } from "lucide-react";
 import { useState } from "react";
+import { CodeBlock } from "../components/code-block";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -54,15 +55,15 @@ export function RpcExample() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <Card className="mb-8">
+    <div className="space-y-6">
+      <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>RPC Client Example</CardTitle>
               <CardDescription>
                 Type-safe RPC calls with auto-generated TypeScript client from
-                Rust
+                Rust.
               </CardDescription>
             </div>
             <Button
@@ -70,66 +71,59 @@ export function RpcExample() {
               size="sm"
               onClick={() => setShowTypes(!showTypes)}
             >
-              <Code className="h-4 w-4 mr-2" />
+              <Code className="mr-2 h-4 w-4" />
               {showTypes ? "Hide" : "Show"} Types
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           {showTypes && (
-            <div className="bg-gray-900 text-gray-100 p-4 rounded-lg mb-6 overflow-x-auto">
-              <pre className="text-xs">
-                {`// Auto-generated from Rust backend
-interface User {
+            <CodeBlock
+              title="Auto-generated TypeScript"
+              code={`interface User {
   id: number;
   name: string;
   email: string;
 }
 
-const rpcClient = new UltimoRpcClient('/api')
+const rpcClient = new UltimoRpcClient('/api');
 
-// List all users
-rpcClient.listUsers({}) 
-  → Promise<{ users: User[]; total: number }>
+rpcClient.listUsers({})
+  // -> Promise<{ users: User[]; total: number }>
 
-// Get user by ID  
-rpcClient.getUserById({ id: 1 })
-  → Promise<User>
-
-// Create new user
-rpcClient.createUser({ name: "Alice", email: "alice@example.com" })
-  → Promise<User>`}
-              </pre>
-            </div>
+rpcClient.createUser({
+  name: 'Alice',
+  email: 'alice@example.com',
+});`}
+            />
           )}
 
-          <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded mb-6">
+          <div className="rounded-lg border bg-primary/5 px-4 py-3 text-sm text-primary/90">
             <div className="flex items-start gap-2">
-              <div className="flex-shrink-0 mt-0.5">✨</div>
-              <div className="text-sm">
-                <strong>Type-Safe RPC:</strong> This example uses an
-                auto-generated TypeScript client that provides full type safety
-                and IDE autocomplete. The types are automatically synced from
-                your Rust backend!
+              <div className="mt-0.5 flex-shrink-0">✨</div>
+              <div>
+                <strong>Type-Safe RPC:</strong> this client is generated from
+                Rust procedure contracts, so request/response shapes stay in
+                sync automatically.
               </div>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex gap-4 mb-6">
+          <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
             <Input
               placeholder="Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="flex-1"
+              className="h-10"
             />
             <Input
               placeholder="Email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="flex-1"
+              className="h-10"
             />
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button type="submit" disabled={createMutation.isPending} className="h-10">
               {createMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -140,51 +134,53 @@ rpcClient.createUser({ name: "Alice", email: "alice@example.com" })
           </form>
 
           {createMutation.error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {createMutation.error.message}
             </div>
           )}
 
           {isLoading && (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               Error: {error.message}
             </div>
           )}
 
           {data && (
             <>
-              <div className="mb-4 text-sm text-gray-600">
+              <div className="text-sm text-muted-foreground">
                 Total users: <strong>{data.total}</strong>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.map((user: User) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.id}</TableCell>
-                      <TableCell>{user.name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
+              <div className="overflow-hidden rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {data.users.map((user: User) => (
+                      <TableRow key={user.id}>
+                        <TableCell>{user.id}</TableCell>
+                        <TableCell>{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </>
           )}
 
-          {data && data.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
+          {data && data.users.length === 0 && (
+            <div className="py-8 text-center text-sm text-muted-foreground">
               No users yet. Add one above!
             </div>
           )}
@@ -196,12 +192,10 @@ rpcClient.createUser({ name: "Alice", email: "alice@example.com" })
           <CardTitle>Benefits of RPC vs REST</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-2 gap-6 text-sm">
-            <div>
-              <h4 className="font-semibold mb-2 text-green-700">
-                ✅ RPC Advantages
-              </h4>
-              <ul className="space-y-1 text-gray-600">
+          <div className="grid gap-4 text-sm md:grid-cols-2">
+            <div className="rounded-lg border bg-emerald-50/50 p-4">
+              <h4 className="mb-2 font-semibold text-emerald-700">✅ RPC Advantages</h4>
+              <ul className="space-y-1 text-muted-foreground">
                 <li>• Full TypeScript type safety</li>
                 <li>• Auto-generated client code</li>
                 <li>• Single source of truth (Rust types)</li>
@@ -210,11 +204,9 @@ rpcClient.createUser({ name: "Alice", email: "alice@example.com" })
                 <li>• No manual type definitions needed</li>
               </ul>
             </div>
-            <div>
-              <h4 className="font-semibold mb-2 text-blue-700">
-                📡 REST Advantages
-              </h4>
-              <ul className="space-y-1 text-gray-600">
+            <div className="rounded-lg border bg-sky-50/50 p-4">
+              <h4 className="mb-2 font-semibold text-sky-700">📡 REST Advantages</h4>
+              <ul className="space-y-1 text-muted-foreground">
                 <li>• Standard HTTP methods</li>
                 <li>• Better caching support</li>
                 <li>• More universal/compatible</li>

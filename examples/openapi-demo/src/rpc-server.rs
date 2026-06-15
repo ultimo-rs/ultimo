@@ -24,6 +24,12 @@ struct CreateUserInput {
 #[derive(Debug, Deserialize, Serialize)]
 struct EmptyParams {}
 
+#[derive(Debug, Deserialize, Serialize)]
+struct UserListResponse {
+    users: Vec<User>,
+    total: usize,
+}
+
 type UserStore = Arc<Mutex<Vec<User>>>;
 
 #[tokio::main]
@@ -53,12 +59,12 @@ async fn main() -> ultimo::Result<()> {
     // Add logger middleware
     app.use_middleware(ultimo::middleware::builtin::logger());
 
-    // Initialize RPC registry in REST mode
-    let rpc = RpcRegistry::new_with_mode(RpcMode::Rest);
+    // Initialize RPC registry in JSON-RPC mode
+    let rpc = RpcRegistry::new_with_mode(RpcMode::JsonRpc);
 
     // Register getUser
     let users_get = users.clone();
-    rpc.query(
+    rpc.query_with_types(
         "getUser",
         move |input: GetUserInput| {
             let users = users_get.clone();
@@ -77,22 +83,25 @@ async fn main() -> ultimo::Result<()> {
 
     // Register listUsers
     let users_list = users.clone();
-    rpc.query(
+    rpc.query_with_types(
         "listUsers",
         move |_input: EmptyParams| {
             let users = users_list.clone();
             async move {
                 let users_data = users.lock().unwrap().clone();
-                Ok(users_data)
+                Ok(UserListResponse {
+                    total: users_data.len(),
+                    users: users_data,
+                })
             }
         },
         "{}".to_string(),
-        "{ id: number; name: string; email: string }[]".to_string(),
+        "{ users: User[]; total: number }".to_string(),
     );
 
     // Register createUser
     let users_create = users.clone();
-    rpc.mutation(
+    rpc.mutation_with_types(
         "createUser",
         move |input: CreateUserInput| {
             let users = users_create.clone();
@@ -137,53 +146,31 @@ async fn main() -> ultimo::Result<()> {
         async move { ctx.html(html).await }
     });
 
-    // Mount RPC endpoints
-    let rpc_get_user = rpc.clone();
-    app.get("/api/getUser", move |ctx: Context| {
-        let rpc = rpc_get_user.clone();
+    // Mount JSON-RPC endpoint (supports single, batch, notifications, and legacy format)
+    let rpc_handler = rpc.clone();
+    app.post("/api", move |ctx: Context| {
+        let rpc = rpc_handler.clone();
         async move {
-            // Parse query parameter
-            let id_str = ctx
-                .req
-                .query("id")
-                .ok_or_else(|| UltimoError::BadRequest("Missing 'id' parameter".to_string()))?;
-            let id: u32 = id_str
-                .parse()
-                .map_err(|_| UltimoError::BadRequest("Invalid 'id' parameter".to_string()))?;
-
-            let input = GetUserInput { id };
-            let params = serde_json::to_value(input)?;
-            let result = rpc.call("getUser", params).await?;
-            ctx.json(result).await
-        }
-    });
-
-    let rpc_list = rpc.clone();
-    app.get("/api/listUsers", move |ctx: Context| {
-        let rpc = rpc_list.clone();
-        async move {
-            let result = rpc.call("listUsers", serde_json::json!({})).await?;
-            ctx.json(result).await
-        }
-    });
-
-    let rpc_create = rpc.clone();
-    app.post("/api/createUser", move |ctx: Context| {
-        let rpc = rpc_create.clone();
-        async move {
-            let input: CreateUserInput = ctx.req.json().await?;
-            let params = serde_json::to_value(input)?;
-            let result = rpc.call("createUser", params).await?;
-            ctx.json(result).await
+            let body = ctx.req.bytes().await?;
+            let output = rpc.handle_request(&body).await;
+            match output.into_body() {
+                Some(bytes) => {
+                    let value: serde_json::Value = serde_json::from_slice(&bytes)
+                        .map_err(|e| UltimoError::Internal(e.to_string()))?;
+                    ctx.json(value).await
+                }
+                None => {
+                    ctx.status(204).await;
+                    ctx.text("").await
+                }
+            }
         }
     });
 
     println!("🌐 Server starting on http://127.0.0.1:3000");
     println!();
     println!("Available endpoints:");
-    println!("  GET  /api/getUser?id=1");
-    println!("  GET  /api/listUsers");
-    println!("  POST /api/createUser");
+    println!("  POST /api (JSON-RPC 2.0)");
     println!();
     println!("📖 Interactive API Documentation:");
     println!("  Swagger UI: http://127.0.0.1:3000/docs");
