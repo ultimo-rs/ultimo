@@ -967,15 +967,18 @@ impl RpcRegistry {
         let value: serde_json::Value = match serde_json::from_slice(body) {
             Ok(v) => v,
             Err(_) => {
-                return JsonRpcOutput::Single(serde_json::to_value(JsonRpcErrorResponse {
-                    jsonrpc: "2.0",
-                    error: JsonRpcError {
-                        code: error_code::PARSE_ERROR,
-                        message: "Parse error".to_string(),
-                        data: None,
-                    },
-                    id: serde_json::Value::Null,
-                }).unwrap());
+                return JsonRpcOutput::Single(
+                    serde_json::to_value(JsonRpcErrorResponse {
+                        jsonrpc: "2.0",
+                        error: JsonRpcError {
+                            code: error_code::PARSE_ERROR,
+                            message: "Parse error".to_string(),
+                            data: None,
+                        },
+                        id: serde_json::Value::Null,
+                    })
+                    .unwrap(),
+                );
             }
         };
 
@@ -983,15 +986,18 @@ impl RpcRegistry {
             serde_json::Value::Array(requests) => {
                 // Batch request
                 if requests.is_empty() {
-                    return JsonRpcOutput::Single(serde_json::to_value(JsonRpcErrorResponse {
-                        jsonrpc: "2.0",
-                        error: JsonRpcError {
-                            code: error_code::INVALID_REQUEST,
-                            message: "Invalid Request: empty batch".to_string(),
-                            data: None,
-                        },
-                        id: serde_json::Value::Null,
-                    }).unwrap());
+                    return JsonRpcOutput::Single(
+                        serde_json::to_value(JsonRpcErrorResponse {
+                            jsonrpc: "2.0",
+                            error: JsonRpcError {
+                                code: error_code::INVALID_REQUEST,
+                                message: "Invalid Request: empty batch".to_string(),
+                                data: None,
+                            },
+                            id: serde_json::Value::Null,
+                        })
+                        .unwrap(),
+                    );
                 }
 
                 let futures: Vec<_> = requests
@@ -1002,10 +1008,7 @@ impl RpcRegistry {
                 let results = futures_util::future::join_all(futures).await;
 
                 // Filter out None responses (notifications)
-                let responses: Vec<serde_json::Value> = results
-                    .into_iter()
-                    .flatten()
-                    .collect();
+                let responses: Vec<serde_json::Value> = results.into_iter().flatten().collect();
 
                 if responses.is_empty() {
                     JsonRpcOutput::None
@@ -1020,8 +1023,8 @@ impl RpcRegistry {
                     None => JsonRpcOutput::None, // notification
                 }
             }
-            _ => {
-                JsonRpcOutput::Single(serde_json::to_value(JsonRpcErrorResponse {
+            _ => JsonRpcOutput::Single(
+                serde_json::to_value(JsonRpcErrorResponse {
                     jsonrpc: "2.0",
                     error: JsonRpcError {
                         code: error_code::INVALID_REQUEST,
@@ -1029,8 +1032,9 @@ impl RpcRegistry {
                         data: None,
                     },
                     id: serde_json::Value::Null,
-                }).unwrap())
-            }
+                })
+                .unwrap(),
+            ),
         }
     }
 
@@ -1058,30 +1062,39 @@ impl RpcRegistry {
                 if is_notification {
                     return None;
                 }
-                return Some(serde_json::to_value(JsonRpcErrorResponse {
-                    jsonrpc: "2.0",
-                    error: JsonRpcError {
-                        code: error_code::INVALID_REQUEST,
-                        message: "Invalid Request: missing 'method' field".to_string(),
-                        data: None,
-                    },
-                    id: id.unwrap_or(serde_json::Value::Null),
-                }).unwrap());
+                return Some(
+                    serde_json::to_value(JsonRpcErrorResponse {
+                        jsonrpc: "2.0",
+                        error: JsonRpcError {
+                            code: error_code::INVALID_REQUEST,
+                            message: "Invalid Request: missing 'method' field".to_string(),
+                            data: None,
+                        },
+                        id: id.unwrap_or(serde_json::Value::Null),
+                    })
+                    .unwrap(),
+                );
             }
         };
 
-        let params = value.get("params").cloned().unwrap_or(serde_json::Value::Null);
+        let params = value
+            .get("params")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
 
         match self.call(&method, params).await {
             Ok(result) => {
                 if is_notification {
                     None
                 } else {
-                    Some(serde_json::to_value(JsonRpcResponse {
-                        jsonrpc: "2.0",
-                        result,
-                        id: id.unwrap(),
-                    }).unwrap())
+                    Some(
+                        serde_json::to_value(JsonRpcResponse {
+                            jsonrpc: "2.0",
+                            result,
+                            id: id.unwrap(),
+                        })
+                        .unwrap(),
+                    )
                 }
             }
             Err(e) => {
@@ -1089,15 +1102,18 @@ impl RpcRegistry {
                     None
                 } else {
                     let (code, message) = Self::error_to_jsonrpc_code(&e);
-                    Some(serde_json::to_value(JsonRpcErrorResponse {
-                        jsonrpc: "2.0",
-                        error: JsonRpcError {
-                            code,
-                            message,
-                            data: None,
-                        },
-                        id: id.unwrap_or(serde_json::Value::Null),
-                    }).unwrap())
+                    Some(
+                        serde_json::to_value(JsonRpcErrorResponse {
+                            jsonrpc: "2.0",
+                            error: JsonRpcError {
+                                code,
+                                message,
+                                data: None,
+                            },
+                            id: id.unwrap_or(serde_json::Value::Null),
+                        })
+                        .unwrap(),
+                    )
                 }
             }
         }
@@ -1108,23 +1124,30 @@ impl RpcRegistry {
         let method = match value.get("method").and_then(|v| v.as_str()) {
             Some(m) => m.to_string(),
             None => {
-                return Some(serde_json::to_value(RpcErrorResponse {
-                    error: "Missing 'method' field".to_string(),
-                    code: -1,
-                }).unwrap());
+                return Some(
+                    serde_json::to_value(RpcErrorResponse {
+                        error: "Missing 'method' field".to_string(),
+                        code: -1,
+                    })
+                    .unwrap(),
+                );
             }
         };
 
-        let params = value.get("params").cloned().unwrap_or(serde_json::Value::Null);
+        let params = value
+            .get("params")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
 
         match self.call(&method, params).await {
             Ok(result) => Some(serde_json::to_value(RpcResponse { result }).unwrap()),
-            Err(e) => {
-                Some(serde_json::to_value(RpcErrorResponse {
+            Err(e) => Some(
+                serde_json::to_value(RpcErrorResponse {
                     error: e.to_string(),
                     code: -1,
-                }).unwrap())
-            }
+                })
+                .unwrap(),
+            ),
         }
     }
 
@@ -1490,11 +1513,11 @@ mod jsonrpc2_tests {
             let b = input.get("b").and_then(|v| v.as_i64()).unwrap_or(0);
             Ok(serde_json::to_value(a + b).unwrap())
         });
-        registry.register("echo", |input: serde_json::Value| async move {
-            Ok(input)
-        });
+        registry.register("echo", |input: serde_json::Value| async move { Ok(input) });
         registry.register("fail", |_input: serde_json::Value| async move {
-            Err::<serde_json::Value, _>(crate::UltimoError::BadRequest("intentional error".to_string()))
+            Err::<serde_json::Value, _>(crate::UltimoError::BadRequest(
+                "intentional error".to_string(),
+            ))
         });
         registry
     }
@@ -1507,7 +1530,8 @@ mod jsonrpc2_tests {
             "method": "add",
             "params": {"a": 3, "b": 4},
             "id": 1
-        })).unwrap();
+        }))
+        .unwrap();
 
         let output = registry.handle_request(&body).await;
         let response_body = output.into_body().unwrap();
@@ -1526,7 +1550,8 @@ mod jsonrpc2_tests {
             "jsonrpc": "2.0",
             "method": "echo",
             "params": {"hello": "world"}
-        })).unwrap();
+        }))
+        .unwrap();
 
         let output = registry.handle_request(&body).await;
         assert!(output.is_none());
@@ -1539,7 +1564,8 @@ mod jsonrpc2_tests {
             {"jsonrpc": "2.0", "method": "add", "params": {"a": 1, "b": 2}, "id": 1},
             {"jsonrpc": "2.0", "method": "add", "params": {"a": 10, "b": 20}, "id": 2},
             {"jsonrpc": "2.0", "method": "echo", "params": {"x": 99}, "id": 3}
-        ])).unwrap();
+        ]))
+        .unwrap();
 
         let output = registry.handle_request(&body).await;
         let response_body = output.into_body().unwrap();
@@ -1558,7 +1584,8 @@ mod jsonrpc2_tests {
             {"jsonrpc": "2.0", "method": "add", "params": {"a": 5, "b": 5}, "id": 1},
             {"jsonrpc": "2.0", "method": "echo", "params": {"fire": "forget"}},
             {"jsonrpc": "2.0", "method": "add", "params": {"a": 7, "b": 3}, "id": 2}
-        ])).unwrap();
+        ]))
+        .unwrap();
 
         let output = registry.handle_request(&body).await;
         let response_body = output.into_body().unwrap();
@@ -1574,7 +1601,8 @@ mod jsonrpc2_tests {
         let body = serde_json::to_vec(&json!([
             {"jsonrpc": "2.0", "method": "echo", "params": {}},
             {"jsonrpc": "2.0", "method": "echo", "params": {}}
-        ])).unwrap();
+        ]))
+        .unwrap();
 
         let output = registry.handle_request(&body).await;
         assert!(output.is_none());
@@ -1614,7 +1642,8 @@ mod jsonrpc2_tests {
             "method": "nonexistent",
             "params": {},
             "id": 42
-        })).unwrap();
+        }))
+        .unwrap();
 
         let output = registry.handle_request(body.as_slice()).await;
         let response_body = output.into_body().unwrap();
@@ -1632,7 +1661,8 @@ mod jsonrpc2_tests {
             "method": "fail",
             "params": {},
             "id": 7
-        })).unwrap();
+        }))
+        .unwrap();
 
         let output = registry.handle_request(body.as_slice()).await;
         let response_body = output.into_body().unwrap();
@@ -1649,7 +1679,8 @@ mod jsonrpc2_tests {
         let body = serde_json::to_vec(&json!({
             "method": "add",
             "params": {"a": 10, "b": 5}
-        })).unwrap();
+        }))
+        .unwrap();
 
         let output = registry.handle_request(&body).await;
         let response_body = output.into_body().unwrap();
@@ -1681,7 +1712,8 @@ mod jsonrpc2_tests {
             "method": "echo",
             "params": {"val": 1},
             "id": "abc-123"
-        })).unwrap();
+        }))
+        .unwrap();
 
         let output = registry.handle_request(&body).await;
         let response_body = output.into_body().unwrap();
@@ -1700,7 +1732,8 @@ mod jsonrpc2_tests {
             "method": "add",
             "params": {"a": 1, "b": 1},
             "id": null
-        })).unwrap();
+        }))
+        .unwrap();
 
         let output = registry.handle_request(&body).await;
         let response_body = output.into_body().unwrap();

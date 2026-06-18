@@ -226,15 +226,29 @@ ultimo new my-app --template fullstack
 
 Available templates: `basic`, `fullstack`, `api-only`, `rpc`, `production`.
 
+## Development Server
+
+Start a hot-reload development server that watches for file changes and
+automatically recompiles and restarts:
+
+```bash
+ultimo dev                       # default: 127.0.0.1:3000
+ultimo dev --port 8080           # custom port
+ultimo dev --host 0.0.0.0        # bind to all interfaces
+```
+
+The dev server watches `src/**/*.rs` and `Cargo.toml`. On any change it kills
+the running server, rebuilds with `cargo build`, and restarts. Compilation
+errors are printed inline — the watcher stays active so the server restarts
+automatically once you fix the error.
+
 ## Future Commands
 
 > ⚠️ **Not implemented yet.** These commands exist as placeholders and currently
-> print a notice. The flags below are tentative sketches, not a stable interface.
-> Until they land, use the cargo equivalents.
+> print a notice. Until they land, use the cargo equivalents.
 
 | Command | Status | Use instead |
 | --- | --- | --- |
-| `ultimo dev` | Planned (0.7.0) — file-watching dev server | `cargo run` |
 | `ultimo build` | Planned — production build wrapper | `cargo build --release` |
 | `ultimo test` | Not planned yet | `cargo test` |
 | `ultimo fmt` / `ultimo lint` | Not planned yet | `cargo fmt` / `cargo clippy` |

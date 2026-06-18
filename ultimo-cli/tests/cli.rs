@@ -32,12 +32,16 @@ fn version_flag_prints_version() {
 }
 
 #[test]
-fn dev_and_build_report_not_implemented() {
+fn dev_shows_help() {
     ultimo()
-        .arg("dev")
+        .args(["dev", "--help"])
         .assert()
         .success()
-        .stdout(contains("not implemented"));
+        .stdout(contains("hot reload"));
+}
+
+#[test]
+fn build_reports_not_implemented() {
     ultimo()
         .arg("build")
         .assert()

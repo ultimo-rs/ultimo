@@ -44,7 +44,7 @@ a stable **1.0**.
 - 🛡️ **Advanced rate limiting** — per-user, per-endpoint limits.
 - ⏱️ **Request timeouts** + **HTTP graceful shutdown** (WebSocket graceful
   shutdown already ships).
-- 🔄 **Hot reload** — `ultimo dev` with file-watching auto-restart.
+- ~~🔄 **Hot reload** — `ultimo dev` with file-watching auto-restart.~~ ✅ Shipped in 0.5.1
 
 ### Developer experience
 
@@ -141,7 +141,7 @@ dependencies and rot as each vendor's API changes).
 | Request Timeouts + HTTP Graceful Shutdown | 📋 Planned | 0.7.0 |
 | Redis (sessions · cache · rate-limit) | 📋 Planned | 0.8.0 |
 | WebSocket Compression     | 📋 Planned       | 0.8.0   |
-| Hot Reload (`ultimo dev`) | 📋 Planned       | 0.8.0   |
+| Hot Reload (`ultimo dev`) | ✅ Available     | 0.5.1   |
 | `#[derive(UltimoType)]`   | 📋 Planned       | 0.8.0   |
 | Built-in Middleware Pack (request-id, cache-control, …) | 📋 Planned | 0.8.0 |
 | End-to-end Typed Errors   | 📋 Planned       | 0.9.0   |
@@ -241,7 +241,6 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
 - **Redis integration** — sessions, cache, and rate-limit store (one dependency)
 - WebSocket compression (per-message deflate)
-- Hot reload (`ultimo dev`)
 - `#[derive(UltimoType)]` (drop the `ts-rs` dependency papercut)
 - Built-in middleware pack (request-id, cache-control/ETag, server-timing, basic-auth)
 

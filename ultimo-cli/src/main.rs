@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use std::path::PathBuf;
 
+mod dev;
 mod generate;
 mod new;
 
@@ -41,11 +42,15 @@ enum Commands {
         template: String,
     },
 
-    /// [not implemented yet] Development server with hot reload (planned for 0.7.0)
+    /// Development server with hot reload
     Dev {
         /// Port to run on
         #[arg(short, long, default_value = "3000")]
         port: u16,
+
+        /// Host to bind to
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
     },
 
     /// [not implemented yet] Production build — use `cargo build --release` for now
@@ -74,12 +79,8 @@ async fn main() -> anyhow::Result<()> {
         Commands::New { name, template } => {
             new::run(name, template).await?;
         }
-        Commands::Dev { port: _ } => {
-            println!(
-                "{}",
-                "`ultimo dev` is not implemented yet (planned for 0.7.0).".yellow()
-            );
-            println!("Run your app directly for now:  {}", "cargo run".cyan());
+        Commands::Dev { port, host } => {
+            dev::run(port, host).await?;
         }
         Commands::Build { profile: _ } => {
             println!("{}", "`ultimo build` is not implemented yet.".yellow());
