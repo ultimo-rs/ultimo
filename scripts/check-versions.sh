@@ -14,6 +14,8 @@ DOCS_SITE_PKG_VERSION=$(grep '"version":' docs-site/package.json | head -1 | sed
 HERO_VERSION=$(grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+ Now Available' website/components/hero-section.tsx | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 CHANGELOG_VERSION=$(grep '## \[' CHANGELOG.md | grep -v Unreleased | head -1 | sed 's/.*\[\(.*\)\].*/\1/')
 DOCS_CHANGELOG_VERSION=$(grep '## \[' docs-site/docs/pages/changelog.mdx | grep -v Unreleased | head -1 | sed 's/.*\[\(.*\)\].*/\1/')
+CLAUDE_VERSION=$(grep -oE 'Current version: \*\*[0-9]+\.[0-9]+\.[0-9]+\*\*' CLAUDE.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+BLOG_CURRENT_VERSION=$(grep -oE 'Current version.*\[?[0-9]+\.[0-9]+\.[0-9]+' website/content/posts/ultimo-vs-axum-comparison.mdx 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 
 echo "📦 Version Check (source of truth: Cargo.toml)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -23,6 +25,8 @@ echo "Docs-site (docs-site/package.json):   $DOCS_SITE_PKG_VERSION"
 echo "Website hero badge (hero-section):    $HERO_VERSION"
 echo "Changelog (CHANGELOG.md):             $CHANGELOG_VERSION"
 echo "Docs Changelog (changelog.mdx):       $DOCS_CHANGELOG_VERSION"
+echo "CLAUDE.md:                            $CLAUDE_VERSION"
+echo "Blog comparison post:                 $BLOG_CURRENT_VERSION"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 MISMATCH=0
@@ -38,6 +42,8 @@ check "Docs-site package version" "$DOCS_SITE_PKG_VERSION"
 check "Website hero badge" "$HERO_VERSION"
 check "Changelog version" "$CHANGELOG_VERSION"
 check "Docs changelog version" "$DOCS_CHANGELOG_VERSION"
+[ -n "$CLAUDE_VERSION" ] && check "CLAUDE.md version" "$CLAUDE_VERSION"
+[ -n "$BLOG_CURRENT_VERSION" ] && check "Blog comparison post" "$BLOG_CURRENT_VERSION"
 
 # ── Crate install snippets (README + every docs page) ─────────────────
 # These pin major.minor (`ultimo = "0.4"` / `ultimo = { version = "0.4", … }`)

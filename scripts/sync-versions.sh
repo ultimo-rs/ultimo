@@ -57,4 +57,17 @@ for f in "${SNIPPET_FILES[@]}"; do
 done
 echo "  updated install snippets in README.md + docs-site/docs/pages/*.mdx → $MAJMIN"
 
+# CLAUDE.md: Current version: **X.X.X**
+if [ -f CLAUDE.md ]; then
+  sed -i.bak -E "s/(Current version: \*\*)[0-9]+\.[0-9]+\.[0-9]+(\*\*)/\1$VERSION\2/" CLAUDE.md && rm -f CLAUDE.md.bak
+  echo "  updated CLAUDE.md"
+fi
+
+# Blog comparison post: "Current version" table cell
+BLOG_COMPARE="website/content/posts/ultimo-vs-axum-comparison.mdx"
+if [ -f "$BLOG_COMPARE" ]; then
+  sed -i.bak -E "s/(\*\*Current version\*\* *\| *\[)[0-9]+\.[0-9]+\.[0-9]+/\1$VERSION/" "$BLOG_COMPARE" && rm -f "$BLOG_COMPARE.bak"
+  echo "  updated $BLOG_COMPARE"
+fi
+
 echo "✅ Done. Review with: git diff"
