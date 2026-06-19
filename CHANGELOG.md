@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-15
+
+### Added
+
+- `ultimo dev` — hot-reload development server with file watching
+
 ## [0.5.0] - 2026-06-09
 
 ### Added

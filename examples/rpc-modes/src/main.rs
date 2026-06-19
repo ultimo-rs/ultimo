@@ -228,7 +228,9 @@ async fn main() -> ultimo::Result<()> {
     println!("  - Single: {{\"jsonrpc\":\"2.0\",\"method\":\"getUser\",\"params\":{{\"id\":1}},\"id\":1}}");
     println!("  - Batch:  [{{...}}, {{...}}] — executed concurrently");
     println!("  - Notify: {{\"jsonrpc\":\"2.0\",\"method\":\"...\",\"params\":{{}}}} (no id = no response)");
-    println!("  - Legacy: {{\"method\":\"getUser\",\"params\":{{\"id\":1}}}} (backward compatible)");
+    println!(
+        "  - Legacy: {{\"method\":\"getUser\",\"params\":{{\"id\":1}}}} (backward compatible)"
+    );
     println!();
 
     // ============================================
