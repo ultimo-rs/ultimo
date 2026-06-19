@@ -68,6 +68,30 @@ when the app is actually behind a proxy that sets them — otherwise clients can
 forge their IP.
 :::
 
+## IP allow/deny (CIDR filtering)
+
+Block or allow requests by client IP using CIDR notation. Respects
+`trust_proxy` when enabled.
+
+```rust
+use ultimo::middleware::builtin::IpFilter;
+
+// Allow only private networks + localhost:
+app.use_middleware(IpFilter::allow(&[
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "127.0.0.1",
+    "::1",
+]).build());
+
+// Or deny specific ranges:
+app.use_middleware(IpFilter::deny(&["203.0.113.0/24"]).build());
+```
+
+Denied requests receive a `403 Forbidden` response. Supports IPv4 and IPv6,
+bare IPs (treated as `/32` or `/128`), and any valid prefix length.
+
 ## Sessions & cookies
 
 Cookie-based sessions are secure by default (HttpOnly, Secure, SameSite, 256-bit

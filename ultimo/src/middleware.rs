@@ -413,6 +413,171 @@ pub mod builtin {
     }
 
     // -------------------------------------------------------------------------
+    // IP allow/deny (CIDR filtering)
+    // -------------------------------------------------------------------------
+
+    use std::net::IpAddr;
+
+    /// A parsed CIDR network (e.g. `192.168.1.0/24`).
+    #[derive(Debug, Clone)]
+    pub(crate) struct CidrNetwork {
+        addr: IpAddr,
+        prefix_len: u8,
+    }
+
+    impl CidrNetwork {
+        /// Parse a CIDR string like `10.0.0.0/8` or `::1/128`.
+        /// Also accepts bare IPs (treated as /32 or /128).
+        pub(crate) fn parse(s: &str) -> std::result::Result<Self, String> {
+            let (addr_str, prefix_len) = if let Some((a, p)) = s.split_once('/') {
+                let prefix: u8 = p.parse().map_err(|_| format!("invalid prefix: {p}"))?;
+                (a, prefix)
+            } else {
+                let addr: IpAddr = s.parse().map_err(|e| format!("invalid IP: {e}"))?;
+                let max = if addr.is_ipv4() { 32 } else { 128 };
+                return Ok(Self {
+                    addr,
+                    prefix_len: max,
+                });
+            };
+
+            let addr: IpAddr = addr_str.parse().map_err(|e| format!("invalid IP: {e}"))?;
+            let max = if addr.is_ipv4() { 32 } else { 128 };
+            if prefix_len > max {
+                return Err(format!("prefix /{prefix_len} exceeds max /{max}"));
+            }
+            Ok(Self { addr, prefix_len })
+        }
+
+        /// Returns true if `ip` is within this network.
+        pub(crate) fn contains(&self, ip: IpAddr) -> bool {
+            match (self.addr, ip) {
+                (IpAddr::V4(net), IpAddr::V4(target)) => {
+                    if self.prefix_len == 0 {
+                        return true;
+                    }
+                    let mask = u32::MAX
+                        .checked_shl(32 - self.prefix_len as u32)
+                        .unwrap_or(0);
+                    (u32::from(net) & mask) == (u32::from(target) & mask)
+                }
+                (IpAddr::V6(net), IpAddr::V6(target)) => {
+                    if self.prefix_len == 0 {
+                        return true;
+                    }
+                    let mask = u128::MAX
+                        .checked_shl(128 - self.prefix_len as u32)
+                        .unwrap_or(0);
+                    (u128::from(net) & mask) == (u128::from(target) & mask)
+                }
+                _ => false, // v4 vs v6 mismatch → no match
+            }
+        }
+    }
+
+    /// IP filter mode: allow-list or deny-list.
+    #[derive(Debug, Clone)]
+    enum IpFilterMode {
+        /// Only listed networks are allowed; everything else is denied.
+        Allow(Vec<CidrNetwork>),
+        /// Listed networks are denied; everything else is allowed.
+        Deny(Vec<CidrNetwork>),
+    }
+
+    /// IP allow/deny middleware builder (CIDR-aware).
+    ///
+    /// Filters requests by client IP against an allow-list or deny-list of
+    /// CIDR networks. Respects proxy headers when `trust_proxy` is enabled.
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// let mut app = Ultimo::new_without_defaults();
+    /// // Allow only private networks:
+    /// app.use_middleware(
+    ///     ultimo::middleware::builtin::IpFilter::allow(&[
+    ///         "10.0.0.0/8",
+    ///         "172.16.0.0/12",
+    ///         "192.168.0.0/16",
+    ///         "127.0.0.1",
+    ///     ]).build(),
+    /// );
+    /// // Or deny specific ranges:
+    /// app.use_middleware(
+    ///     ultimo::middleware::builtin::IpFilter::deny(&["203.0.113.0/24"])
+    ///         .build(),
+    /// );
+    /// ```
+    #[derive(Debug, Clone)]
+    pub struct IpFilter {
+        mode: IpFilterMode,
+    }
+
+    impl IpFilter {
+        /// Create an allow-list filter. Only IPs matching one of the given
+        /// CIDR networks will be allowed; all others get 403 Forbidden.
+        ///
+        /// Accepts bare IPs (`127.0.0.1`) or CIDR notation (`10.0.0.0/8`).
+        ///
+        /// # Panics
+        /// Panics if any entry fails to parse as a valid CIDR/IP.
+        pub fn allow(cidrs: &[&str]) -> Self {
+            Self {
+                mode: IpFilterMode::Allow(Self::parse_cidrs(cidrs)),
+            }
+        }
+
+        /// Create a deny-list filter. IPs matching any of the given CIDR
+        /// networks will get 403 Forbidden; all others are allowed.
+        ///
+        /// # Panics
+        /// Panics if any entry fails to parse as a valid CIDR/IP.
+        pub fn deny(cidrs: &[&str]) -> Self {
+            Self {
+                mode: IpFilterMode::Deny(Self::parse_cidrs(cidrs)),
+            }
+        }
+
+        fn parse_cidrs(cidrs: &[&str]) -> Vec<CidrNetwork> {
+            cidrs
+                .iter()
+                .map(|s| {
+                    CidrNetwork::parse(s).unwrap_or_else(|e| panic!("invalid CIDR '{s}': {e}"))
+                })
+                .collect()
+        }
+
+        /// Build the middleware.
+        pub fn build(self) -> BoxedMiddleware {
+            let mode = Arc::new(self.mode);
+            Arc::new(move |ctx, next| {
+                let mode = mode.clone();
+                Box::pin(async move {
+                    let ip = ctx.client_ip();
+
+                    let allowed = match (ip, mode.as_ref()) {
+                        (None, _) => false, // no IP → deny
+                        (Some(ip), IpFilterMode::Allow(nets)) => {
+                            nets.iter().any(|n| n.contains(ip))
+                        }
+                        (Some(ip), IpFilterMode::Deny(nets)) => {
+                            !nets.iter().any(|n| n.contains(ip))
+                        }
+                    };
+
+                    if allowed {
+                        next(ctx).await
+                    } else {
+                        Ok(HyperResponse::builder()
+                            .status(403)
+                            .body(Full::new(Bytes::from("Forbidden")))
+                            .unwrap())
+                    }
+                })
+            })
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Response compression
     // -------------------------------------------------------------------------
 
@@ -805,5 +970,80 @@ mod tests {
 
         assert_send::<builtin::Cors>();
         assert_sync::<builtin::Cors>();
+    }
+
+    // IP filter tests ---------------------------------------------------------
+
+    #[test]
+    fn test_ip_filter_allow_builder() {
+        let _m = builtin::IpFilter::allow(&["10.0.0.0/8", "192.168.1.0/24"]).build();
+    }
+
+    #[test]
+    fn test_ip_filter_deny_builder() {
+        let _m = builtin::IpFilter::deny(&["203.0.113.0/24"]).build();
+    }
+
+    #[test]
+    fn test_ip_filter_bare_ip() {
+        let _m = builtin::IpFilter::allow(&["127.0.0.1", "::1"]).build();
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid CIDR")]
+    fn test_ip_filter_invalid_cidr_panics() {
+        builtin::IpFilter::allow(&["not-an-ip/8"]);
+    }
+
+    #[test]
+    #[should_panic(expected = "prefix /33 exceeds max /32")]
+    fn test_ip_filter_prefix_too_large() {
+        builtin::IpFilter::allow(&["10.0.0.0/33"]);
+    }
+
+    #[test]
+    fn test_cidr_contains_ipv4() {
+        let net = builtin::CidrNetwork::parse("192.168.1.0/24").unwrap();
+        assert!(net.contains("192.168.1.1".parse().unwrap()));
+        assert!(net.contains("192.168.1.254".parse().unwrap()));
+        assert!(!net.contains("192.168.2.1".parse().unwrap()));
+        assert!(!net.contains("10.0.0.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_cidr_contains_ipv6() {
+        let net = builtin::CidrNetwork::parse("fd00::/8").unwrap();
+        assert!(net.contains("fd00::1".parse().unwrap()));
+        assert!(net.contains("fdff::1".parse().unwrap()));
+        assert!(!net.contains("fe80::1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_cidr_single_host() {
+        let net = builtin::CidrNetwork::parse("127.0.0.1").unwrap();
+        assert!(net.contains("127.0.0.1".parse().unwrap()));
+        assert!(!net.contains("127.0.0.2".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_cidr_v4_v6_mismatch() {
+        let net = builtin::CidrNetwork::parse("10.0.0.0/8").unwrap();
+        assert!(!net.contains("::1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_cidr_zero_prefix() {
+        let net = builtin::CidrNetwork::parse("0.0.0.0/0").unwrap();
+        assert!(net.contains("1.2.3.4".parse().unwrap()));
+        assert!(net.contains("255.255.255.255".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_ip_filter_struct_is_send_sync() {
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<builtin::IpFilter>();
+        assert_sync::<builtin::IpFilter>();
     }
 }
