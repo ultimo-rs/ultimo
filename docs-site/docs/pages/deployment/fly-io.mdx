@@ -1,0 +1,195 @@
+# Fly.io
+
+[Fly.io](https://fly.io) runs your Docker containers on hardware close to your
+users. Machines boot in ~300 ms, scale to zero when idle, and deploy globally
+with a single command.
+
+## Prerequisites
+
+```bash
+# Install the Fly CLI
+curl -L https://fly.io/install.sh | sh
+
+# Sign up / login
+fly auth login
+```
+
+## First deploy
+
+From your project root (with a [Dockerfile](/deployment/docker)):
+
+```bash
+fly launch
+```
+
+Fly auto-detects the Dockerfile, picks a region, and generates `fly.toml`.
+Accept the defaults or tweak interactively.
+
+Then deploy:
+
+```bash
+fly deploy
+```
+
+Your app is live at `https://<app-name>.fly.dev`.
+
+## fly.toml (reference)
+
+```toml
+app = "my-ultimo-app"
+primary_region = "iad"
+
+[build]
+  # Uses Dockerfile by default
+
+[env]
+  PORT = "3000"
+  RUST_LOG = "info"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 500
+    soft_limit = 250
+
+  [[http_service.checks]]
+    interval = "10s"
+    timeout = "2s"
+    grace_period = "5s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+```
+
+## Scaling
+
+### Multiple regions
+
+```bash
+# Add machines in London and Tokyo
+fly scale count 2 --region lhr
+fly scale count 2 --region nrt
+```
+
+### Vertical scaling
+
+```bash
+fly scale vm shared-cpu-2x --memory 512
+```
+
+### Auto-scaling
+
+The `auto_stop_machines` / `auto_start_machines` settings in `fly.toml` enable
+scale-to-zero: machines stop when idle and start on the next request (~300 ms
+cold start for Rust binaries).
+
+## Secrets
+
+```bash
+# Set secrets (encrypted, never visible in logs)
+fly secrets set DATABASE_URL="postgres://..." JWT_SECRET="..."
+
+# List secrets
+fly secrets list
+```
+
+## Custom domain
+
+```bash
+fly certs add your-domain.com
+```
+
+Then point a CNAME to `<app-name>.fly.dev` (or an A record to the Fly IP).
+
+## Volumes (persistent storage)
+
+```bash
+fly volumes create data --size 1 --region iad
+```
+
+In `fly.toml`:
+
+```toml
+[mounts]
+  source = "data"
+  destination = "/data"
+```
+
+## Database
+
+### Fly Postgres
+
+```bash
+fly postgres create --name my-db
+fly postgres attach my-db
+```
+
+This sets `DATABASE_URL` as a secret automatically.
+
+### External databases
+
+Set the connection string as a secret:
+
+```bash
+fly secrets set DATABASE_URL="postgres://user:pass@host:5432/db?sslmode=require"
+```
+
+## Monitoring
+
+```bash
+# Live logs
+fly logs
+
+# Machine status
+fly status
+
+# Metrics dashboard
+fly dashboard
+```
+
+## CI/CD with GitHub Actions
+
+```yaml
+# .github/workflows/fly-deploy.yml
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+```
+
+Generate the token: `fly tokens create deploy -x 999999h`
+
+## WebSocket support
+
+Fly.io natively supports WebSocket connections. No extra configuration needed —
+requests to your app on the same port are automatically upgraded when the client
+sends an `Upgrade: websocket` header.
+
+For long-lived WebSocket connections, consider:
+
+```toml
+# Increase the idle timeout (default 60s)
+[http_service]
+  idle_timeout = "300s"
+```

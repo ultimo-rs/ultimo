@@ -1,0 +1,99 @@
+# Deployment Overview
+
+Ultimo compiles to a **single static binary** — no runtime, no interpreter, no
+`node_modules`. This makes deployment straightforward on any platform that runs
+Linux containers or bare-metal binaries.
+
+## Build for release
+
+```bash
+cargo build --release
+```
+
+The optimized binary lands at `target/release/<your-app>` (typically 10–15 MB).
+Copy it anywhere and run it — zero dependencies beyond libc.
+
+## Guides
+
+| Platform                                         | Best for                             |
+| ------------------------------------------------ | ------------------------------------ |
+| [Docker](/deployment/docker)                     | Reproducible builds, any hosting     |
+| [Fly.io](/deployment/fly-io)                     | Global edge deployment, simple CLI   |
+| [Railway](/deployment/railway)                   | Git-push deploys, zero config        |
+| [AWS](/deployment/aws)                           | Enterprise, ECS/Fargate              |
+| [Google Cloud Run](/deployment/google-cloud-run) | Serverless containers, scale-to-zero |
+| [Azure](/deployment/azure)                       | Container Apps, enterprise Azure     |
+| [DigitalOcean](/deployment/digitalocean)         | App Platform, simple PaaS            |
+| [Kubernetes](/deployment/kubernetes)             | Full orchestration, multi-cloud      |
+
+## Production checklist
+
+Before going live:
+
+- [ ] **Health check endpoint** — add a `GET /health` route returning 200:
+
+```rust
+app.get("/health", |ctx: Context| async move {
+    ctx.response().text("ok")
+});
+```
+
+- [ ] **Environment variables** — don't hardcode secrets; use env vars or a
+      secret manager
+
+```rust
+let db_url = std::env::var("DATABASE_URL")
+    .expect("DATABASE_URL must be set");
+```
+
+- [ ] **Logging** — set `RUST_LOG=info` (or `RUST_LOG=ultimo=info,my_app=debug`)
+
+- [ ] **HTTPS** — terminate TLS at the load balancer/reverse proxy (Caddy,
+      nginx, cloud LB) — Ultimo serves HTTP, your infra adds the S
+
+- [ ] **Security headers** — enable the built-in middleware:
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::security_headers());
+```
+
+- [ ] **Trust proxy** — if behind a load balancer, enable so `client_ip()`
+      reads `X-Forwarded-For`:
+
+```rust
+app.trust_proxy(true);
+```
+
+- [ ] **IP filtering** — restrict access if needed:
+
+```rust
+use ultimo::middleware::builtin::IpFilter;
+app.use_middleware(IpFilter::allow(&["10.0.0.0/8"]).build());
+```
+
+- [ ] **Graceful shutdown** — Ultimo handles `SIGTERM` automatically; HTTP
+      connections drain, WebSocket clients get close frames via `broadcast_all()`
+
+- [ ] **Resource limits** — Ultimo binaries are lean; 64–128 MB RAM handles
+      most workloads; set container limits accordingly
+
+## Environment variables
+
+Ultimo apps typically read configuration from environment variables. Here's
+a common pattern:
+
+```rust
+use std::env;
+
+let port: u16 = env::var("PORT")
+    .unwrap_or_else(|_| "3000".to_string())
+    .parse()
+    .expect("PORT must be a number");
+
+let host = env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+```
+
+:::tip
+In production, always bind to `0.0.0.0` (not `127.0.0.1`) so the container's
+port mapping works correctly.
+:::

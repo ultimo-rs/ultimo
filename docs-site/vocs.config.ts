@@ -131,11 +131,43 @@ export default defineConfig({
       ],
     },
     {
-      text: "Operations",
+      text: "Deployment",
       items: [
         {
-          text: "Deployment",
+          text: "Overview",
           link: "/deployment",
+        },
+        {
+          text: "Docker",
+          link: "/deployment/docker",
+        },
+        {
+          text: "Fly.io",
+          link: "/deployment/fly-io",
+        },
+        {
+          text: "Railway",
+          link: "/deployment/railway",
+        },
+        {
+          text: "AWS (ECS/Fargate)",
+          link: "/deployment/aws",
+        },
+        {
+          text: "Google Cloud Run",
+          link: "/deployment/google-cloud-run",
+        },
+        {
+          text: "Azure Container Apps",
+          link: "/deployment/azure",
+        },
+        {
+          text: "DigitalOcean",
+          link: "/deployment/digitalocean",
+        },
+        {
+          text: "Kubernetes",
+          link: "/deployment/kubernetes",
         },
       ],
     },

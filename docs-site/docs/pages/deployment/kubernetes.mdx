@@ -1,0 +1,286 @@
+# Kubernetes
+
+Deploy Ultimo to any Kubernetes cluster — managed (EKS, GKE, AKS, DOKS) or
+self-hosted. This guide provides production-ready manifests with health checks,
+resource limits, HPA autoscaling, and TLS ingress.
+
+## Manifests
+
+### Deployment
+
+```yaml
+# k8s/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  labels:
+    app: my-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/your-org/my-app:latest
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: PORT
+              value: "3000"
+            - name: RUST_LOG
+              value: "info"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: my-app-secrets
+                  key: database-url
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"] # Allow in-flight requests to drain
+      terminationGracePeriodSeconds: 30
+```
+
+### Service
+
+```yaml
+# k8s/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+spec:
+  selector:
+    app: my-app
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+  type: ClusterIP
+```
+
+### Secrets
+
+```bash
+kubectl create secret generic my-app-secrets \
+  --from-literal=database-url="postgres://user:pass@db-host:5432/mydb"
+```
+
+Or use a YAML manifest (base64-encoded):
+
+```yaml
+# k8s/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-app-secrets
+type: Opaque
+data:
+  database-url: cG9zdGdyZXM6Ly91c2VyOnBhc3NAZGItaG9zdDo1NDMyL215ZGI=
+```
+
+:::warning
+Don't commit secrets to Git. Use sealed-secrets, external-secrets, or your
+cloud provider's secret manager integration instead.
+:::
+
+### Ingress (with TLS)
+
+Using nginx-ingress + cert-manager:
+
+```yaml
+# k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.example.com
+      secretName: my-app-tls
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-app
+                port:
+                  number: 80
+```
+
+### Horizontal Pod Autoscaler
+
+```yaml
+# k8s/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: my-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-app
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+```
+
+## Apply everything
+
+```bash
+kubectl apply -f k8s/
+```
+
+## Helm chart (optional)
+
+For teams managing multiple environments, wrap the manifests in a Helm chart:
+
+```
+helm/my-app/
+├── Chart.yaml
+├── values.yaml
+├── values-staging.yaml
+├── values-production.yaml
+└── templates/
+    ├── deployment.yaml
+    ├── service.yaml
+    ├── ingress.yaml
+    ├── hpa.yaml
+    └── secrets.yaml
+```
+
+```bash
+helm install my-app ./helm/my-app -f helm/my-app/values-production.yaml
+helm upgrade my-app ./helm/my-app -f helm/my-app/values-production.yaml
+```
+
+## CI/CD with GitHub Actions
+
+```yaml
+name: Deploy to Kubernetes
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push image
+        run: |
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker build -t ghcr.io/${{ github.repository }}:${{ github.sha }} .
+          docker push ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+
+      - name: Deploy
+        run: |
+          kubectl set image deployment/my-app \
+            app=ghcr.io/${{ github.repository }}:${{ github.sha }}
+          kubectl rollout status deployment/my-app --timeout=120s
+```
+
+## WebSocket considerations
+
+For WebSocket support through the ingress:
+
+```yaml
+# In ingress annotations
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "my-app"
+```
+
+## Observability
+
+### Pod disruption budget
+
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: my-app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: my-app
+```
+
+### Resource recommendations
+
+Ultimo apps are lightweight:
+
+| Workload                 | CPU request | Memory request |
+| ------------------------ | ----------- | -------------- |
+| Low traffic API          | 50m         | 32Mi           |
+| Medium traffic           | 100m        | 64Mi           |
+| High traffic + WebSocket | 250m        | 128Mi          |
+| Database-heavy           | 200m        | 256Mi          |
+
+Start small and let HPA scale horizontally rather than over-provisioning.

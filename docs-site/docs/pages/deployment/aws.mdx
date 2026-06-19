@@ -1,0 +1,246 @@
+# AWS (ECS + Fargate)
+
+Run your Ultimo container on AWS without managing servers. This guide uses
+**ECS with Fargate** — AWS manages the underlying compute.
+
+## Architecture
+
+```
+Internet → ALB (HTTPS) → ECS Service → Fargate Tasks (your container)
+                                      ↓
+                                  RDS / ElastiCache
+```
+
+## Prerequisites
+
+- AWS CLI configured (`aws configure`)
+- Docker installed locally
+- A [Dockerfile](/deployment/docker) in your project
+
+## Step 1: Push image to ECR
+
+```bash
+# Create an ECR repository (once)
+aws ecr create-repository --repository-name my-app --region us-east-1
+
+# Get the repository URI
+REPO=$(aws ecr describe-repositories --repository-names my-app \
+  --query 'repositories[0].repositoryUri' --output text)
+
+# Authenticate Docker to ECR
+aws ecr get-login-password --region us-east-1 \
+  | docker login --username AWS --password-stdin "$REPO"
+
+# Build and push
+docker build -t my-app .
+docker tag my-app:latest "$REPO:latest"
+docker push "$REPO:latest"
+```
+
+## Step 2: Create the ECS cluster
+
+```bash
+aws ecs create-cluster --cluster-name my-cluster
+```
+
+## Step 3: Task definition
+
+Create `task-definition.json`:
+
+```json
+{
+  "family": "my-app",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::<account-id>:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "<account-id>.dkr.ecr.us-east-1.amazonaws.com/my-app:latest",
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "PORT", "value": "3000" },
+        { "name": "RUST_LOG", "value": "info" }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:ssm:us-east-1:<account-id>:parameter/my-app/database-url"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/my-app",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "app"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:3000/health || exit 1"
+        ],
+        "interval": 10,
+        "timeout": 3,
+        "retries": 3,
+        "startPeriod": 5
+      }
+    }
+  ]
+}
+```
+
+Register it:
+
+```bash
+aws ecs register-task-definition --cli-input-json file://task-definition.json
+```
+
+## Step 4: Application Load Balancer
+
+```bash
+# Create ALB
+aws elbv2 create-load-balancer \
+  --name my-app-alb \
+  --subnets subnet-xxx subnet-yyy \
+  --security-groups sg-xxx
+
+# Create target group
+aws elbv2 create-target-group \
+  --name my-app-tg \
+  --protocol HTTP \
+  --port 3000 \
+  --vpc-id vpc-xxx \
+  --target-type ip \
+  --health-check-path /health
+
+# Create HTTPS listener (requires ACM certificate)
+aws elbv2 create-listener \
+  --load-balancer-arn <alb-arn> \
+  --protocol HTTPS \
+  --port 443 \
+  --certificates CertificateArn=<cert-arn> \
+  --default-actions Type=forward,TargetGroupArn=<tg-arn>
+```
+
+## Step 5: Create the ECS service
+
+```bash
+aws ecs create-service \
+  --cluster my-cluster \
+  --service-name my-app \
+  --task-definition my-app \
+  --desired-count 2 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={
+    subnets=[subnet-xxx,subnet-yyy],
+    securityGroups=[sg-xxx],
+    assignPublicIp=ENABLED
+  }" \
+  --load-balancers "targetGroupArn=<tg-arn>,containerName=app,containerPort=3000"
+```
+
+## Secrets management
+
+Store secrets in AWS Systems Manager Parameter Store:
+
+```bash
+aws ssm put-parameter \
+  --name "/my-app/database-url" \
+  --type SecureString \
+  --value "postgres://user:pass@rds-host:5432/db"
+```
+
+Reference them in the task definition via the `secrets` field (shown above).
+
+## Auto-scaling
+
+```bash
+# Register scalable target
+aws application-autoscaling register-scalable-target \
+  --service-namespace ecs \
+  --resource-id service/my-cluster/my-app \
+  --scalable-dimension ecs:service:DesiredCount \
+  --min-capacity 1 \
+  --max-capacity 10
+
+# Scale on CPU utilization
+aws application-autoscaling put-scaling-policy \
+  --service-namespace ecs \
+  --resource-id service/my-cluster/my-app \
+  --scalable-dimension ecs:service:DesiredCount \
+  --policy-name cpu-scaling \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration '{
+    "TargetValue": 70.0,
+    "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ECSServiceAverageCPUUtilization"
+    }
+  }'
+```
+
+## CI/CD with GitHub Actions
+
+```yaml
+name: Deploy to ECS
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: my-app
+  ECS_CLUSTER: my-cluster
+  ECS_SERVICE: my-app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          docker build -t $REGISTRY/$ECR_REPOSITORY:${{ github.sha }} .
+          docker push $REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment
+```
+
+## Cost estimate
+
+| Component                                | Monthly (us-east-1)    |
+| ---------------------------------------- | ---------------------- |
+| Fargate (0.25 vCPU, 512 MB, 1 task 24/7) | ~$9                    |
+| ALB                                      | ~$16 + $0.008/LCU-hour |
+| ECR (1 GB storage)                       | ~$0.10                 |
+| CloudWatch Logs                          | ~$0.50/GB ingested     |
+
+Total for a small service: **~$25–30/month**.

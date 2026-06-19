@@ -1,0 +1,137 @@
+# Railway
+
+[Railway](https://railway.app) deploys from your Git repo with zero
+configuration. Push to `main` and Railway builds, deploys, and gives you a URL.
+
+## First deploy
+
+### 1. Push your code to GitHub
+
+Railway deploys from GitHub (or GitLab).
+
+### 2. Create a project
+
+Go to [railway.app/new](https://railway.app/new) → **Deploy from GitHub repo** →
+select your repository.
+
+### 3. Configure the service
+
+Railway auto-detects Rust projects. For faster builds, add a
+[Dockerfile](/deployment/docker) — Railway will use it automatically.
+
+Set environment variables in the dashboard or via CLI:
+
+| Variable       | Value                          |
+| -------------- | ------------------------------ |
+| `PORT`         | `${{RAILWAY_PORT}}` (injected) |
+| `RUST_LOG`     | `info`                         |
+| `DATABASE_URL` | (if using a database)          |
+
+:::warning
+Railway injects `PORT` dynamically. Your app **must** read `PORT` from the
+environment — don't hardcode 3000.
+:::
+
+### 4. Expose the service
+
+**Settings** → **Networking** → **Generate Domain** (or add a custom domain).
+
+## railway.toml
+
+```toml
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 3
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+```
+
+## Railway CLI
+
+```bash
+# Install
+npm install -g @railway/cli
+
+# Login
+railway login
+
+# Link to existing project
+railway link
+
+# Deploy from local
+railway up
+
+# Open the dashboard
+railway open
+
+# Set variables
+railway variables set RUST_LOG=info
+
+# View logs
+railway logs
+```
+
+## Database
+
+### Provision a database
+
+Click **+ New** in your project → **Database** → choose PostgreSQL, MySQL, or
+Redis. Railway provisions it and injects the connection URL into your service
+environment automatically.
+
+### Example: PostgreSQL
+
+After provisioning, `DATABASE_URL` is available in your service:
+
+```rust
+let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set");
+```
+
+No manual secret management needed.
+
+## Scaling
+
+- **Horizontal:** Railway supports multiple instances via the dashboard
+- **Vertical:** Adjust RAM/CPU in service settings (Pro plan)
+- **Auto-sleep:** On the free/Hobby plan, services sleep after inactivity
+
+## Custom domains
+
+1. **Settings** → **Networking** → **Custom Domain**
+2. Add your domain (e.g. `api.example.com`)
+3. Create a CNAME record pointing to the Railway-provided target
+4. Railway provisions TLS automatically
+
+## CI/CD
+
+Railway deploys on every push to `main` by default. To change:
+
+- **Settings** → **Deploy** → select branch
+- Enable/disable auto-deploy
+- Add a **Deploy trigger** for specific branches or tags
+
+### Preview environments
+
+Railway creates isolated preview environments for pull requests:
+
+- Each PR gets its own URL and database
+- Merging the PR promotes to production
+- Closing deletes the preview
+
+## Monorepo support
+
+If your Ultimo app is in a subdirectory:
+
+1. **Settings** → **Source** → set **Root Directory** to your app path
+2. Railway builds from that directory
+
+## Cost optimization
+
+- Use the Hobby plan ($5/mo) for small projects — includes 8 GB RAM, 8 vCPU hours
+- Dockerfile builds cache layers → subsequent deploys are fast
+- Services auto-sleep on Hobby plan when unused
+- Add a `railway.toml` with health checks to avoid unnecessary restarts
