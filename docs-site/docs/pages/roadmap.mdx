@@ -206,7 +206,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - ✅ **Static file serving + SPA fallback** — `serve_static`, `serve_spa`, ETag caching, path-traversal protection (`static-files` feature)
 - ✅ **Response compression** — automatic brotli/gzip middleware, pure Rust, builder API (`compression` feature)
 
-### v0.5.0 (Current) — Type-safe clients, for real
+### v0.5.0 — Type-safe clients, for real
 
 - ✅ **TypeScript type derivation** (`client-gen` feature) — RPC client types are
   derived from your Rust types via `ts-rs`; the generated client emits real
@@ -217,6 +217,11 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
   remain as escape hatches.
 - ✅ **`ultimo generate` runs for real** — executes the project's
   `generate-client` binary (no more artifact-hunting); `assert_cmd` CLI tests.
+
+### v0.5.1 (Current)
+
+- ✅ **Hot reload** — `ultimo dev` with file-watching auto-restart
+- ✅ **IP allow/deny middleware** — CIDR-aware `IpFilter` (allow-list / deny-list)
 
 ### v0.6.0 — Finish the codegen story + ship-readiness
 

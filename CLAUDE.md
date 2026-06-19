@@ -6,7 +6,7 @@ WebSocket support with built-in pub/sub. Built on **Hyper 1.0 + Tokio**.
 
 - Homepage: https://ultimo.dev · Docs: https://docs.ultimo.dev · Roadmap: https://docs.ultimo.dev/roadmap
 - Repo: https://github.com/ultimo-rs/ultimo · Issues: https://github.com/ultimo-rs/ultimo/issues · Board: https://github.com/orgs/ultimo-rs/projects/1
-- Current version: **0.3.0** · Edition 2021 · MSRV **1.86.0** · License MIT
+- Current version: **0.5.1** · Edition 2021 · MSRV **1.86.0** · License MIT
 
 ## ⚠️ THESE ARE PUBLISHED CRATES — read before changing any public code
 

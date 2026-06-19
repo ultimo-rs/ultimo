@@ -18,11 +18,11 @@ This example demonstrates how to build a full-stack application with:
 - ✅ Loading and error states
 - ✅ Beautiful UI with shadcn/ui components
 
-### RPC Client Example (Coming Soon)
+### RPC Client Example
 
-- 🚧 Type-safe RPC calls
-- 🚧 Auto-generated TypeScript types from Rust
-- 🚧 Single source of truth for API contracts
+- ✅ Type-safe RPC calls
+- ✅ Auto-generated TypeScript types from Rust
+- ✅ Single source of truth for API contracts
 
 ## Running the Example
 
@@ -52,7 +52,7 @@ The frontend will start on `http://localhost:5173`
 Navigate to `http://localhost:5173` and explore:
 
 - REST API example at `/rest`
-- RPC example at `/rpc` (coming soon)
+- RPC example at `/rpc`
 
 ## Project Structure
 
@@ -116,4 +116,4 @@ examples/
 1. Try adding more CRUD operations (Update)
 2. Add pagination and filtering
 3. Implement authentication
-4. Explore the upcoming RPC example with type-safe communication
+4. Explore the RPC example with type-safe communication
