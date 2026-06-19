@@ -130,6 +130,15 @@ export default defineConfig({
         },
       ],
     },
+    {
+      text: "Operations",
+      items: [
+        {
+          text: "Deployment",
+          link: "/deployment",
+        },
+      ],
+    },
   ],
   socials: [
     {
