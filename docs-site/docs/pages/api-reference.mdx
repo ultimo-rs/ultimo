@@ -590,6 +590,26 @@ app.use_middleware(
 );
 ```
 
+#### `IpFilter` — IP allow/deny (CIDR)
+
+Filters requests by client IP against an allow-list or deny-list of CIDR networks.
+Respects `X-Forwarded-For` when `trust_proxy` is enabled.
+
+```rust
+use ultimo::middleware::builtin::IpFilter;
+
+// Allow only private networks:
+app.use_middleware(IpFilter::allow(&[
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "127.0.0.1",
+]).build());
+
+// Or deny specific ranges:
+app.use_middleware(IpFilter::deny(&["203.0.113.0/24"]).build());
+```
+
 #### `compression()` / `Compression` (requires `compression` feature)
 
 Automatic response compression — brotli preferred, gzip fallback. Pure Rust
