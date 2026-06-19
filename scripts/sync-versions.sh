@@ -70,4 +70,15 @@ if [ -f "$BLOG_COMPARE" ]; then
   echo "  updated $BLOG_COMPARE"
 fi
 
+# Roadmap: move (Current) marker to the matching version header
+ROADMAP="docs-site/docs/pages/roadmap.mdx"
+if [ -f "$ROADMAP" ]; then
+  # Strip (Current) from all version headers
+  sed -i.bak -E 's/(### v[0-9]+\.[0-9]+\.[0-9]+) \(Current\)/\1/' "$ROADMAP" && rm -f "$ROADMAP.bak"
+  # Add (Current) to the header matching the workspace version
+  sed -i.bak -E "s/### v${VERSION}$/### v${VERSION} (Current)/" "$ROADMAP"
+  sed -i.bak -E "s/### v${VERSION} —/### v${VERSION} (Current) —/" "$ROADMAP" && rm -f "$ROADMAP.bak"
+  echo "  updated $ROADMAP — (Current) → v$VERSION"
+fi
+
 echo "✅ Done. Review with: git diff"
