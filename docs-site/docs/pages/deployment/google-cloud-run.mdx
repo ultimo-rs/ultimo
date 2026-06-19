@@ -1,0 +1,198 @@
+# Google Cloud Run
+
+[Cloud Run](https://cloud.google.com/run) runs containers with automatic scaling
+— including scale-to-zero. You pay only for actual request processing time.
+
+## Prerequisites
+
+- Google Cloud CLI (`gcloud`) installed and authenticated
+- A GCP project with billing enabled
+- A [Dockerfile](/deployment/docker) in your project
+
+## Quick deploy
+
+The fastest path — Cloud Run builds and deploys from source:
+
+```bash
+# Enable APIs (once)
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com
+
+# Deploy directly from source (Cloud Build handles the Dockerfile)
+gcloud run deploy my-app \
+  --source . \
+  --port 3000 \
+  --region us-central1 \
+  --allow-unauthenticated
+```
+
+Cloud Run gives you an HTTPS URL like `https://my-app-xxxxx-uc.a.run.app`.
+
+## Deploy from Artifact Registry
+
+For more control over your image:
+
+```bash
+# Create Artifact Registry repository (once)
+gcloud artifacts repositories create my-repo \
+  --repository-format=docker \
+  --location=us-central1
+
+# Build and push
+gcloud builds submit \
+  --tag us-central1-docker.pkg.dev/<project-id>/my-repo/my-app:latest
+
+# Deploy the specific image
+gcloud run deploy my-app \
+  --image us-central1-docker.pkg.dev/<project-id>/my-repo/my-app:latest \
+  --port 3000 \
+  --region us-central1 \
+  --allow-unauthenticated
+```
+
+## Configuration
+
+### Environment variables
+
+```bash
+gcloud run services update my-app \
+  --set-env-vars "RUST_LOG=info,APP_ENV=production" \
+  --region us-central1
+```
+
+### Secrets (via Secret Manager)
+
+```bash
+# Create a secret
+echo -n "postgres://..." | gcloud secrets create db-url --data-file=-
+
+# Mount as env var
+gcloud run services update my-app \
+  --set-secrets "DATABASE_URL=db-url:latest" \
+  --region us-central1
+```
+
+### Resource limits
+
+```bash
+gcloud run services update my-app \
+  --memory 256Mi \
+  --cpu 1 \
+  --concurrency 250 \
+  --timeout 60s \
+  --region us-central1
+```
+
+## Scaling
+
+```bash
+# Min/max instances
+gcloud run services update my-app \
+  --min-instances 0 \
+  --max-instances 10 \
+  --region us-central1
+```
+
+- `min-instances=0` enables scale-to-zero (cold starts ~300 ms for Rust)
+- `min-instances=1` keeps one instance warm (avoids cold starts, ~$6/month)
+
+## Custom domain
+
+```bash
+# Map domain
+gcloud run domain-mappings create \
+  --service my-app \
+  --domain api.example.com \
+  --region us-central1
+```
+
+Then add the DNS records shown in the output. TLS is automatic.
+
+## VPC connectivity
+
+Connect to Cloud SQL, Memorystore, or other VPC resources:
+
+```bash
+# Create a VPC connector (once)
+gcloud compute networks vpc-access connectors create my-connector \
+  --region us-central1 \
+  --range 10.8.0.0/28
+
+# Attach to Cloud Run
+gcloud run services update my-app \
+  --vpc-connector my-connector \
+  --region us-central1
+```
+
+## Cloud SQL
+
+```bash
+# Connect via Unix socket (recommended)
+gcloud run services update my-app \
+  --add-cloudsql-instances <project>:<region>:<instance> \
+  --set-env-vars "DATABASE_URL=postgres://user:pass@/db?host=/cloudsql/<project>:<region>:<instance>" \
+  --region us-central1
+```
+
+## CI/CD with GitHub Actions
+
+```yaml
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PROJECT_ID: my-project
+  REGION: us-central1
+  SERVICE: my-app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/<num>/locations/global/workloadIdentityPools/github/providers/github
+          service_account: deploy@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          source: .
+```
+
+## Cost estimate
+
+| Scenario                                | Monthly cost |
+| --------------------------------------- | ------------ |
+| Scale-to-zero, 100k requests/month      | ~$0.50       |
+| 1 instance always-on (0.5 vCPU, 256 MB) | ~$6          |
+| 5 instances peak, avg 2                 | ~$30         |
+
+Cloud Run charges per 100ms of actual processing + request count. Idle = free.
+
+## WebSocket support
+
+Cloud Run supports WebSocket connections with automatic timeout handling.
+Set a longer request timeout for long-lived connections:
+
+```bash
+gcloud run services update my-app \
+  --timeout 3600s \
+  --region us-central1
+```
+
+:::warning
+Cloud Run has a maximum request timeout of 60 minutes. For indefinite
+WebSocket connections, consider Fly.io or a GKE deployment instead.
+:::

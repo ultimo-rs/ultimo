@@ -1,0 +1,157 @@
+# Azure Container Apps
+
+[Azure Container Apps](https://azure.microsoft.com/en-us/products/container-apps)
+is a serverless container platform with built-in autoscaling, HTTPS, and
+managed identity — no Kubernetes expertise required.
+
+## Prerequisites
+
+- Azure CLI (`az`) installed and logged in
+- A [Dockerfile](/deployment/docker) in your project
+
+## Quick deploy
+
+Deploy directly from your Dockerfile:
+
+```bash
+# Create resource group (once)
+az group create --name my-rg --location eastus
+
+# Create Container Apps environment (once)
+az containerapp env create \
+  --name my-env \
+  --resource-group my-rg \
+  --location eastus
+
+# Deploy (builds from Dockerfile automatically)
+az containerapp up \
+  --name my-app \
+  --resource-group my-rg \
+  --environment my-env \
+  --source . \
+  --target-port 3000 \
+  --ingress external
+```
+
+Your app gets an HTTPS URL like `https://my-app.<random>.eastus.azurecontainerapps.io`.
+
+## Configuration
+
+### Environment variables
+
+```bash
+az containerapp update \
+  --name my-app \
+  --resource-group my-rg \
+  --set-env-vars "RUST_LOG=info" "APP_ENV=production"
+```
+
+### Secrets
+
+```bash
+# Create a secret
+az containerapp secret set \
+  --name my-app \
+  --resource-group my-rg \
+  --secrets "db-url=postgres://user:pass@host:5432/db"
+
+# Reference in env var
+az containerapp update \
+  --name my-app \
+  --resource-group my-rg \
+  --set-env-vars "DATABASE_URL=secretref:db-url"
+```
+
+### Scaling rules
+
+```bash
+az containerapp update \
+  --name my-app \
+  --resource-group my-rg \
+  --min-replicas 0 \
+  --max-replicas 10 \
+  --scale-rule-name http-rule \
+  --scale-rule-type http \
+  --scale-rule-http-concurrency 100
+```
+
+## Custom domain
+
+```bash
+# Add custom domain
+az containerapp hostname add \
+  --name my-app \
+  --resource-group my-rg \
+  --hostname api.example.com
+
+# Bind managed certificate
+az containerapp hostname bind \
+  --name my-app \
+  --resource-group my-rg \
+  --hostname api.example.com \
+  --environment my-env \
+  --validation-method CNAME
+```
+
+## Database connectivity
+
+### Azure Database for PostgreSQL
+
+```bash
+# Create Postgres (once)
+az postgres flexible-server create \
+  --name my-db \
+  --resource-group my-rg \
+  --location eastus \
+  --admin-user dbadmin \
+  --admin-password <password> \
+  --sku-name Standard_B1ms
+
+# Allow Container Apps to connect
+az postgres flexible-server firewall-rule create \
+  --name allow-azure \
+  --resource-group my-rg \
+  --server-name my-db \
+  --start-ip-address 0.0.0.0 \
+  --end-ip-address 0.0.0.0
+```
+
+## CI/CD with GitHub Actions
+
+```yaml
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }}
+          acrName: myregistry
+          containerAppName: my-app
+          resourceGroup: my-rg
+          targetPort: 3000
+```
+
+## Cost estimate
+
+| Scenario                          | Monthly cost    |
+| --------------------------------- | --------------- |
+| Scale-to-zero, occasional traffic | ~$0 (free tier) |
+| 1 vCPU, 2 GB, always-on           | ~$35            |
+| Auto-scaling 1-5 replicas         | ~$35–175        |
+
+The free tier includes 2M requests/month and 180,000 vCPU-seconds.

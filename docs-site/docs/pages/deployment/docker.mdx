@@ -1,0 +1,211 @@
+# Docker
+
+Docker is the foundation for most deployment targets. This guide covers
+building optimized Ultimo images with multi-stage builds, layer caching,
+and production-ready configurations.
+
+## Multi-stage Dockerfile
+
+```dockerfile
+# ── Build stage ──────────────────────────────────────────────────────
+FROM rust:1.86-slim AS builder
+
+WORKDIR /app
+
+# Cache dependencies — copy manifests first, build a dummy, then copy source
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo 'fn main() {}' > src/main.rs
+RUN cargo build --release && rm -rf src
+
+# Now copy real source and rebuild (only your code recompiles)
+COPY src/ src/
+RUN touch src/main.rs && cargo build --release
+
+# ── Runtime stage ────────────────────────────────────────────────────
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/release/my-app /usr/local/bin/app
+
+# Non-root user for security
+RUN useradd -r -s /bin/false appuser
+USER appuser
+
+ENV PORT=3000
+EXPOSE 3000
+
+CMD ["app"]
+```
+
+Replace `my-app` with your binary name (the `[[bin]]` name or package name in
+`Cargo.toml`).
+
+### Why multi-stage?
+
+- **Build image** (~1.5 GB with Rust toolchain) is discarded
+- **Runtime image** (~80 MB) contains only your binary + CA certs
+- Layer caching means dependency changes rebuild deps, but source changes only
+  recompile your code (~seconds vs minutes)
+
+## .dockerignore
+
+```
+target/
+.git/
+.env
+*.md
+docs/
+```
+
+Keep the build context small — Docker sends everything not ignored to the daemon.
+
+## Build and run
+
+```bash
+docker build -t my-app .
+docker run -p 3000:3000 -e RUST_LOG=info my-app
+```
+
+## Docker Compose
+
+```yaml
+# docker-compose.yml
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - RUST_LOG=info
+      - DATABASE_URL=postgres://user:pass@db:5432/mydb
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: mydb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
+```
+
+```bash
+docker compose up -d
+docker compose logs -f app
+```
+
+## Optimizations
+
+### Smaller images with Alpine
+
+```dockerfile
+FROM rust:1.86-alpine AS builder
+RUN apk add --no-cache musl-dev
+WORKDIR /app
+COPY . .
+RUN cargo build --release
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /app/target/release/my-app /usr/local/bin/app
+CMD ["app"]
+```
+
+Alpine images are ~15 MB total. Note: some crates with C dependencies (OpenSSL,
+libpq) need extra `apk add` packages in the build stage.
+
+### BuildKit cache mounts
+
+Speed up repeated builds with Cargo registry caching:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM rust:1.86-slim AS builder
+WORKDIR /app
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --release && \
+    cp target/release/my-app /usr/local/bin/app
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /usr/local/bin/app /usr/local/bin/app
+CMD ["app"]
+```
+
+Enable BuildKit: `DOCKER_BUILDKIT=1 docker build .`
+
+### Health checks
+
+```dockerfile
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s \
+  CMD curl -f http://localhost:3000/health || exit 1
+```
+
+Or without curl (smaller image):
+
+```dockerfile
+HEALTHCHECK --interval=10s --timeout=3s \
+  CMD wget -qO- http://localhost:3000/health || exit 1
+```
+
+## CI/CD integration
+
+### GitHub Actions
+
+```yaml
+# .github/workflows/deploy.yml
+name: Build and Push
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+```
+
+This builds your image with full layer caching and pushes to GitHub Container
+Registry on every merge to `main`.

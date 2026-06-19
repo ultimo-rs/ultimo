@@ -1,0 +1,161 @@
+# DigitalOcean App Platform
+
+[DigitalOcean App Platform](https://www.digitalocean.com/products/app-platform)
+is a PaaS that detects your Dockerfile, builds it, and deploys with managed
+HTTPS, scaling, and monitoring.
+
+## Quick deploy via dashboard
+
+1. Go to [cloud.digitalocean.com/apps](https://cloud.digitalocean.com/apps) → **Create App**
+2. Connect your GitHub or GitLab repo
+3. DigitalOcean detects the `Dockerfile` and builds automatically
+4. Set the HTTP port to `3000`
+5. Add environment variables (`RUST_LOG=info`, `DATABASE_URL`, etc.)
+6. Choose a plan (Basic $5/mo or Pro $12/mo)
+7. Deploy
+
+## Deploy via doctl
+
+```bash
+# Install doctl
+brew install doctl  # or snap install doctl
+
+# Authenticate
+doctl auth init
+
+# Create the app
+doctl apps create --spec .do/app.yaml
+```
+
+### App spec (`.do/app.yaml`)
+
+```yaml
+name: my-ultimo-app
+region: nyc
+
+services:
+  - name: api
+    dockerfile_path: Dockerfile
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    routes:
+      - path: /
+    envs:
+      - key: PORT
+        value: "3000"
+      - key: RUST_LOG
+        value: "info"
+      - key: DATABASE_URL
+        type: SECRET
+        value: "postgres://..."
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 5
+      period_seconds: 10
+    source_dir: /
+    github:
+      repo: your-org/your-repo
+      branch: main
+      deploy_on_push: true
+
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    size: db-s-dev-database
+    production: false
+```
+
+## Environment variables
+
+```bash
+# Set via CLI
+doctl apps update <app-id> --spec .do/app.yaml
+
+# Or in the dashboard: Settings → App-Level Environment Variables
+```
+
+For secrets, set `type: SECRET` in the spec — values are encrypted and hidden.
+
+## Database
+
+### Managed PostgreSQL
+
+Add a `databases` block to your app spec (shown above). App Platform
+automatically injects `${db.DATABASE_URL}` into your service environment.
+
+Reference it in the service envs:
+
+```yaml
+envs:
+  - key: DATABASE_URL
+    value: "${db.DATABASE_URL}"
+```
+
+### External databases
+
+Use the connection string directly as a SECRET env var.
+
+## Custom domain
+
+1. **Settings** → **Domains** → **Add Domain**
+2. Enter your domain (e.g. `api.example.com`)
+3. Add the CNAME record shown
+4. TLS is provisioned automatically
+
+## Scaling
+
+```yaml
+# In app.yaml
+services:
+  - name: api
+    instance_count: 3
+    instance_size_slug: apps-s-2vcpu-4gb
+    autoscaling:
+      min_instance_count: 1
+      max_instance_count: 5
+      metrics:
+        cpu:
+          percent: 70
+```
+
+## CI/CD
+
+App Platform deploys on every push to the configured branch by default.
+To trigger manually:
+
+```bash
+doctl apps create-deployment <app-id>
+```
+
+### GitHub Actions (alternative)
+
+```yaml
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: digitalocean/app_action@v2
+        with:
+          app_name: my-ultimo-app
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+```
+
+## Cost
+
+| Plan  | Specs                     | Monthly |
+| ----- | ------------------------- | ------- |
+| Basic | 1 vCPU, 512 MB            | $5      |
+| Basic | 1 vCPU, 1 GB              | $10     |
+| Pro   | 1 vCPU, 1 GB, autoscaling | $12     |
+| Pro   | 2 vCPU, 4 GB              | $25     |
+
+Managed PostgreSQL dev database: $7/month.
