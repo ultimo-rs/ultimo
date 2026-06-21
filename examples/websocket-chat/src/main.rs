@@ -107,9 +107,8 @@ async fn main() -> Result<()> {
         max_message_size: 10 * 1024 * 1024, // 10 MB
         max_frame_size: 1 * 1024 * 1024,    // 1 MB (enables automatic fragmentation)
 
-        // Ping/pong heartbeat to detect dead connections
-        ping_interval: Some(30), // Send ping every 30 seconds
-        ping_timeout: 10,        // Disconnect if no pong after 10 seconds
+        // Disable ping/pong for the demo (browser pong handling varies)
+        ping_interval: None,
 
         // Backpressure handling
         max_write_queue_size: 100, // Buffer up to 100 messages per connection

@@ -202,6 +202,7 @@
       const sendButton = document.getElementById("sendButton");
 
       let ws;
+      const clientId = Math.random().toString(36).slice(2, 10);
 
       function connect() {
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -228,7 +229,8 @@
             } else if (data.type === "leave") {
               addMessage(data.message, "system");
             } else if (data.message) {
-              addMessage(data.message, "received");
+              const isSelf = data.sender === clientId;
+              addMessage(data.message, isSelf ? "sent" : "received");
             }
           } catch (e) {
             // Not JSON, display as regular message
@@ -273,11 +275,11 @@
         const data = {
           type: "message",
           message: message,
+          sender: clientId,
           timestamp: new Date().toISOString(),
         };
 
         ws.send(JSON.stringify(data));
-        addMessage(message, "sent");
         messageInput.value = "";
         messageInput.focus();
       }
