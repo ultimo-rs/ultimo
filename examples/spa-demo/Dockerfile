@@ -1,8 +1,6 @@
 FROM rust:1.86-slim AS builder
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
-COPY ultimo/ ultimo/
-COPY examples/spa-demo/ examples/spa-demo/
+COPY . .
 RUN cargo build --release -p spa-demo
 
 FROM debian:bookworm-slim

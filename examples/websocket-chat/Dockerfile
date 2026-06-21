@@ -1,8 +1,6 @@
 FROM rust:1.86-slim AS builder
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
-COPY ultimo/ ultimo/
-COPY examples/websocket-chat/ examples/websocket-chat/
+COPY . .
 RUN cargo build --release -p websocket-chat
 
 FROM debian:bookworm-slim

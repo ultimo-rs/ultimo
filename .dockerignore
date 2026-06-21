@@ -1,0 +1,9 @@
+target/
+.git/
+node_modules/
+website/
+docs-site/
+docs/
+.history/
+*.md
+!README.md

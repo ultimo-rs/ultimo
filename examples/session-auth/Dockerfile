@@ -1,8 +1,6 @@
 FROM rust:1.86-slim AS builder
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
-COPY ultimo/ ultimo/
-COPY examples/session-auth/ examples/session-auth/
+COPY . .
 RUN cargo build --release -p session-auth-example
 
 FROM debian:bookworm-slim
