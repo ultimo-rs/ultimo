@@ -33,8 +33,28 @@ async fn main() -> Result<()> {
             .build(),
     );
 
-    // Simple GET route
+    // Landing page with demo links
     app.get("/", |ctx: Context| async move {
+        ctx.html(r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ultimo Basic Demo</title>
+<style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;color:#1a1a1a}
+a{color:#4f46e5}code{background:#f4f4f5;padding:0.15rem 0.4rem;border-radius:0.25rem;font-size:0.9em}
+.card{border:1px solid #e4e4e7;border-radius:0.75rem;padding:1rem 1.25rem;margin:0.5rem 0}
+.banner{background:#fef3c7;border:1px solid #f59e0b;border-radius:0.5rem;padding:0.5rem 1rem;margin-bottom:1.5rem;font-size:0.85rem;color:#92400e}</style></head><body>
+<div class="banner">⚡ <strong>Live demo</strong> — hosted on Render free tier. First request may take ~30s due to cold start. Powered by <a href="https://github.com/ultimo-rs/ultimo" style="color:#92400e;font-weight:600">Ultimo</a>.</div>
+<h1>🚀 Ultimo Basic Demo</h1>
+<p>A fast, type-safe Rust web framework. Try the endpoints below:</p>
+<div class="card"><strong>GET</strong> <a href="/json">/json</a> — JSON response</div>
+<div class="card"><strong>GET</strong> <a href="/users/42">/users/42</a> — path parameters</div>
+<div class="card"><strong>GET</strong> <a href="/search?q=rust">/search?q=rust</a> — query parameters</div>
+<div class="card"><strong>GET</strong> <a href="/html">/html</a> — HTML response</div>
+<div class="card"><strong>GET</strong> <a href="/redirect">/redirect</a> — redirect</div>
+<div class="card"><strong>POST</strong> <code>/users</code> — create user (send JSON: <code>{"name":"Alice","email":"alice@example.com"}</code>)</div>
+<p style="margin-top:2rem;font-size:0.85rem;color:#71717a">View source: <a href="https://github.com/ultimo-rs/ultimo/tree/main/examples/basic">examples/basic</a></p>
+</body></html>"#).await
+    });
+
+    // JSON endpoint
+    app.get("/json", |ctx: Context| async move {
         ctx.json(json!({
             "message": "Hello Ultimo!",
             "version": "0.1.0"
@@ -115,18 +135,7 @@ async fn main() -> Result<()> {
 
     // HTML response
     app.get("/html", |ctx: Context| async move {
-        ctx.html(r#"<!doctype html><html><head><meta charset="utf-8"><title>Ultimo Basic Demo</title></head><body>
-<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:0.5rem;padding:0.5rem 1rem;margin-bottom:1rem;font-size:0.85rem;color:#92400e;">
-⚡ <strong>Live demo</strong> — hosted on Render free tier. First request may take ~30s due to cold start.
-Powered by <a href="https://github.com/ultimo-rs/ultimo" style="color:#92400e;font-weight:600;">Ultimo</a>.
-</div>
-<h1>Hello from Ultimo!</h1><p>A fast, type-safe Rust web framework</p>
-<h2>Try these endpoints:</h2>
-<ul>
-<li><a href="/users/42">/users/42</a> — path params</li>
-<li><a href="/search?q=rust">/search?q=rust</a> — query params</li>
-<li><a href="/json">/json</a> — JSON response</li>
-</ul></body></html>"#)
+        ctx.html("<h1>Hello from Ultimo!</h1><p>This is a simple HTML response from a Rust web framework.</p>")
             .await
     });
 
