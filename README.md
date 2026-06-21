@@ -147,12 +147,25 @@ WebSockets, database integration, testing, and [performance](https://docs.ultimo
 
 ## Examples
 
-Runnable examples live in [`examples/`](https://github.com/ultimo-rs/ultimo/tree/main/examples)
-— including `session-auth` and `jwt-auth` full-stack demos. Run one with:
+Runnable examples live in [`examples/`](https://github.com/ultimo-rs/ultimo/tree/main/examples).
+Run one locally with:
 
 ```bash
 cargo run -p jwt-auth-example
 ```
+
+### Live demos
+
+Try them without cloning (hosted on Render free tier — first request may take ~30s):
+
+| Demo                                                           | What it shows                     |
+| -------------------------------------------------------------- | --------------------------------- |
+| [basic-example](https://basic-example-v4wi.onrender.com/)      | Routing, JSON, query params, HTML |
+| [session-auth](https://session-auth-example.onrender.com/)     | Cookie sessions + CSRF protection |
+| [jwt-auth](https://jwt-auth-example-16kq.onrender.com/)        | JWT authentication + scope guards |
+| [websocket-chat](https://websocket-chat-example.onrender.com/) | WebSocket pub/sub chat room       |
+| [spa-demo](https://spa-demo-example.onrender.com/)             | Static files + SPA fallback       |
+| [openapi-demo](https://openapi-demo-example.onrender.com/)     | Swagger UI + OpenAPI spec         |
 
 ## Contributing
 
