@@ -1,0 +1,66 @@
+services:
+  - type: web
+    name: ultimo-basic
+    runtime: docker
+    dockerfilePath: ./examples/basic/Dockerfile
+    rootDir: .
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: RUST_LOG
+        value: "info"
+
+  - type: web
+    name: ultimo-session-auth
+    runtime: docker
+    dockerfilePath: ./examples/session-auth/Dockerfile
+    rootDir: .
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: RUST_LOG
+        value: "info"
+
+  - type: web
+    name: ultimo-jwt-auth
+    runtime: docker
+    dockerfilePath: ./examples/jwt-auth/Dockerfile
+    rootDir: .
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: RUST_LOG
+        value: "info"
+
+  - type: web
+    name: ultimo-websocket-chat
+    runtime: docker
+    dockerfilePath: ./examples/websocket-chat/Dockerfile
+    rootDir: .
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: RUST_LOG
+        value: "info"
+
+  - type: web
+    name: ultimo-spa-demo
+    runtime: docker
+    dockerfilePath: ./examples/spa-demo/Dockerfile
+    rootDir: .
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: RUST_LOG
+        value: "info"
+
+  - type: web
+    name: ultimo-openapi-demo
+    runtime: docker
+    dockerfilePath: ./examples/openapi-demo/Dockerfile
+    rootDir: .
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: RUST_LOG
+        value: "info"
