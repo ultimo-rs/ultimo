@@ -10,6 +10,12 @@ a stable **1.0**.
 
 - 🧩 **Finish the codegen story** — scaffold `generate-client` into `ultimo new`
   templates; TypeScript docs/workflow rewrite; `ultimo generate --watch`.
+- 🦀 **Rust client generation** — `ultimo generate --target rust` produces a
+  typed Rust crate (with `reqwest`) from your RPC definitions, enabling
+  compile-time-safe service-to-service communication. Publish to a private
+  registry (CodeArtifact, Artifactory, Cloudsmith) for internal microservice
+  contracts — if Service A changes an RPC signature, Service B won't compile
+  until updated.
 - 📡 **Typed RPC subscriptions / SSE** — server-push with event types derived
   from your Rust types (tRPC-style subscriptions, in Rust).
 - ❗ **End-to-end typed errors** — RPC errors surfaced as typed results in the
@@ -126,6 +132,7 @@ dependencies and rot as each vendor's API changes).
 | `ultimo generate` (runs generate-client)                | ✅ Available     | 0.5.0    |
 | IP Allow/Deny (CIDR)                                    | ✅ Available     | 0.5.1    |
 | Codegen: `ultimo new` scaffold + `--watch`              | 📋 Planned       | 0.6.0    |
+| Rust Client Generation (`--target rust`)                | 📋 Planned       | 0.6.0    |
 | Interactive API Docs (Swagger/Scalar/ReDoc)             | 📋 Planned       | 0.6.0    |
 | Deployment Guides                                       | ✅ Available     | 0.5.1    |
 | Advanced Rate Limiting                                  | 📋 Planned       | 0.6.0    |
@@ -223,6 +230,8 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
 - Codegen: scaffold `generate-client` into `ultimo new` templates; TypeScript
   docs rewrite; `ultimo generate --watch`
+- **Rust client generation** — `ultimo generate --target rust` for typed
+  service-to-service RPC (microservice contracts via private crate registry)
 - **Turnkey interactive API docs** — `serve_docs` (Swagger UI / Scalar / ReDoc)
 - ~~Deployment guides (Docker, Fly.io/Railway, AWS, DigitalOcean, Azure, GCR, K8s)~~ ✅ Shipped
 - Advanced rate limiting (per-user, per-endpoint)
