@@ -520,6 +520,16 @@ async fn main() -> ultimo::Result<()> {
         async move { ctx.json(spec).await }
     });
 
+    // Root route — redirect to Swagger UI
+    app.get("/", |ctx: Context| async move {
+        ctx.html(r#"<!doctype html><html><head><meta http-equiv="refresh" content="0;url=/docs"></head><body>
+<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:0.5rem;padding:0.5rem 1rem;margin-bottom:1rem;font-size:0.85rem;color:#92400e;">
+⚡ <strong>Live demo</strong> — hosted on Render free tier. First request may take ~30s due to cold start.
+Powered by <a href="https://github.com/ultimo-rs/ultimo" style="color:#92400e;font-weight:600;">Ultimo</a>.
+</div>
+<p>Redirecting to <a href="/docs">/docs</a>...</p></body></html>"#).await
+    });
+
     // Serve Swagger UI at /docs
     let openapi_docs = openapi.clone();
     app.get("/docs", move |ctx: Context| {
