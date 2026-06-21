@@ -32,18 +32,13 @@ impl WebSocketHandler for ChatHandler {
     async fn on_open(&self, ws: &WebSocket<Self::Data>) {
         tracing::info!("New client connected to {}", self.room);
 
-        // Subscribe to chat room
-        if let Err(e) = ws.subscribe(self.room).await {
-            tracing::error!("Failed to subscribe: {}", e);
-            return;
-        }
-
-        // Send welcome message
+        // Send welcome message to the new user
         ws.send("Welcome to the chat room!").await.ok();
 
-        // Notify all users in the room (including this one)
-        let join_msg = json!({"type": "join", "message": "A user joined the room"});
-        ws.publish(self.room, &join_msg).await.ok();
+        // Subscribe to chat room (after welcome, so we receive future messages)
+        if let Err(e) = ws.subscribe(self.room).await {
+            tracing::error!("Failed to subscribe: {}", e);
+        }
     }
 
     async fn on_message(&self, ws: &WebSocket<Self::Data>, msg: Message) {
@@ -73,12 +68,8 @@ impl WebSocketHandler for ChatHandler {
         }
     }
 
-    async fn on_close(&self, ws: &WebSocket<Self::Data>, code: u16, reason: &str) {
+    async fn on_close(&self, _ws: &WebSocket<Self::Data>, code: u16, reason: &str) {
         tracing::info!("Client disconnected: {} - {}", code, reason);
-
-        // Notify others
-        let leave_msg = json!({"type": "leave", "message": "A user left the room"});
-        ws.publish(self.room, &leave_msg).await.ok();
     }
 
     async fn on_drain(&self, ws: &WebSocket<Self::Data>) {
