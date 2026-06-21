@@ -59,10 +59,8 @@ impl WebSocketHandler for ChatHandler {
                 tracing::info!("Received binary data: {} bytes", data.len());
                 ws.send_binary(data).await.ok();
             }
-            Message::Close(frame) => {
-                if let Some(cf) = frame {
-                    tracing::info!("Client closing: {} - {}", cf.code, cf.reason);
-                }
+            Message::Close(Some(cf)) => {
+                tracing::info!("Client closing: {} - {}", cf.code, cf.reason);
             }
             _ => {}
         }
@@ -96,16 +94,14 @@ async fn main() -> Result<()> {
 
     // Serve static HTML page
     app.get("/", |_ctx: Context| async move {
-        Ok(ultimo::response::helpers::html(include_str!(
-            "../index.html"
-        ))?)
+        ultimo::response::helpers::html(include_str!("../index.html"))
     });
 
     // WebSocket endpoint with custom configuration (Phase 2 features)
     let config = WebSocketConfig {
         // Limit message sizes for chat
         max_message_size: 10 * 1024 * 1024, // 10 MB
-        max_frame_size: 1 * 1024 * 1024,    // 1 MB (enables automatic fragmentation)
+        max_frame_size: 1024 * 1024,        // 1 MB (enables automatic fragmentation)
 
         // Disable ping/pong for the demo (browser pong handling varies)
         ping_interval: None,

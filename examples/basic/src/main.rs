@@ -74,7 +74,7 @@ a{color:#4f46e5}code{background:#f4f4f5;padding:0.15rem 0.4rem;border-radius:0.2
 
     // Query parameters
     app.get("/search", |ctx: Context| async move {
-        let query = ctx.req.query("q").unwrap_or_else(|| "".to_string());
+        let query = ctx.req.query("q").unwrap_or_default();
         ctx.json(json!({
             "query": query,
             "results": []

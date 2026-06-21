@@ -40,6 +40,10 @@ jobs:
       - name: clippy (ultimo-cli)
         run: cargo clippy -p ultimo-cli --all-targets -- -D warnings
 
+      # Lint all workspace examples (catches broken code before it ships)
+      - name: clippy (examples)
+        run: cargo clippy --workspace --exclude ultimo --exclude ultimo-cli --exclude ultimo-coverage -- -D warnings
+
       # --all-targets here lints lib, integration tests and benches together,
       # all of which compile once websocket+test-helpers are enabled.
       # Database features are linted in the `test-db` job (needs system libs).
