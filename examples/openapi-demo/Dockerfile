@@ -1,4 +1,4 @@
-FROM rust:1.86-slim AS builder
+FROM rust:1.91-slim AS builder
 WORKDIR /app
 COPY . .
 RUN cargo build --release -p openapi-demo --bin rest-server
