@@ -63,3 +63,4 @@ venv/
 .next/
 
 *.swp
+!examples/spa-demo/dist/
