@@ -115,7 +115,18 @@ async fn main() -> Result<()> {
 
     // HTML response
     app.get("/html", |ctx: Context| async move {
-        ctx.html("<h1>Hello from Ultimo!</h1><p>A fast, type-safe Rust web framework</p>")
+        ctx.html(r#"<!doctype html><html><head><meta charset="utf-8"><title>Ultimo Basic Demo</title></head><body>
+<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:0.5rem;padding:0.5rem 1rem;margin-bottom:1rem;font-size:0.85rem;color:#92400e;">
+⚡ <strong>Live demo</strong> — hosted on Render free tier. First request may take ~30s due to cold start.
+Powered by <a href="https://github.com/ultimo-rs/ultimo" style="color:#92400e;font-weight:600;">Ultimo</a>.
+</div>
+<h1>Hello from Ultimo!</h1><p>A fast, type-safe Rust web framework</p>
+<h2>Try these endpoints:</h2>
+<ul>
+<li><a href="/users/42">/users/42</a> — path params</li>
+<li><a href="/search?q=rust">/search?q=rust</a> — query params</li>
+<li><a href="/json">/json</a> — JSON response</li>
+</ul></body></html>"#)
             .await
     });
 
@@ -146,5 +157,7 @@ async fn main() -> Result<()> {
     println!("   GET  http://localhost:3000/redirect");
     println!();
 
-    app.listen("127.0.0.1:3000").await
+    let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    let addr = format!("0.0.0.0:{port}");
+    app.listen(&addr).await
 }

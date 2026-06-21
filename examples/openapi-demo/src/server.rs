@@ -207,5 +207,7 @@ async fn main() -> ultimo::Result<()> {
     println!("  OpenAPI:    http://127.0.0.1:3000/openapi.json");
     println!();
 
-    app.listen("127.0.0.1:3000").await
+    let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    let addr = format!("0.0.0.0:{port}");
+    app.listen(&addr).await
 }

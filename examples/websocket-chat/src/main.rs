@@ -135,5 +135,7 @@ async fn main() -> Result<()> {
     tracing::info!("  - Message fragmentation (for messages > 1MB)");
     tracing::info!("  - Backpressure handling (100 message buffer)");
 
-    app.listen("127.0.0.1:4000").await
+    let port = std::env::var("PORT").unwrap_or_else(|_| "4000".to_string());
+    let addr = format!("0.0.0.0:{port}");
+    app.listen(&addr).await
 }

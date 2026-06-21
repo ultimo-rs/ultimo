@@ -28,6 +28,10 @@ const PAGE: &str = r#"<!doctype html>
   </style>
 </head>
 <body>
+  <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:0.5rem;padding:0.5rem 1rem;margin-bottom:1rem;font-size:0.85rem;color:#92400e;">
+    ⚡ <strong>Live demo</strong> — hosted on Render free tier. First request may take ~30s due to cold start.
+    Powered by <a href="https://github.com/ultimo-rs/ultimo" style="color:#92400e;font-weight:600;">Ultimo</a>.
+  </div>
   <h1>Ultimo JWT Auth + Guards</h1>
   <p class="hint">Log in as <code>admin</code> to get the <code>admin</code> scope; any other name gets only <code>user</code>.</p>
   <div>
@@ -139,5 +143,7 @@ async fn main() -> Result<()> {
     });
 
     println!("🔑 JWT auth + guards demo: http://127.0.0.1:3000");
-    app.listen("127.0.0.1:3000").await
+    let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    let addr = format!("0.0.0.0:{port}");
+    app.listen(&addr).await
 }
