@@ -127,14 +127,13 @@ async fn main() -> ultimo::Result<()> {
     };
 
     println!("📋 Generating OpenAPI specification...");
+    let server_url = std::env::var("BASE_URL").unwrap_or_else(|_| "/".to_string());
+
     let mut openapi = OpenApiBuilder::new()
         .title("User API - REST Mode")
         .version("1.0.0")
         .description("User management API using regular REST endpoints")
-        .server(
-            "http://127.0.0.1:3000",
-            Some("Development server".to_string()),
-        )
+        .server(&server_url, Some("API server".to_string()))
         .tag("users", Some("User management operations".to_string()))
         .build();
 
