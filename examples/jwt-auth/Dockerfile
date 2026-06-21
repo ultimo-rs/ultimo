@@ -1,8 +1,6 @@
 FROM rust:1.86-slim AS builder
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
-COPY ultimo/ ultimo/
-COPY examples/jwt-auth/ examples/jwt-auth/
+COPY . .
 RUN cargo build --release -p jwt-auth-example
 
 FROM debian:bookworm-slim

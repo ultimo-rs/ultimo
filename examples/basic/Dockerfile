@@ -1,8 +1,6 @@
 FROM rust:1.86-slim AS builder
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
-COPY ultimo/ ultimo/
-COPY examples/basic/ examples/basic/
+COPY . .
 RUN cargo build --release -p basic-example
 
 FROM debian:bookworm-slim

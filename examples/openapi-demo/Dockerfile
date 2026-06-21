@@ -1,8 +1,6 @@
 FROM rust:1.86-slim AS builder
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
-COPY ultimo/ ultimo/
-COPY examples/openapi-demo/ examples/openapi-demo/
+COPY . .
 RUN cargo build --release -p openapi-demo --bin rest-server
 
 FROM debian:bookworm-slim
