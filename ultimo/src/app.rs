@@ -347,6 +347,47 @@ impl Ultimo {
         self
     }
 
+    /// Serve interactive API documentation (Swagger UI) at the given path.
+    ///
+    /// Registers two routes:
+    /// - `GET {path}` — Swagger UI HTML page
+    /// - `GET {path}/openapi.json` — the OpenAPI JSON spec
+    ///
+    /// This is the Ultimo equivalent of FastAPI's `/docs`.
+    ///
+    /// ```rust,no_run
+    /// use ultimo::prelude::*;
+    /// use ultimo::openapi::OpenApiBuilder;
+    ///
+    /// let mut app = Ultimo::new();
+    /// let spec = OpenApiBuilder::new()
+    ///     .title("My API")
+    ///     .version("1.0.0")
+    ///     .build();
+    /// app.serve_docs("/docs", spec);
+    /// ```
+    pub fn serve_docs(&mut self, path: &str, spec: crate::openapi::OpenApiSpec) -> &mut Self {
+        let path = path.trim_end_matches('/');
+        let spec_path = format!("{}/openapi.json", path);
+        let ui_html = spec.swagger_ui_html(&spec_path);
+        let spec_json = std::sync::Arc::new(spec);
+
+        // Serve the OpenAPI JSON spec
+        let spec_clone = spec_json.clone();
+        self.get(&spec_path, move |ctx: Context| {
+            let spec = spec_clone.clone();
+            async move { ctx.json(spec.as_ref()).await }
+        });
+
+        // Serve the Swagger UI page
+        self.get(path, move |ctx: Context| {
+            let html = ui_html.clone();
+            async move { ctx.html(html).await }
+        });
+
+        self
+    }
+
     /// Handle an incoming HTTP request
     async fn handle_request(&self, req: HyperRequest<Incoming>, peer_addr: SocketAddr) -> Response {
         // Check for WebSocket upgrade request (needs the live `Incoming` body)
@@ -735,6 +776,18 @@ mod tests {
         assert_send::<Ultimo>();
         // Note: Ultimo is not Sync because it contains non-Sync types
         // This is OK since we Arc it in listen()
+    }
+
+    #[test]
+    fn test_serve_docs_registers_routes() {
+        let mut app = Ultimo::new_without_defaults();
+        let spec = crate::openapi::OpenApiBuilder::new()
+            .title("Test API")
+            .version("1.0.0")
+            .build();
+        app.serve_docs("/docs", spec);
+        // Should register 2 routes: /docs and /docs/openapi.json
+        assert_eq!(app.handlers.len(), 2);
     }
 }
 

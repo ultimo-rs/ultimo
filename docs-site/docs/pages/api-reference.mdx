@@ -114,6 +114,24 @@ app.serve_spa("./dist", "index.html");
 
 See [Static Files](/static-files).
 
+##### `serve_docs(&mut self, path: &str, spec: OpenApiSpec)`
+
+Serve interactive API documentation (Swagger UI) at the given path. Registers
+two routes: `GET {path}` (Swagger UI page) and `GET {path}/openapi.json` (the
+spec). One-liner equivalent of FastAPI's `/docs`.
+
+```rust
+use ultimo::openapi::OpenApiBuilder;
+
+let spec = OpenApiBuilder::new()
+    .title("My API")
+    .version("1.0.0")
+    .build();
+app.serve_docs("/docs", spec);
+```
+
+See [OpenAPI](/openapi).
+
 ##### `oneshot(&self, req: hyper::Request<Full<Bytes>>) -> Response`
 
 Dispatch a fully-buffered request through the app **in-process** (no socket).
