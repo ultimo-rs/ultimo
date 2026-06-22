@@ -610,6 +610,32 @@ app.use_middleware(IpFilter::allow(&[
 app.use_middleware(IpFilter::deny(&["203.0.113.0/24"]).build());
 ```
 
+#### `rate_limiter()` / `RateLimiter` — Rate limiting (token bucket)
+
+Per-IP, per-header, or global rate limiting. Returns 429 Too Many Requests with
+`Retry-After` header when the limit is exceeded.
+
+```rust
+use ultimo::middleware::builtin::{rate_limiter, RateLimiter, RateLimitKey};
+
+// Default: 100 requests per 60 seconds, keyed by client IP
+app.use_middleware(rate_limiter());
+
+// Custom: 10 requests per second, keyed by API key header
+app.use_middleware(
+    RateLimiter::new(10, 1)
+        .key(RateLimitKey::Header("X-API-Key".into()))
+        .build()
+);
+
+// Global rate limit (all requests share one bucket)
+app.use_middleware(
+    RateLimiter::new(1000, 60)
+        .key(RateLimitKey::Global)
+        .build()
+);
+```
+
 #### `compression()` / `Compression` (requires `compression` feature)
 
 Automatic response compression — brotli preferred, gzip fallback. Pure Rust

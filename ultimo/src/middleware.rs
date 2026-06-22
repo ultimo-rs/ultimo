@@ -578,6 +578,147 @@ pub mod builtin {
     }
 
     // -------------------------------------------------------------------------
+    // Rate limiting
+    // -------------------------------------------------------------------------
+
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    /// A token-bucket entry for a single key.
+    struct RateBucket {
+        tokens: f64,
+        last_refill: std::time::Instant,
+    }
+
+    /// Key extraction strategy for rate limiting.
+    #[derive(Clone)]
+    pub enum RateLimitKey {
+        /// Rate limit by client IP (default).
+        Ip,
+        /// Rate limit by a custom header value (e.g. `X-API-Key`).
+        Header(String),
+        /// Rate limit globally (all requests share one bucket).
+        Global,
+    }
+
+    /// Per-route or global rate limiting middleware (token bucket algorithm).
+    ///
+    /// Limits the number of requests per time window. Returns `429 Too Many
+    /// Requests` with a `Retry-After` header when the limit is exceeded.
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// let mut app = Ultimo::new_without_defaults();
+    /// // 100 requests per 60 seconds, keyed by client IP:
+    /// app.use_middleware(
+    ///     ultimo::middleware::builtin::RateLimiter::new(100, 60).build()
+    /// );
+    /// // 10 requests per second, keyed by API key header:
+    /// app.use_middleware(
+    ///     ultimo::middleware::builtin::RateLimiter::new(10, 1)
+    ///         .key(ultimo::middleware::builtin::RateLimitKey::Header("X-API-Key".into()))
+    ///         .build()
+    /// );
+    /// ```
+    #[derive(Clone)]
+    pub struct RateLimiter {
+        max_requests: u64,
+        window_secs: u64,
+        key: RateLimitKey,
+    }
+
+    impl RateLimiter {
+        /// Create a rate limiter: `max_requests` per `window_secs` seconds.
+        /// Default key is client IP.
+        pub fn new(max_requests: u64, window_secs: u64) -> Self {
+            Self {
+                max_requests,
+                window_secs,
+                key: RateLimitKey::Ip,
+            }
+        }
+
+        /// Set the key extraction strategy.
+        pub fn key(mut self, key: RateLimitKey) -> Self {
+            self.key = key;
+            self
+        }
+
+        /// Build the middleware.
+        pub fn build(self) -> BoxedMiddleware {
+            let rate = self.max_requests as f64 / self.window_secs as f64;
+            let max_tokens = self.max_requests as f64;
+            let window_secs = self.window_secs;
+            let key_strategy = self.key;
+
+            let buckets: Arc<Mutex<HashMap<String, RateBucket>>> =
+                Arc::new(Mutex::new(HashMap::new()));
+
+            Arc::new(move |ctx, next| {
+                let buckets = buckets.clone();
+                let key_strategy = key_strategy.clone();
+                let rate = rate;
+                let max_tokens = max_tokens;
+                let window_secs = window_secs;
+
+                Box::pin(async move {
+                    // Extract key
+                    let key = match &key_strategy {
+                        RateLimitKey::Ip => ctx
+                            .client_ip()
+                            .map(|ip| ip.to_string())
+                            .unwrap_or_else(|| "unknown".to_string()),
+                        RateLimitKey::Header(name) => ctx
+                            .req
+                            .header(name)
+                            .unwrap_or_else(|| "anonymous".to_string()),
+                        RateLimitKey::Global => "__global__".to_string(),
+                    };
+
+                    // Check/update bucket
+                    let allowed = {
+                        let mut map = buckets.lock().unwrap_or_else(|e| e.into_inner());
+                        let now = std::time::Instant::now();
+                        let bucket = map.entry(key).or_insert_with(|| RateBucket {
+                            tokens: max_tokens,
+                            last_refill: now,
+                        });
+
+                        // Refill tokens based on elapsed time
+                        let elapsed = now.duration_since(bucket.last_refill).as_secs_f64();
+                        bucket.tokens = (bucket.tokens + elapsed * rate).min(max_tokens);
+                        bucket.last_refill = now;
+
+                        // Try to consume a token
+                        if bucket.tokens >= 1.0 {
+                            bucket.tokens -= 1.0;
+                            true
+                        } else {
+                            false
+                        }
+                    };
+
+                    if allowed {
+                        next(ctx).await
+                    } else {
+                        Ok(HyperResponse::builder()
+                            .status(429)
+                            .header("Retry-After", window_secs.to_string())
+                            .header("Content-Type", "text/plain")
+                            .body(Full::new(Bytes::from("Too Many Requests")))
+                            .unwrap())
+                    }
+                })
+            })
+        }
+    }
+
+    /// Rate limiting middleware with default settings (100 req/min per IP).
+    pub fn rate_limiter() -> BoxedMiddleware {
+        RateLimiter::new(100, 60).build()
+    }
+
+    // -------------------------------------------------------------------------
     // Response compression
     // -------------------------------------------------------------------------
 
@@ -1045,5 +1186,40 @@ mod tests {
 
         assert_send::<builtin::IpFilter>();
         assert_sync::<builtin::IpFilter>();
+    }
+
+    // Rate limiter tests ------------------------------------------------------
+
+    #[test]
+    fn test_rate_limiter_builder() {
+        let _m = builtin::RateLimiter::new(100, 60).build();
+    }
+
+    #[test]
+    fn test_rate_limiter_with_header_key() {
+        let _m = builtin::RateLimiter::new(10, 1)
+            .key(builtin::RateLimitKey::Header("X-API-Key".into()))
+            .build();
+    }
+
+    #[test]
+    fn test_rate_limiter_with_global_key() {
+        let _m = builtin::RateLimiter::new(5, 10)
+            .key(builtin::RateLimitKey::Global)
+            .build();
+    }
+
+    #[test]
+    fn test_rate_limiter_convenience_function() {
+        let _m = builtin::rate_limiter();
+    }
+
+    #[test]
+    fn test_rate_limiter_struct_is_send_sync() {
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<builtin::RateLimiter>();
+        assert_sync::<builtin::RateLimiter>();
     }
 }
