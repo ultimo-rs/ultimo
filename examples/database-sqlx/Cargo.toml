@@ -2,6 +2,7 @@
 name = "database-sqlx-example"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 
 [dependencies]
 ultimo = { path = "../../ultimo", features = ["sqlx-postgres"] }

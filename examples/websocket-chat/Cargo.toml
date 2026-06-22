@@ -2,6 +2,7 @@
 name = "websocket-chat"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 
 [dependencies]
 ultimo = { path = "../../ultimo", features = ["websocket"] }
