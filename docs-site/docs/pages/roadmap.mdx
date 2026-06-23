@@ -51,10 +51,10 @@ a stable **1.0**.
 
 ### Developer experience
 
-- 📖 **Turnkey interactive API docs** — one call (`app.serve_docs("/docs")`) to
+- ~~📖 **Turnkey interactive API docs** — one call (`app.serve_docs("/docs")`) to
   serve Swagger UI / Scalar / ReDoc wired to the generated OpenAPI spec
   (FastAPI's signature `/docs`). The Swagger UI helper exists today; this makes
-  it one line.
+  it one line.~~ ✅ Shipped in 0.5.1
 - 🧩 **Built-in middleware pack** — small, expected pieces: `request-id`,
   `cache-control` / ETag helpers, `server-timing`, basic-auth, trailing-slash
   normalization (Hono-style breadth).
@@ -133,7 +133,7 @@ dependencies and rot as each vendor's API changes).
 | IP Allow/Deny (CIDR)                                    | ✅ Available     | 0.5.1    |
 | Codegen: `ultimo new` scaffold + `--watch`              | 📋 Planned       | 0.6.0    |
 | Rust Client Generation (`--target rust`)                | 📋 Planned       | 0.6.0    |
-| Interactive API Docs (Swagger/Scalar/ReDoc)             | 📋 Planned       | 0.6.0    |
+| Interactive API Docs (`serve_docs`)                     | ✅ Available     | 0.5.1    |
 | Deployment Guides                                       | ✅ Available     | 0.5.1    |
 | Advanced Rate Limiting                                  | 📋 Planned       | 0.6.0    |
 | Typed Handler Extractors + Validation                   | 📋 Planned       | 0.7.0    |
@@ -232,7 +232,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
   docs rewrite; `ultimo generate --watch`
 - **Rust client generation** — `ultimo generate --target rust` for typed
   service-to-service RPC (microservice contracts via private crate registry)
-- **Turnkey interactive API docs** — `serve_docs` (Swagger UI / Scalar / ReDoc)
+- ~~**Turnkey interactive API docs** — `serve_docs` (Swagger UI / Scalar / ReDoc)~~ ✅ Shipped
 - ~~Deployment guides (Docker, Fly.io/Railway, AWS, DigitalOcean, Azure, GCR, K8s)~~ ✅ Shipped
 - Advanced rate limiting (per-user, per-endpoint)
 
