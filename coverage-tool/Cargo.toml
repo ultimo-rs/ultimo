@@ -2,6 +2,7 @@
 name = "ultimo-coverage"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 authors = ["Ultimo Contributors"]
 description = "Simple, transparent code coverage tool for Ultimo framework"
 

@@ -2,6 +2,7 @@
 name = "rpc-modes"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 ultimo = { path = "../../ultimo", features = ["client-gen"] }
