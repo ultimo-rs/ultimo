@@ -725,7 +725,7 @@ fn create_rpc_template(name: &str, project_dir: &Path) -> Result<()> {
     println!("📝 Setting up RPC template with type-safe client generation...");
 
     // Create project structure
-    fs::create_dir_all(project_dir.join("src"))?;
+    fs::create_dir_all(project_dir.join("src/bin"))?;
 
     // Cargo.toml
     let cargo_toml = format!(
@@ -834,6 +834,25 @@ async fn main() {
 }
 "#;
     fs::write(project_dir.join("src/main.rs"), main_rs)?;
+
+    // src/bin/generate-client.rs — works with `ultimo generate`
+    let generate_client = r#"//! TypeScript client generator — run via `ultimo generate -o ./client.ts`
+fn main() {
+    let out = std::env::args()
+        .nth(1)
+        .expect("usage: generate-client <output-path>");
+
+    // In a real project, build the same RpcRegistry as your server
+    // and call rpc.generate_client_file(&out).
+    // For now this is a placeholder — see https://docs.ultimo.dev/typescript
+    println!("✅ Would generate TypeScript client to: {out}");
+    println!("   Implement this binary to call rpc.generate_client_file(&out)");
+}
+"#;
+    fs::write(
+        project_dir.join("src/bin/generate-client.rs"),
+        generate_client,
+    )?;
 
     // README.md
     let readme = format!(
