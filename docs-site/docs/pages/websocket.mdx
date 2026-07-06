@@ -283,6 +283,31 @@ Ultimo's WebSocket implementation:
 - **Pub/Sub** - ChannelManager for topic-based messaging
 - **Router** - Optimized Radix Tree for efficient route matching
 
+## Security
+
+### Cross-Site WebSocket Hijacking (CSWSH)
+
+Browsers don't enforce same-origin for WebSocket connections the way they do
+for `fetch`/XHR — a page on any origin can open a WebSocket connection to
+your server. If the connection relies on ambient cookie authentication,
+restrict the handshake's `Origin` header with an allow-list:
+
+```rust
+app.websocket_with_config_and_origins(
+    "/ws",
+    ChatHandler,
+    WebSocketConfig::default(),
+    vec!["https://example.com".to_string()],
+);
+```
+
+The allow-list is empty by default (no restriction — matches
+`websocket_with_config`'s prior behavior). Set it whenever the connection
+carries ambient authority. `"*"` matches any origin; otherwise the match is
+exact against the full `Origin` value. Once set, a handshake missing the
+`Origin` header is rejected with
+`403 Forbidden`.
+
 ## Testing
 
 The WebSocket implementation includes 93 comprehensive tests:
@@ -301,15 +326,10 @@ The WebSocket implementation includes 93 comprehensive tests:
 - **Memory** - Minimal per-connection overhead
 - **Tested** - 210 tests passing, production-ready
 
-## Coming in Phase 2
+## Coming Later
 
 Future enhancements planned:
-- Message fragmentation for large payloads
-- Automatic ping/pong heartbeat
-- Backpressure handling
 - Per-message deflate compression (RFC 7692)
-- Configuration system (timeouts, buffer sizes)
-- Graceful shutdown support
 
 ## Learn More
 

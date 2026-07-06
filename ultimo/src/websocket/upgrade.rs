@@ -7,7 +7,7 @@ use super::WebSocketConfig;
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::header::{
-    CONNECTION, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE,
+    CONNECTION, ORIGIN, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE,
 };
 use hyper::{Request as HyperRequest, Response as HyperResponse, StatusCode};
 use sha1::{Digest, Sha1};
@@ -25,6 +25,7 @@ pub struct WebSocketUpgrade<T = ()> {
     protocols: Vec<String>,
     config: WebSocketConfig,
     channel_manager: Arc<ChannelManager>,
+    allowed_origins: Vec<String>,
 }
 
 impl<T> WebSocketUpgrade<T>
@@ -40,6 +41,7 @@ where
             protocols: Vec::new(),
             config: WebSocketConfig::default(),
             channel_manager: Arc::new(ChannelManager::new()),
+            allowed_origins: Vec::new(),
         }
     }
 
@@ -73,6 +75,22 @@ where
         self
     }
 
+    /// Restrict the handshake to the given `Origin` header allow-list —
+    /// defense against Cross-Site WebSocket Hijacking (a page on another
+    /// origin opening a WebSocket connection to this server; browsers don't
+    /// enforce same-origin for WebSocket the way they do for `fetch`).
+    ///
+    /// **Empty (default) disables the check.** Set this whenever the
+    /// connection carries ambient authority (cookies). The literal `"*"`
+    /// matches any origin; otherwise comparison is an exact, case-sensitive
+    /// match against the full `Origin` value (e.g. `"https://example.com"`).
+    /// A request missing the `Origin` header is rejected once this list is
+    /// non-empty.
+    pub fn with_allowed_origins(mut self, origins: Vec<String>) -> Self {
+        self.allowed_origins = origins;
+        self
+    }
+
     /// Set callback to be executed when WebSocket is upgraded
     pub fn on_upgrade<F, Fut>(self, callback: F) -> HyperResponse<Full<Bytes>>
     where
@@ -85,6 +103,14 @@ where
             return HyperResponse::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .body(Full::new(Bytes::from("Invalid WebSocket upgrade request")))
+                .unwrap();
+        }
+
+        // Origin allow-list (Cross-Site WebSocket Hijacking defense).
+        if !origin_allowed(&self.allowed_origins, request_origin(&self.request)) {
+            return HyperResponse::builder()
+                .status(StatusCode::FORBIDDEN)
+                .body(Full::new(Bytes::from("Origin not allowed")))
                 .unwrap();
         }
 
@@ -186,6 +212,14 @@ where
             return HyperResponse::builder()
                 .status(StatusCode::BAD_REQUEST)
                 .body(Full::new(Bytes::from("Invalid WebSocket upgrade request")))
+                .unwrap();
+        }
+
+        // Origin allow-list (Cross-Site WebSocket Hijacking defense).
+        if !origin_allowed(&self.allowed_origins, request_origin(&self.request)) {
+            return HyperResponse::builder()
+                .status(StatusCode::FORBIDDEN)
+                .body(Full::new(Bytes::from("Origin not allowed")))
                 .unwrap();
         }
 
@@ -307,6 +341,26 @@ fn is_valid_upgrade_request(req: &HyperRequest<hyper::body::Incoming>) -> bool {
     true
 }
 
+/// Extract the `Origin` header value from the upgrade request, if present.
+fn request_origin(req: &HyperRequest<hyper::body::Incoming>) -> Option<&str> {
+    req.headers().get(ORIGIN).and_then(|v| v.to_str().ok())
+}
+
+/// Check `origin` against the configured allow-list.
+///
+/// An empty `allowed` list disables the check entirely (backward-compatible
+/// default). Otherwise `"*"` matches any origin, and a request with no
+/// `Origin` header is rejected.
+fn origin_allowed(allowed: &[String], origin: Option<&str>) -> bool {
+    if allowed.is_empty() {
+        return true;
+    }
+    match origin {
+        Some(o) => allowed.iter().any(|a| a == "*" || a == o),
+        None => false,
+    }
+}
+
 /// Calculate WebSocket accept key from client key
 fn calculate_accept_key(key: &str) -> String {
     use base64::{engine::general_purpose, Engine as _};
@@ -326,5 +380,33 @@ mod tests {
         let key = "dGhlIHNhbXBsZSBub25jZQ==";
         let accept = calculate_accept_key(key);
         assert_eq!(accept, "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+    }
+
+    #[test]
+    fn test_origin_allowed_empty_list_permits_all() {
+        // Backward-compatible default: no restriction configured.
+        assert!(origin_allowed(&[], None));
+        assert!(origin_allowed(&[], Some("https://evil.example")));
+    }
+
+    #[test]
+    fn test_origin_allowed_exact_match() {
+        let allowed = vec!["https://example.com".to_string()];
+        assert!(origin_allowed(&allowed, Some("https://example.com")));
+        assert!(!origin_allowed(&allowed, Some("https://evil.example")));
+        assert!(!origin_allowed(&allowed, Some("http://example.com"))); // scheme differs
+    }
+
+    #[test]
+    fn test_origin_allowed_missing_header_rejected_when_restricted() {
+        let allowed = vec!["https://example.com".to_string()];
+        assert!(!origin_allowed(&allowed, None));
+    }
+
+    #[test]
+    fn test_origin_allowed_wildcard() {
+        let allowed = vec!["*".to_string()];
+        assert!(origin_allowed(&allowed, Some("https://anything.example")));
+        assert!(!origin_allowed(&allowed, None)); // still requires the header
     }
 }

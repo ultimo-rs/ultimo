@@ -585,9 +585,21 @@ pub mod builtin {
     use std::sync::Mutex;
 
     /// A token-bucket entry for a single key.
-    struct RateBucket {
-        tokens: f64,
-        last_refill: std::time::Instant,
+    pub(crate) struct RateBucket {
+        pub(crate) tokens: f64,
+        pub(crate) last_refill: std::time::Instant,
+    }
+
+    /// Evict buckets idle for at least `idle_cutoff`. A bucket idle that long
+    /// has already refilled to its cap, so removing it is behaviorally
+    /// identical to it staying — but bounds the map's memory under sustained
+    /// load from many distinct keys (e.g. spoofed `X-Forwarded-For` values).
+    pub(crate) fn evict_stale(
+        buckets: &mut HashMap<String, RateBucket>,
+        now: std::time::Instant,
+        idle_cutoff: std::time::Duration,
+    ) {
+        buckets.retain(|_, b| now.duration_since(b.last_refill) < idle_cutoff);
     }
 
     /// Key extraction strategy for rate limiting.
@@ -653,6 +665,9 @@ pub mod builtin {
 
             let buckets: Arc<Mutex<HashMap<String, RateBucket>>> =
                 Arc::new(Mutex::new(HashMap::new()));
+            // A bucket idle this long is guaranteed to have refilled to its
+            // cap, so it's safe to evict (see `evict_stale`).
+            let idle_cutoff = std::time::Duration::from_secs(window_secs.max(1));
 
             Arc::new(move |ctx, next| {
                 let buckets = buckets.clone();
@@ -660,6 +675,7 @@ pub mod builtin {
                 let rate = rate;
                 let max_tokens = max_tokens;
                 let window_secs = window_secs;
+                let idle_cutoff = idle_cutoff;
 
                 Box::pin(async move {
                     // Extract key
@@ -690,12 +706,17 @@ pub mod builtin {
                         bucket.last_refill = now;
 
                         // Try to consume a token
-                        if bucket.tokens >= 1.0 {
+                        let allowed = if bucket.tokens >= 1.0 {
                             bucket.tokens -= 1.0;
                             true
                         } else {
                             false
-                        }
+                        };
+
+                        // Bound the map's memory (anti unbounded-growth DoS).
+                        evict_stale(&mut map, now, idle_cutoff);
+
+                        allowed
                     };
 
                     if allowed {
@@ -1221,5 +1242,34 @@ mod tests {
 
         assert_send::<builtin::RateLimiter>();
         assert_sync::<builtin::RateLimiter>();
+    }
+
+    #[test]
+    fn test_rate_limiter_evicts_stale_buckets() {
+        use builtin::{evict_stale, RateBucket};
+        use std::collections::HashMap;
+        use std::time::{Duration, Instant};
+
+        let now = Instant::now();
+        let mut map: HashMap<String, RateBucket> = HashMap::new();
+        map.insert(
+            "stale".to_string(),
+            RateBucket {
+                tokens: 5.0,
+                last_refill: now - Duration::from_secs(120),
+            },
+        );
+        map.insert(
+            "fresh".to_string(),
+            RateBucket {
+                tokens: 5.0,
+                last_refill: now,
+            },
+        );
+
+        evict_stale(&mut map, now, Duration::from_secs(60));
+
+        assert!(!map.contains_key("stale"), "idle bucket must be evicted");
+        assert!(map.contains_key("fresh"), "active bucket must be kept");
     }
 }

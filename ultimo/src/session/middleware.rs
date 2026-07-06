@@ -76,11 +76,18 @@ where
             let response: Response = next(ctx).await?;
 
             // Persist per the security rules.
-            if session.is_destroyed() {
+            //
+            // A session that is dirty-but-empty (e.g. the handler called
+            // `clear()`) must be treated the same as `destroy()`: if it were
+            // left alone here, the store entry would neither be rewritten
+            // nor removed, so the *old* data would keep resolving via the
+            // still-valid cookie — silently defeating `clear()`-as-logout.
+            let dirty_and_empty = session.is_dirty() && session.is_empty().await;
+            if session.is_destroyed() || dirty_and_empty {
                 store.destroy(&id).await;
                 push_cookie(&cookie_sink, expiry_cookie(&config)).await;
-            } else if session.is_dirty() && !session.is_empty().await {
-                // Only persist dirty, non-empty sessions (anti unbounded-DoS).
+            } else if session.is_dirty() {
+                // Non-empty and dirty (anti unbounded-DoS: never persist empty).
                 let final_id = if session.wants_regenerate() {
                     store.destroy(&id).await; // fixation: drop the old entry
                     generate_id()

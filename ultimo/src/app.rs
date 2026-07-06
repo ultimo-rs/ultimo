@@ -234,6 +234,27 @@ impl Ultimo {
     where
         H: WebSocketHandler<Data = ()> + 'static,
     {
+        self.websocket_with_config_and_origins(path, handler, config, Vec::new())
+    }
+
+    /// Register a WebSocket handler with custom configuration and an
+    /// `Origin` allow-list for the handshake (Cross-Site WebSocket
+    /// Hijacking defense — see [`WebSocketUpgrade::with_allowed_origins`]).
+    ///
+    /// `allowed_origins` empty disables the check (matches
+    /// [`websocket_with_config`](Self::websocket_with_config)). Set this
+    /// whenever the connection relies on ambient cookie authentication.
+    #[cfg(feature = "websocket")]
+    pub fn websocket_with_config_and_origins<H>(
+        &mut self,
+        path: &str,
+        handler: H,
+        config: WebSocketConfig,
+        allowed_origins: Vec<String>,
+    ) -> &mut Self
+    where
+        H: WebSocketHandler<Data = ()> + 'static,
+    {
         let handler = Arc::new(handler);
         let channel_manager = self.channel_manager.clone();
 
@@ -242,7 +263,8 @@ impl Ultimo {
             let upgrade = upgrade
                 .with_data(())
                 .with_channel_manager(channel_manager.clone())
-                .with_config(config.clone());
+                .with_config(config.clone())
+                .with_allowed_origins(allowed_origins.clone());
 
             upgrade.on_upgrade_with_receiver(move |ws, mut incoming_rx, mut drain_rx| {
                 let handler = handler.clone();

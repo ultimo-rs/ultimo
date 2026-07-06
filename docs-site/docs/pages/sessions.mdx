@@ -46,7 +46,9 @@ app.post("/logout", |ctx: Context| async move {
 });
 ```
 
-Other methods: `remove(key)`, `clear()`, `id()`.
+Other methods: `remove(key)`, `id()`. `clear()` wipes all session data and —
+like `destroy()` — removes the store entry and expires the cookie, so it
+doubles as a logout call.
 
 ## Security
 
@@ -59,6 +61,9 @@ Defaults are secure-by-default:
   `regenerate()` on login/privilege change (the middleware issues a fresh id and
   drops the old one).
 - **Anti-DoS** — empty/untouched sessions are never persisted and get no cookie.
+  `MemoryStore` is unbounded by default; use `MemoryStore::with_max_sessions(n)`
+  in production to cap live sessions (soonest-to-expire evicted first) and
+  bound worst-case memory under sustained load.
 - **Expiry** — enforced server-side (store TTL) *and* via the cookie `Max-Age`.
 
 :::warning CSRF
@@ -113,8 +118,9 @@ ctx.remove_cookie("theme").await?;
 
 ## Custom stores
 
-`MemoryStore` (single-process) is built in. Implement `SessionStore` for other
-backends:
+`MemoryStore` (single-process) is built in — `MemoryStore::new()` is unbounded;
+`MemoryStore::with_max_sessions(n)` caps it, evicting the soonest-to-expire
+session to make room once full. Implement `SessionStore` for other backends:
 
 ```rust
 #[async_trait::async_trait]
