@@ -29,6 +29,10 @@ fn app() -> Ultimo {
         ctx.session().await.regenerate();
         ctx.text("rotated").await
     });
+    app.get("/clear", |ctx: Context| async move {
+        ctx.session().await.clear().await;
+        ctx.text("cleared").await
+    });
     app
 }
 
@@ -96,6 +100,32 @@ async fn destroy_logs_out() {
     assert_eq!(
         me.json::<serde_json::Value>(),
         serde_json::json!({ "uid": null })
+    );
+}
+
+#[tokio::test]
+async fn clear_logs_out() {
+    // `clear()` must behave like `destroy()`: the store entry is dropped and
+    // the cookie is expired, not silently left in place (regression test for
+    // the dirty-but-empty persistence gap).
+    let client = TestClient::new(app());
+    let login = client.get("/login").send().await;
+    let cookie = sid(login.header("set-cookie").expect("login sets a cookie"));
+
+    let cleared = client.get("/clear").header("cookie", &cookie).send().await;
+    assert!(
+        cleared
+            .header("set-cookie")
+            .expect("clear() expires the cookie")
+            .contains("Max-Age=0"),
+        "clear() must expire the session cookie like destroy() does"
+    );
+
+    let me = client.get("/me").header("cookie", &cookie).send().await;
+    assert_eq!(
+        me.json::<serde_json::Value>(),
+        serde_json::json!({ "uid": null }),
+        "clear() must drop the server-side session data"
     );
 }
 
