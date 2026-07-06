@@ -108,24 +108,31 @@ impl UltimoError {
                 message: msg.clone(),
                 details: None,
             },
-            UltimoError::Hyper(err) => ErrorResponse {
+            // Hyper/HttpError/Io are internal-machinery errors (protocol
+            // internals, filesystem paths, OS error text) — never echo their
+            // `Display` text to the client. Full detail is still available
+            // to the app via `Display`/`Debug` for server-side logging.
+            UltimoError::Hyper(_) => ErrorResponse {
                 error: "ServerError".to_string(),
-                message: format!("HTTP server error: {}", err),
+                message: "internal server error".to_string(),
                 details: None,
             },
-            UltimoError::HttpError(err) => ErrorResponse {
+            UltimoError::HttpError(_) => ErrorResponse {
                 error: "ServerError".to_string(),
-                message: format!("HTTP error: {}", err),
+                message: "internal server error".to_string(),
                 details: None,
             },
+            // JSON errors originate from the client's own malformed request
+            // body, so the parser's position/message is safe (and useful) to
+            // return as-is.
             UltimoError::Json(err) => ErrorResponse {
                 error: "JsonError".to_string(),
                 message: format!("JSON parsing error: {}", err),
                 details: None,
             },
-            UltimoError::Io(err) => ErrorResponse {
+            UltimoError::Io(_) => ErrorResponse {
                 error: "IoError".to_string(),
-                message: format!("IO error: {}", err),
+                message: "internal server error".to_string(),
                 details: None,
             },
         }
@@ -343,8 +350,26 @@ mod tests {
         let response = ultimo_err.to_error_response();
 
         assert_eq!(response.error, "IoError");
-        assert!(response.message.contains("IO error"));
+        // Client-facing message must be generic — the underlying OS error
+        // text (which can include filesystem paths) must never reach the
+        // client. Full detail remains available via `Display` for logging.
+        assert_eq!(response.message, "internal server error");
+        assert!(!response.message.contains("access denied"));
         assert!(response.details.is_none());
+    }
+
+    #[test]
+    fn test_http_error_does_not_leak_details() {
+        // An invalid header name makes `.body()` return a real
+        // hyper::http::Error to convert from.
+        let http_err = hyper::Response::builder()
+            .header("bad header name", "value")
+            .body(())
+            .expect_err("a header name with a space is invalid and must fail to build");
+        let ultimo_err = UltimoError::from(http_err);
+        let response = ultimo_err.to_error_response();
+        assert_eq!(response.error, "ServerError");
+        assert_eq!(response.message, "internal server error");
     }
 
     #[test]
