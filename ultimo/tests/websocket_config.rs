@@ -31,6 +31,7 @@ mod websocket_config_tests {
             write_buffer_size: 64 * 1024, // 64KB
             max_write_queue_size: 512,
             subprotocols: vec!["chat".to_string(), "binary".to_string()],
+            allowed_origins: vec![],
         };
 
         assert_eq!(config.max_message_size, 1024 * 1024);
