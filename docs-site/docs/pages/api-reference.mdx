@@ -873,6 +873,11 @@ specific message.
 
 ### SQLx Support (requires `sqlx` feature)
 
+Ultimo's SQLx integration re-exposes `sqlx` types (`sqlx::Pool`, `PgPoolOptions`, …)
+directly through its own public API, so your `sqlx` dependency version must match
+the major version Ultimo was built against (currently **0.8**). Bumping Ultimo's
+`sqlx` requirement is treated as a breaking change for exactly this reason.
+
 ```rust
 use sqlx::postgres::PgPoolOptions;
 
