@@ -859,6 +859,14 @@ Errors automatically serialize to JSON:
 }
 ```
 
+Errors that wrap internal machinery (I/O errors, hyper/HTTP errors) return a
+generic `"internal server error"` message to the client instead of the raw
+underlying error text — OS error strings can contain filesystem paths and
+other details that shouldn't reach callers. The full error is still available
+server-side via `Display`/`Debug` for logging. Client-input errors (JSON
+parse failures, validation errors) are unaffected and still return their
+specific message.
+
 ---
 
 ## Database Integration
