@@ -38,7 +38,9 @@ async-trait = "0.1"
 getrandom = { version = "0.3", optional = true }
 
 # JWT auth (optional) â audited impl; pins algorithm, rejects `alg: none`
-jsonwebtoken = { version = "9", optional = true }
+jsonwebtoken = { version = "10", optional = true, default-features = false, features = [
+  "rust_crypto",
+] }
 
 # API-key auth (optional) — SHA-256 to hash keys (high-entropy secrets, not passwords)
 sha2 = { version = "0.10", optional = true }
