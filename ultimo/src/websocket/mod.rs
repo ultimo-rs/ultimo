@@ -100,19 +100,6 @@ pub struct WebSocketConfig {
 
     /// Accepted WebSocket subprotocols
     pub subprotocols: Vec<String>,
-
-    /// Allow-list of acceptable `Origin` header values for the handshake —
-    /// defense against Cross-Site WebSocket Hijacking (a page on another
-    /// origin opening a WebSocket connection to this server; browsers don't
-    /// enforce same-origin for WebSocket the way they do for `fetch`).
-    ///
-    /// **Empty (default) disables the check**, matching prior behavior. Set
-    /// this whenever the connection carries ambient authority (cookies).
-    /// The literal `"*"` matches any origin; otherwise comparison is an
-    /// exact, case-sensitive match against the full `Origin` value (e.g.
-    /// `"https://example.com"`). A request with no `Origin` header is
-    /// rejected once this list is non-empty.
-    pub allowed_origins: Vec<String>,
 }
 
 impl Default for WebSocketConfig {
@@ -126,7 +113,6 @@ impl Default for WebSocketConfig {
             write_buffer_size: 128 * 1024, // 128 KB
             max_write_queue_size: 1024,
             subprotocols: vec![],
-            allowed_origins: vec![],
         }
     }
 }

@@ -32,11 +32,15 @@ async fn find_available_port() -> u16 {
 async fn start_restricted_server(port: u16) {
     let mut app = Ultimo::new_without_defaults();
     let config = WebSocketConfig {
-        allowed_origins: vec!["https://good.example".to_string()],
         ping_interval: None, // avoid heartbeat frames interfering with the test
         ..Default::default()
     };
-    app.websocket_with_config("/ws", EchoHandler, config);
+    app.websocket_with_config_and_origins(
+        "/ws",
+        EchoHandler,
+        config,
+        vec!["https://good.example".to_string()],
+    );
 
     tokio::spawn(async move {
         app.listen(&format!("127.0.0.1:{}", port)).await.ok();

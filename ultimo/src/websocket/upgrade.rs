@@ -25,6 +25,7 @@ pub struct WebSocketUpgrade<T = ()> {
     protocols: Vec<String>,
     config: WebSocketConfig,
     channel_manager: Arc<ChannelManager>,
+    allowed_origins: Vec<String>,
 }
 
 impl<T> WebSocketUpgrade<T>
@@ -40,6 +41,7 @@ where
             protocols: Vec::new(),
             config: WebSocketConfig::default(),
             channel_manager: Arc::new(ChannelManager::new()),
+            allowed_origins: Vec::new(),
         }
     }
 
@@ -73,6 +75,22 @@ where
         self
     }
 
+    /// Restrict the handshake to the given `Origin` header allow-list —
+    /// defense against Cross-Site WebSocket Hijacking (a page on another
+    /// origin opening a WebSocket connection to this server; browsers don't
+    /// enforce same-origin for WebSocket the way they do for `fetch`).
+    ///
+    /// **Empty (default) disables the check.** Set this whenever the
+    /// connection carries ambient authority (cookies). The literal `"*"`
+    /// matches any origin; otherwise comparison is an exact, case-sensitive
+    /// match against the full `Origin` value (e.g. `"https://example.com"`).
+    /// A request missing the `Origin` header is rejected once this list is
+    /// non-empty.
+    pub fn with_allowed_origins(mut self, origins: Vec<String>) -> Self {
+        self.allowed_origins = origins;
+        self
+    }
+
     /// Set callback to be executed when WebSocket is upgraded
     pub fn on_upgrade<F, Fut>(self, callback: F) -> HyperResponse<Full<Bytes>>
     where
@@ -89,7 +107,7 @@ where
         }
 
         // Origin allow-list (Cross-Site WebSocket Hijacking defense).
-        if !origin_allowed(&self.config.allowed_origins, request_origin(&self.request)) {
+        if !origin_allowed(&self.allowed_origins, request_origin(&self.request)) {
             return HyperResponse::builder()
                 .status(StatusCode::FORBIDDEN)
                 .body(Full::new(Bytes::from("Origin not allowed")))
@@ -198,7 +216,7 @@ where
         }
 
         // Origin allow-list (Cross-Site WebSocket Hijacking defense).
-        if !origin_allowed(&self.config.allowed_origins, request_origin(&self.request)) {
+        if !origin_allowed(&self.allowed_origins, request_origin(&self.request)) {
             return HyperResponse::builder()
                 .status(StatusCode::FORBIDDEN)
                 .body(Full::new(Bytes::from("Origin not allowed")))
