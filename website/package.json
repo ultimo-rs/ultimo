@@ -49,7 +49,7 @@
     "gray-matter": "^4.0.3",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
-    "next": "16.0.10",
+    "next": "16.2.10",
     "next-mdx-remote": "^6.0.0",
     "next-themes": "^0.4.6",
     "react": "19.2.0",
@@ -73,9 +73,17 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "postcss": "^8.5",
+    "postcss": "^8.5.16",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "overrides": {
+      "lodash": ">=4.17.23 <5",
+      "tar": ">=7.5.16 <8",
+      "js-yaml": ">=3.15.0 <4",
+      "postcss": ">=8.5.10 <9"
+    }
   }
 }
