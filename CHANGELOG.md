@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-08
+
+### Security
+
+- Session `clear()` now correctly destroys the store entry and expires the cookie — previously it was marked dirty-and-empty but neither persisted nor removed, silently leaving the old session data resolvable via the still-valid cookie. (#157)
+- `MemoryStore::with_max_sessions(n)` bounds session-store memory under sustained load, evicting the soonest-to-expire entry once at capacity (opt-in, non-breaking; `MemoryStore::new()` remains unbounded). (#157)
+- Rate-limiter buckets are now evicted once idle for a full window, bounding memory growth from many distinct keys (e.g. spoofed `X-Forwarded-For` values under `trust_proxy`). (#157)
+- Internal error variants (`UltimoError::Io` / `Hyper` / `HttpError`) no longer echo raw OS/protocol error text to clients — they now return a generic message, avoiding leaking filesystem paths or internals. (#157)
+- **WebSocket `Origin` allow-list** (Cross-Site WebSocket Hijacking defense): browsers don't enforce same-origin for WebSocket connections the way they do for `fetch`. Restrict the handshake to trusted origins via `WebSocketUpgrade::with_allowed_origins` / `Ultimo::websocket_with_config_and_origins` (empty/default preserves prior behavior — no check). (#157)
+- Bumped `jsonwebtoken` 9 → 10, fixing **CVE-2026-25537** (a type-confusion vulnerability in JWT claim validation). (#158)
+- **BREAKING:** bumped `sqlx` 0.7 → 0.8, fixing **RUSTSEC-2024-0363** (binary protocol misinterpretation, all backends). Because `ultimo`'s SQLx integration re-exposes `sqlx` types directly through its public API (`SqlxPool<DB: sqlx::Database>`, `PgPoolOptions`, …), downstream consumers of the `sqlx`/`sqlx-postgres`/`sqlx-mysql`/`sqlx-sqlite` features need to bump their own `sqlx` dependency to `"0.8"` in lockstep. (#159)
+
+### Added
+
+- **Rate limiting middleware** (token bucket): `RateLimiter` / `rate_limiter()`, keyed by client IP, a request header, or globally; returns `429` with `Retry-After`. (#154)
+- `serve_docs()` — one-line interactive Swagger UI + OpenAPI JSON, the Ultimo equivalent of FastAPI's `/docs`. (#153)
+- **IP allow/deny middleware** (`IpFilter`) with CIDR support, for allow-listing or blocking client IP ranges. (#131)
+- `ultimo generate --watch` and scaffolded `generate-client` support in project templates. (#155)
+
 ## [0.5.1] - 2026-06-15
 
 ### Added
