@@ -11,10 +11,26 @@
   "dependencies": {
     "react": "latest",
     "react-dom": "latest",
-    "vocs": "latest"
+    "vocs": "^1.4.1"
   },
   "devDependencies": {
     "@types/react": "latest",
     "typescript": "latest"
+  },
+  "pnpm": {
+    "overrides": {
+      "dompurify": ">=3.4.11 <4",
+      "hono": ">=4.12.25 <5",
+      "lodash-es": ">=4.18.0 <5",
+      "mdast-util-to-hast": ">=13.2.1 <14",
+      "mermaid": ">=11.15.0 <12",
+      "picomatch": ">=4.0.4 <5",
+      "react-router": ">=7.15.0 <8",
+      "rollup": ">=4.59.0 <5",
+      "uuid": ">=11.1.1 <12",
+      "vite": ">=7.3.5 <8",
+      "yaml": ">=2.8.3 <3",
+      "@hono/node-server": ">=1.19.13 <2"
+    }
   }
 }
