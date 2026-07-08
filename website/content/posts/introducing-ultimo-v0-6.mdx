@@ -1,0 +1,131 @@
+---
+title: "Ultimo v0.6.0: What a Security Review Found (and a SemVer Blind Spot We Didn't Expect)"
+description: "Ultimo v0.6.0 fixes a session logout bug, two memory-exhaustion DoS vectors, an error-message info leak, adds a WebSocket Origin allow-list against Cross-Site WebSocket Hijacking, patches a JWT CVE and a SQLx RUSTSEC advisory — and exposes a real gap in cargo-semver-checks along the way."
+date: "2026-07-08"
+author: "Ultimo Team"
+tags: ["release", "security"]
+---
+
+# Ultimo v0.6.0: What a Security Review Found
+
+We ran a full security review of the framework — [session handling](/blog/session-auth-rust-cookies-csrf), rate limiting, error handling, WebSocket upgrades, and the dependency tree. v0.6.0 is the result: five hardening fixes, two dependency CVEs closed, and one breaking change we couldn't avoid. This post walks through what we found, why it mattered, and a genuinely interesting blind spot in Rust's SemVer tooling we ran into while fixing it.
+
+## Session `clear()` Was a Silent Logout Bug
+
+Ultimo's session middleware only persists a session under two conditions: it's dirty and non-empty (write it), or it's destroyed (remove it). `Session::clear()` falls into neither bucket — it marks the session dirty *and* empty. That combination fell through both branches: the store entry was neither rewritten nor removed, so `clear()` silently failed to invalidate the session. The cookie stayed valid, and the *old* session data kept resolving through it.
+
+```rust
+// Before v0.6.0: this looked like a logout, but wasn't one.
+app.post("/logout", |ctx: Context| async move {
+    ctx.session().await.clear(); // data survives — cookie still valid
+    ctx.text("bye").await
+});
+```
+
+The fix treats dirty-and-empty the same as destroyed: drop the store entry, expire the cookie.
+
+```rust
+// v0.6.0: clear() now behaves like destroy()
+app.post("/logout", |ctx: Context| async move {
+    ctx.session().await.clear(); // store entry dropped, cookie expired
+    ctx.text("bye").await
+});
+```
+
+If you were relying on `clear()` for logout, this was silently broken before — `destroy()` was the only method that actually worked. Both now behave identically for this case.
+
+## Two Memory-Exhaustion DoS Vectors, Bounded
+
+Two places in the framework grew unbounded memory under sustained load, and both are the kind of thing that only shows up once you're actually under attack.
+
+**`MemoryStore`** had no cap on live sessions — only opportunistic eviction of *already-expired* entries. If any pre-auth handler ever wrote to the session (a login-attempt counter, a flash message), an attacker sending cookieless requests could mint a fresh, full-TTL session on every request, growing the store without limit.
+
+```rust
+use ultimo::session::{session, MemoryStore, SessionConfig};
+
+// Unbounded — fine for dev/single-process apps, risky in production
+app.use_middleware(session(MemoryStore::new(), SessionConfig::default()));
+
+// v0.6.0: cap live sessions, evicting the soonest-to-expire entry at capacity
+app.use_middleware(session(
+    MemoryStore::with_max_sessions(100_000),
+    SessionConfig::default(),
+));
+```
+
+**`RateLimiter`**'s per-key token-bucket map had the same shape of problem: one entry per distinct key, forever. Combined with IP-keyed limiting behind `trust_proxy` — where `X-Forwarded-For` is client-spoofable by design — an attacker could mint unbounded distinct keys per request. v0.6.0 evicts buckets idle for a full window on every request: a bucket idle that long has already refilled to its cap, so removing it is behaviorally identical to keeping it, while bounding the map to roughly the set of keys active in the current window. No API change — this one's just fixed.
+
+## Error Responses Were Leaking Internals
+
+`UltimoError::Io`, `Hyper`, and `HttpError` formatted the underlying error's `Display` text directly into the client-facing JSON body. OS-level `io::Error` text can include filesystem paths; hyper/HTTP internals aren't meant for client consumption either way.
+
+```json
+// Before: a real 500 response body
+{ "error": "IoError", "message": "No such file or directory (os error 2): /var/app/secrets/db.conf" }
+
+// v0.6.0: same error class, generic message
+{ "error": "IoError", "message": "internal server error" }
+```
+
+The full detail is still available server-side via `Display`/`Debug` for logging — it just doesn't reach the client anymore. `UltimoError::Json` is unchanged on purpose: it reflects the client's *own* malformed request body, so returning the parser's message is safe and actually useful for API consumers debugging their own payloads.
+
+## WebSocket Origin Allow-List (Cross-Site WebSocket Hijacking)
+
+Browsers don't enforce same-origin for WebSocket connections the way they do for `fetch`/XHR. A page on any origin can open a WebSocket connection to your server — and if that connection relies on ambient cookie authentication, that's a [Cross-Site WebSocket Hijacking](https://christian-schneider.net/CrossSiteWebSocketHijacking.html) vector with no built-in defense until now.
+
+```rust
+use ultimo::websocket::WebSocketConfig;
+
+app.websocket_with_config_and_origins(
+    "/ws",
+    ChatHandler,
+    WebSocketConfig::default(),
+    vec!["https://example.com".to_string()],
+);
+```
+
+Empty (default) preserves prior behavior — no restriction, so nothing breaks on upgrade. Set the allow-list whenever the connection carries ambient authority; `"*"` matches any origin if you need the header present without pinning it. Once set, a handshake missing the `Origin` header entirely is rejected with `403`.
+
+## Two Dependency CVEs
+
+Beyond code we own, two dependency advisories needed closing:
+
+- **[CVE-2026-25537](https://github.com/advisories/GHSA-h395-gr6q-cpjc)** — a type-confusion vulnerability in `jsonwebtoken`'s claim validation: a standard claim (`nbf`/`exp`) provided with an incorrect JSON type could bypass validation. Bumped 9 → 10, switched to the `rust_crypto` backend (pure Rust, matches Ultimo's `#![forbid(unsafe_code)]`). Not yet in the [RUSTSEC advisory-db](https://rustsec.org) as of this writing — `cargo-audit` alone won't catch it; we found it triaging GitHub Dependabot alerts directly.
+- **[RUSTSEC-2024-0363](https://rustsec.org/advisories/RUSTSEC-2024-0363.html)** — a binary protocol misinterpretation bug in `sqlx` across Postgres/MySQL/SQLite, patched in 0.8.1. Bumped `sqlx` 0.7 → 0.8.
+
+The `sqlx` bump is the one breaking change in this release, and it's worth explaining why — because the tooling that's supposed to catch breaking changes automatically didn't.
+
+## The SemVer Blind Spot
+
+Ultimo runs [`cargo-semver-checks`](https://github.com/obi1kenobi/cargo-semver-checks) in CI on every PR, diffing the public API against the last published crate. It's caught real breaks before — earlier in this same release cycle, adding a field to `WebSocketConfig` (a struct with every field public) got correctly flagged and we redesigned around it instead of forcing a version bump.
+
+The `sqlx` bump is different, and `cargo-semver-checks` gave it a clean pass: **196 checks, 0 flagged.**
+
+Here's the problem: Ultimo's SQLx integration re-exposes `sqlx` types directly through its own public API — `SqlxPool<DB: sqlx::Database>`, `connect_with_options(options: sqlx::postgres::PgPoolOptions, ...)`, `ctx.sqlx::<DB>() -> &sqlx::Pool<DB>`. `cargo-semver-checks` compares *type and trait shapes* between two versions of *our* crate. `sqlx::Pool<Postgres>` looks structurally identical whether the `sqlx` underneath is 0.7 or 0.8 — the tool has no way to know that Rust treats those as genuinely different types when two crates in a dependency graph resolve to different major versions of the same underlying dependency.
+
+Which means: if you depend on `ultimo`'s `sqlx-postgres` feature *and* on `sqlx` directly in your own code, you need to bump your own `sqlx` requirement to `"0.8"` too — the types won't unify otherwise. This is a real breaking change that no automated check in our pipeline was capable of catching. We only caught it because [our own contributor guidelines](https://github.com/ultimo-rs/ultimo/blob/main/CLAUDE.md) call out the pattern explicitly: *a dependency whose types leak through your public API makes that dependency's version part of your API contract* — and that's a judgment call a human has to make, not something `cargo-semver-checks` can currently see.
+
+We marked the commit accordingly (`feat(database)!:`) so our release automation would compute a minor version bump instead of a patch, per our pre-1.0 convention (breaking → minor, additive/fix → patch). If you maintain a crate that re-exports a dependency's types, this is worth checking for yourself — the tooling won't warn you.
+
+## Upgrading
+
+```toml
+# Cargo.toml
+ultimo = { version = "0.6", features = ["session", "websocket", "sqlx-postgres"] }
+```
+
+```bash
+cargo update -p ultimo -p ultimo-cli
+```
+
+If you use `sqlx-postgres`, `sqlx-mysql`, or `sqlx-sqlite` and depend on `sqlx` directly in your own crate, bump it to `"0.8"` in lockstep — see the [SQLx docs](https://docs.ultimo.dev/sqlx) for the updated example. Everything else is backward compatible: `Session::clear()`, the rate limiter, and error responses all keep the same signatures; `MemoryStore::with_max_sessions` and the WebSocket `Origin` allow-list are opt-in additions.
+
+## What's Next
+
+The full list of fixes — including the exact commits and PRs — is in the [changelog](https://docs.ultimo.dev/changelog). Two things are still open from this review that need their own dedicated work rather than a quick patch: an `rsa` timing-side-channel advisory with no upstream fix yet (reachable only via the optional `sqlx-mysql` backend), and an `idna` advisory pinned transitively through `validator`, which needs its own major-version migration.
+
+Security work doesn't really end at a release — it's the kind of thing you keep doing. If you find something, [open an issue](https://github.com/ultimo-rs/ultimo/issues).
+
+---
+
+**Docs:** [docs.ultimo.dev](https://docs.ultimo.dev) · **Sessions guide:** [Session Authentication in Rust](/blog/session-auth-rust-cookies-csrf) · **Source:** [github.com/ultimo-rs/ultimo](https://github.com/ultimo-rs/ultimo) · **Install:** [`cargo add ultimo`](https://crates.io/crates/ultimo)
