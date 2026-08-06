@@ -99,8 +99,8 @@ export class UltimoRpcClient {
 }
 
 // Type Definitions
-type CreateUserInput = { name: string, email: string, };
-type EmptyParams = Record<symbol, never>;
-type GetUserInput = { id: number, };
-type User = { id: number, name: string, email: string, };
-type UserListResponse = { users: Array<User>, total: number, };
+export type CreateUserInput = { name: string, email: string, };
+export type EmptyParams = Record<symbol, never>;
+export type GetUserInput = { id: number, };
+export type User = { id: number, name: string, email: string, };
+export type UserListResponse = { users: Array<User>, total: number, };

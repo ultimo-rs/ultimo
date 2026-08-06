@@ -487,73 +487,58 @@ class InterceptedUltimoClient extends UltimoRpcClient {
 }
 ```
 
-## React Hooks
+## React Hooks (TanStack Query)
 
-Create reusable hooks for your RPC calls:
+Ultimo **generates** typed TanStack Query hooks from your RPC registry — no need
+to hand-write `useQuery` / `useMutation`. Emit them alongside the client in your
+`generate-client` binary:
 
-```typescript
-// hooks/useUltimoRpc.ts
-import { UltimoRpcClient } from "../lib/ultimo-client";
-import { useMemo } from "react";
-
-export function useUltimoClient() {
-  return useMemo(() => new UltimoRpcClient("/api/rpc"), []);
-}
-
-export function useUsers(page: number, search?: string) {
-  const client = useUltimoClient();
-
-  return useQuery({
-    queryKey: ["users", page, search],
-    queryFn: () => client.listUsers({ page, limit: 10, search }),
-  });
-}
-
-export function useUser(id: number) {
-  const client = useUltimoClient();
-
-  return useQuery({
-    queryKey: ["user", id],
-    queryFn: () => client.getUser({ id }),
-  });
-}
-
-export function useCreateUser() {
-  const client = useUltimoClient();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (input) => client.createUser(input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-    },
-  });
-}
+```rust
+rpc.generate_client_file("./src/lib/client.ts")?;
+rpc.generate_react_hooks_file("./src/lib/hooks.ts")?;
 ```
 
-Usage:
+Wrap your app once, inside your existing `QueryClientProvider`:
 
-```typescript
-function UserList() {
-  const { data, isLoading } = useUsers(1);
-  const createUser = useCreateUser();
+```tsx
+import { QueryClientProvider } from "@tanstack/react-query";
+import { UltimoProvider } from "./lib/hooks";
+import { UltimoRpcClient } from "./lib/client";
 
-  // ...
-}
+<QueryClientProvider client={queryClient}>
+  <UltimoProvider client={new UltimoRpcClient()}>
+    <App />
+  </UltimoProvider>
+</QueryClientProvider>;
+```
+
+Then use the generated hooks — input and output are fully typed, inferred from
+your Rust types:
+
+```tsx
+import { useGetUser, useCreateUser } from "./lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 
 function UserProfile({ id }: { id: number }) {
-  const { data: user, isLoading } = useUser(id);
+  const { data: user, isLoading } = useGetUser({ id }); // user: User | undefined
+  if (isLoading) return <div>Loading…</div>;
+  return <h1>{user!.name}</h1>;
+}
 
-  if (isLoading) return <div>Loading...</div>;
-
-  return (
-    <div>
-      <h1>{user.name}</h1>
-      <p>{user.email}</p>
-    </div>
-  );
+function CreateUser() {
+  const queryClient = useQueryClient();
+  const create = useCreateUser({
+    // invalidate cached getUser queries after a successful create
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["getUser"] }),
+  });
+  return <button onClick={() => create.mutate({ name: "Ada" })}>Add</button>;
 }
 ```
+
+Each **query** procedure becomes a `useX` hook backed by `useQuery`; each
+**mutation** becomes a `useX` hook backed by `useMutation`. A `queryKeys` export
+provides stable keys for cache invalidation (`queryKeys.getUser({ id })`).
+Requires `@tanstack/react-query` v5 in your frontend.
 
 ## Testing
 

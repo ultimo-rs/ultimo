@@ -108,6 +108,10 @@ async fn main() -> ultimo::Result<()> {
     // Generate REST client
     rest_rpc.generate_client_file("ultimo-client-rest.ts")?;
     println!("✅ REST client generated: ultimo-client-rest.ts");
+
+    // Also emit TanStack Query React hooks alongside the client.
+    rest_rpc.generate_react_hooks_file("ultimo-hooks.ts")?;
+    println!("✅ React hooks generated: ultimo-hooks.ts");
     println!("   - GET  /api/listUsers");
     println!("   - GET  /api/getUserById?id=1");
     println!("   - POST /api/createUser");
