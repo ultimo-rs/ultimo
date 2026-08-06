@@ -23,6 +23,8 @@ use jsonwebtoken::{
     Validation,
 };
 use serde::{de::DeserializeOwned, Serialize};
+#[cfg(feature = "oidc")]
+use {crate::auth::jwks::JwksClient, jsonwebtoken::decode_header, jsonwebtoken::jwk::JwkSet};
 
 /// Where the middleware looks for the token on an incoming request.
 #[derive(Debug, Clone)]
@@ -144,6 +146,86 @@ impl Jwt {
             )),
         }
     }
+
+    /// Verify against a fixed in-memory JWKS (offline / air-gapped / tests).
+    #[cfg(feature = "oidc")]
+    pub fn jwks_from_set(set: JwkSet) -> Self {
+        Self::from_jwks_client(JwksClient::from_set(set))
+    }
+
+    /// Verify against a provider's JWKS endpoint (RS256/ES256, cached + rotated).
+    #[cfg(feature = "oidc")]
+    pub fn jwks(jwks_url: impl Into<String>) -> Self {
+        Self::from_jwks_client(JwksClient::from_url(jwks_url.into()))
+    }
+
+    /// Verify against a provider discovered from its OIDC issuer
+    /// (`{issuer}/.well-known/openid-configuration` -> `jwks_uri`).
+    #[cfg(feature = "oidc")]
+    pub fn oidc(issuer: impl Into<String>) -> Self {
+        Self::from_jwks_client(JwksClient::from_issuer(issuer.into()))
+    }
+
+    #[cfg(feature = "oidc")]
+    fn from_jwks_client(client: JwksClient) -> Self {
+        // The concrete algorithm is pinned per-request to the token header's
+        // (asymmetric) `alg` in `verify_claims` — a `Validation` may only list
+        // algorithms of one key family, so we can't pre-list RSA + EC together.
+        Self {
+            key: KeySource::Jwks(client),
+            validation: Validation::new(Algorithm::RS256),
+            source: TokenSource::Bearer,
+            optional: false,
+        }
+    }
+
+    /// Verify a token and return its claims as JSON, handling both the static
+    /// (sync) and JWKS (async fetch) key sources.
+    async fn verify_claims(&self, token: &str) -> Result<serde_json::Value> {
+        match &self.key {
+            KeySource::Static { decoding, .. } => {
+                jwt_decode::<serde_json::Value>(token, decoding, &self.validation)
+                    .map(|d| d.claims)
+                    .map_err(|e| UltimoError::Unauthorized(format!("invalid JWT: {e}")))
+            }
+            #[cfg(feature = "oidc")]
+            KeySource::Jwks(client) => {
+                let header = decode_header(token)
+                    .map_err(|e| UltimoError::Unauthorized(format!("invalid JWT header: {e}")))?;
+                // Only asymmetric algorithms are valid against JWKS public keys.
+                // Rejecting HS*/none prevents the classic algorithm-confusion
+                // attack (an attacker signing HS256 with the RSA public key).
+                if !matches!(
+                    header.alg,
+                    Algorithm::RS256
+                        | Algorithm::RS384
+                        | Algorithm::RS512
+                        | Algorithm::PS256
+                        | Algorithm::PS384
+                        | Algorithm::PS512
+                        | Algorithm::ES256
+                        | Algorithm::ES384
+                        | Algorithm::EdDSA
+                ) {
+                    return Err(UltimoError::Unauthorized(format!(
+                        "unsupported JWT algorithm for JWKS: {:?}",
+                        header.alg
+                    )));
+                }
+                let kid = header
+                    .kid
+                    .ok_or_else(|| UltimoError::Unauthorized("JWT missing 'kid'".into()))?;
+                let key = client.decoding_key(&kid).await?;
+                // Pin the validation to exactly this token's algorithm (one
+                // family), preserving iss/aud/exp/leeway from the builder.
+                let mut validation = self.validation.clone();
+                validation.algorithms = vec![header.alg];
+                jwt_decode::<serde_json::Value>(token, &key, &validation)
+                    .map(|d| d.claims)
+                    .map_err(|e| UltimoError::Unauthorized(format!("invalid JWT: {e}")))
+            }
+        }
+    }
 }
 
 use crate::Context;
@@ -190,7 +272,7 @@ impl Jwt {
             let cfg = cfg.clone();
             Box::pin(async move {
                 match extract_token(&cfg, &ctx) {
-                    Some(token) => match cfg.decode::<serde_json::Value>(&token) {
+                    Some(token) => match cfg.verify_claims(&token).await {
                         Ok(claims) => {
                             let principal = crate::auth::Principal {
                                 id: claims.get("sub").and_then(|v| v.as_str()).map(String::from),
