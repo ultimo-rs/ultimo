@@ -36,10 +36,22 @@ enum TokenSource {
 /// JWT auth configuration. Verifies (`build`) and issues (`sign`) tokens using a
 /// shared HS256 secret. Secure-by-default: `exp` is validated, the algorithm is
 /// pinned to HS256, and `alg: none` / algorithm-confusion tokens are rejected.
+/// Where a `Jwt` gets its verification key.
+#[derive(Clone)]
+enum KeySource {
+    /// HS256 / fixed symmetric key — synchronous verify; supports `sign`.
+    Static {
+        encoding: Option<EncodingKey>,
+        decoding: DecodingKey,
+    },
+    /// Remote JWKS — asynchronous verify; verify-only.
+    #[cfg(feature = "oidc")]
+    Jwks(crate::auth::jwks::JwksClient),
+}
+
 #[derive(Clone)]
 pub struct Jwt {
-    encoding: EncodingKey,
-    decoding: DecodingKey,
+    key: KeySource,
     validation: Validation,
     source: TokenSource,
     /// When false (default), a missing/invalid token yields 401. When true, the
@@ -52,8 +64,10 @@ impl Jwt {
     pub fn hs256(secret: impl AsRef<[u8]>) -> Self {
         let secret = secret.as_ref();
         Self {
-            encoding: EncodingKey::from_secret(secret),
-            decoding: DecodingKey::from_secret(secret),
+            key: KeySource::Static {
+                encoding: Some(EncodingKey::from_secret(secret)),
+                decoding: DecodingKey::from_secret(secret),
+            },
             validation: Validation::new(Algorithm::HS256),
             source: TokenSource::Bearer,
             optional: false,
@@ -100,16 +114,35 @@ impl Jwt {
 
     /// Issue a signed HS256 token for the given claims (which must include `exp`).
     pub fn sign<T: Serialize>(&self, claims: &T) -> Result<String> {
-        jwt_encode(&Header::new(Algorithm::HS256), claims, &self.encoding)
-            .map_err(|e| UltimoError::Internal(format!("JWT signing failed: {e}")))
+        match &self.key {
+            KeySource::Static {
+                encoding: Some(enc),
+                ..
+            } => jwt_encode(&Header::new(Algorithm::HS256), claims, enc)
+                .map_err(|e| UltimoError::Internal(format!("JWT signing failed: {e}"))),
+            _ => Err(UltimoError::Internal(
+                "this Jwt cannot sign (verify-only / JWKS)".into(),
+            )),
+        }
     }
 
     /// Verify a token and deserialize its claims. Errors on bad signature,
     /// expired/`nbf` violations, wrong `iss`/`aud`, or `alg: none`.
+    ///
+    /// Synchronous — for the JWKS key source (which fetches keys asynchronously)
+    /// verification happens in the middleware; this returns an error.
     pub fn decode<T: DeserializeOwned>(&self, token: &str) -> Result<T> {
-        jwt_decode::<T>(token, &self.decoding, &self.validation)
-            .map(|data| data.claims)
-            .map_err(|e| UltimoError::Unauthorized(format!("invalid JWT: {e}")))
+        match &self.key {
+            KeySource::Static { decoding, .. } => {
+                jwt_decode::<T>(token, decoding, &self.validation)
+                    .map(|data| data.claims)
+                    .map_err(|e| UltimoError::Unauthorized(format!("invalid JWT: {e}")))
+            }
+            #[cfg(feature = "oidc")]
+            KeySource::Jwks(_) => Err(UltimoError::Internal(
+                "JWKS verification is async; use the middleware".into(),
+            )),
+        }
     }
 }
 

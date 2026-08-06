@@ -49,6 +49,9 @@ sha2 = { version = "0.10", optional = true }
 # Static file serving (optional) — pure-Rust MIME detection
 mime_guess = { version = "2", optional = true }
 
+# OIDC/JWKS auth (optional) — fetch a provider's JWKS over HTTPS (rustls, no C)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
+
 # Response compression (optional) — both pure Rust, no C deps
 flate2  = { version = "1", optional = true }
 brotli  = { version = "8", optional = true }
@@ -70,6 +73,9 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
 reqwest = { version = "0.12", features = ["json"] }
+# Offline test keys for OIDC/JWKS verification (generate an RSA keypair + JWKS).
+rsa = { version = "0.9", features = ["std"] }
+rand = "0.8"
 
 [features]
 default = []
@@ -91,6 +97,9 @@ csrf = ["dep:getrandom"]
 
 # JWT authentication middleware (HS256)
 jwt = ["dep:jsonwebtoken"]
+
+# OIDC/JWKS verification (RS256/ES256 against a provider's JWKS endpoint)
+oidc = ["jwt", "dep:reqwest", "jsonwebtoken/use_pem"]
 
 # API-key authentication middleware (pluggable store, SHA-256 hashed keys)
 api-key = ["dep:sha2"]

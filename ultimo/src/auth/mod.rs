@@ -10,6 +10,11 @@
 #[cfg(feature = "jwt")]
 pub mod jwt;
 
+#[cfg(feature = "oidc")]
+pub mod jwks;
+#[cfg(feature = "oidc")]
+pub use jwks::JwksClient;
+
 #[cfg(feature = "api-key")]
 pub mod api_key;
 
