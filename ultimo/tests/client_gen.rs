@@ -47,8 +47,8 @@ fn rest_client_has_derived_types_and_signatures() {
         "input decl missing:\n{client}"
     );
     assert!(
-        client.contains("type User = "),
-        "output decl missing:\n{client}"
+        client.contains("export type User = "),
+        "User decl must be exported:\n{client}"
     );
     assert!(client.contains("email: string"));
     assert!(client.contains("tags: Array<string>"));

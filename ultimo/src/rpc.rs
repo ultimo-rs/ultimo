@@ -544,6 +544,9 @@ export class UltimoRpcClient {
         }
         client.push_str("\n// Type Definitions\n");
         for decl in decls.values() {
+            // ts-rs emits `type X = { … };`; export it so other modules
+            // (and the generated hooks) can import the named type.
+            client.push_str("export ");
             client.push_str(decl);
             client.push('\n');
         }
