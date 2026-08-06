@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-06
+
+### Added
+
+- **Frontend client adapters** — generate TanStack Query React hooks from the RPC registry (`generate_react_hooks` / `generate_react_hooks_file`, `client-gen` feature). Emits an `UltimoProvider` context, a `queryKeys` factory, and a `useQuery`/`useMutation` hook per procedure, with input/output types derived from the generated client's method signatures. (#164)
+- Generated client type declarations are now `export`ed so consumers (and the hooks module) can import them. (#164)
+
 ## [0.6.0] - 2026-07-08
 
 ### Security
