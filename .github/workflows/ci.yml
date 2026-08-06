@@ -136,6 +136,7 @@ jobs:
         run: |
           cargo test -p ultimo --features "client-gen" --lib client_gen_tests
           cargo test -p ultimo --features "client-gen" --test client_gen
+          cargo test -p ultimo --features "client-gen" --test react_hooks
           cargo build -p rpc-modes
 
       # websocket_pubsub_bench uses test_helpers::ChannelManager, so benches
