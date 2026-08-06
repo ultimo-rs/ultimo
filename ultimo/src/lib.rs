@@ -67,7 +67,7 @@ pub(crate) mod static_files;
 pub use app::Ultimo;
 pub use context::Context;
 pub use error::{Result, UltimoError};
-pub use extract::{FromRequest, Json, Query, Valid};
+pub use extract::{FromRequest, Json, Path, Query, Valid};
 pub use rpc::{
     error_code, JsonRpcError, JsonRpcErrorResponse, JsonRpcOutput, JsonRpcRequest, JsonRpcResponse,
 };
@@ -79,7 +79,7 @@ pub mod prelude {
     pub use crate::app::Ultimo;
     pub use crate::context::Context;
     pub use crate::error::{Result, UltimoError};
-    pub use crate::extract::{FromRequest, Json, Query, Valid};
+    pub use crate::extract::{FromRequest, Json, Path, Query, Valid};
     pub use crate::middleware;
     pub use crate::rpc::{
         JsonRpcError, JsonRpcErrorResponse, JsonRpcOutput, JsonRpcRequest, JsonRpcResponse,

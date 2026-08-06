@@ -4,7 +4,8 @@
 
 use crate::context::Context;
 use crate::error::{Result, UltimoError};
-use serde::de::DeserializeOwned;
+use serde::de::{self, DeserializeOwned, Deserializer, Visitor};
+use std::fmt;
 use validator::Validate;
 
 /// A type that can be extracted from the request context.
@@ -48,6 +49,100 @@ impl<T: DeserializeOwned + Validate + Send> FromRequest for Valid<T> {
         let value = ctx.req.json::<T>().await?; // 400 on malformed JSON
         crate::validate(&value)?; // UltimoError::Validation -> 422
         Ok(Valid(value))
+    }
+}
+
+/// Extracts typed path parameters captured by the route (`:name` segments).
+/// A single-parameter route deserializes into a scalar (`Path<u32>`); a
+/// multi-parameter route deserializes into a struct whose fields match the
+/// parameter names (`Path<Struct>`).
+pub struct Path<T>(pub T);
+
+#[async_trait::async_trait]
+impl<T: DeserializeOwned + Send> FromRequest for Path<T> {
+    async fn from_request(ctx: &Context) -> Result<Self> {
+        let params = ctx.req.params();
+        let value: T = if params.len() == 1 {
+            let raw = params.values().next().expect("len == 1");
+            T::deserialize(ScalarStr(raw))
+                .map_err(|e| UltimoError::BadRequest(format!("Invalid path parameter: {e}")))?
+        } else {
+            let qs = serde_urlencoded::to_string(params)
+                .map_err(|e| UltimoError::BadRequest(format!("Invalid path parameters: {e}")))?;
+            serde_urlencoded::from_str::<T>(&qs)
+                .map_err(|e| UltimoError::BadRequest(format!("Invalid path parameters: {e}")))?
+        };
+        Ok(Path(value))
+    }
+}
+
+/// A serde deserializer over a single string that parses numeric/bool targets
+/// but passes strings through unchanged (so `Path<String>` of "42" stays "42").
+struct ScalarStr<'a>(&'a str);
+
+#[derive(Debug)]
+struct ScalarErr(String);
+impl fmt::Display for ScalarErr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+impl std::error::Error for ScalarErr {}
+impl de::Error for ScalarErr {
+    fn custom<M: fmt::Display>(msg: M) -> Self {
+        ScalarErr(msg.to_string())
+    }
+}
+
+macro_rules! scalar_parse {
+    ($method:ident, $visit:ident, $ty:ty) => {
+        fn $method<V: Visitor<'de>>(self, v: V) -> std::result::Result<V::Value, Self::Error> {
+            let parsed: $ty = self.0.parse().map_err(|_| {
+                ScalarErr(format!("cannot parse '{}' as {}", self.0, stringify!($ty)))
+            })?;
+            v.$visit(parsed)
+        }
+    };
+}
+
+impl<'de> Deserializer<'de> for ScalarStr<'de> {
+    type Error = ScalarErr;
+
+    scalar_parse!(deserialize_i8, visit_i8, i8);
+    scalar_parse!(deserialize_i16, visit_i16, i16);
+    scalar_parse!(deserialize_i32, visit_i32, i32);
+    scalar_parse!(deserialize_i64, visit_i64, i64);
+    scalar_parse!(deserialize_u8, visit_u8, u8);
+    scalar_parse!(deserialize_u16, visit_u16, u16);
+    scalar_parse!(deserialize_u32, visit_u32, u32);
+    scalar_parse!(deserialize_u64, visit_u64, u64);
+    scalar_parse!(deserialize_f32, visit_f32, f32);
+    scalar_parse!(deserialize_f64, visit_f64, f64);
+    scalar_parse!(deserialize_bool, visit_bool, bool);
+
+    fn deserialize_str<V: Visitor<'de>>(self, v: V) -> std::result::Result<V::Value, Self::Error> {
+        v.visit_borrowed_str(self.0)
+    }
+    fn deserialize_string<V: Visitor<'de>>(
+        self,
+        v: V,
+    ) -> std::result::Result<V::Value, Self::Error> {
+        v.visit_str(self.0)
+    }
+    fn deserialize_any<V: Visitor<'de>>(self, v: V) -> std::result::Result<V::Value, Self::Error> {
+        v.visit_borrowed_str(self.0)
+    }
+    fn deserialize_newtype_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        v: V,
+    ) -> std::result::Result<V::Value, Self::Error> {
+        v.visit_newtype_struct(self)
+    }
+
+    serde::forward_to_deserialize_any! {
+        char bytes byte_buf option unit unit_struct seq tuple tuple_struct
+        map struct enum identifier ignored_any
     }
 }
 
@@ -123,6 +218,54 @@ mod tests {
         let bad = ctx_with("", br#"{"name":"a"}"#);
         let err = Valid::<NewUser>::from_request(&bad).await.err().unwrap();
         assert_eq!(err.status_code(), 422);
+    }
+
+    fn ctx_with_params(pairs: &[(&str, &str)]) -> Context {
+        let parts = hyper::Request::builder()
+            .uri("http://x/")
+            .body(())
+            .unwrap()
+            .into_parts()
+            .0;
+        let params: crate::router::Params = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        Context::from_parts(parts, Bytes::new(), params)
+    }
+
+    #[tokio::test]
+    async fn path_single_u32() {
+        let ctx = ctx_with_params(&[("id", "42")]);
+        let Path(id) = Path::<u32>::from_request(&ctx).await.unwrap();
+        assert_eq!(id, 42);
+    }
+
+    #[tokio::test]
+    async fn path_single_string_numeric_value_stays_string() {
+        let ctx = ctx_with_params(&[("id", "42")]);
+        let Path(id) = Path::<String>::from_request(&ctx).await.unwrap();
+        assert_eq!(id, "42"); // NOT coerced to a number
+    }
+
+    #[derive(Deserialize)]
+    struct Coord {
+        x: u32,
+        y: u32,
+    }
+
+    #[tokio::test]
+    async fn path_struct_multi_param() {
+        let ctx = ctx_with_params(&[("x", "3"), ("y", "5")]);
+        let Path(c) = Path::<Coord>::from_request(&ctx).await.unwrap();
+        assert_eq!((c.x, c.y), (3, 5));
+    }
+
+    #[tokio::test]
+    async fn path_single_bad_is_400() {
+        let ctx = ctx_with_params(&[("id", "notanumber")]);
+        let err = Path::<u32>::from_request(&ctx).await.err().unwrap();
+        assert_eq!(err.status_code(), 400);
     }
 
     #[tokio::test]
