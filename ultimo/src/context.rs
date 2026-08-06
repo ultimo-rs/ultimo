@@ -81,6 +81,11 @@ impl Request {
         })
     }
 
+    /// The raw query string (everything after `?`), if present.
+    pub fn query_string(&self) -> Option<&str> {
+        self.uri.query()
+    }
+
     /// Get all query parameters at once
     pub fn queries(&self) -> HashMap<String, Vec<String>> {
         let mut result: HashMap<String, Vec<String>> = HashMap::new();

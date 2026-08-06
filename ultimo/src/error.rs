@@ -57,7 +57,7 @@ impl UltimoError {
     pub fn status_code(&self) -> u16 {
         match self {
             UltimoError::Http { status, .. } => *status,
-            UltimoError::Validation { .. } => 400,
+            UltimoError::Validation { .. } => 422,
             UltimoError::Unauthorized(_) => 401,
             UltimoError::Forbidden(_) => 403,
             UltimoError::NotFound(_) => 404,
@@ -234,7 +234,7 @@ mod tests {
             message: "Validation failed".to_string(),
             details: vec![],
         };
-        assert_eq!(err.status_code(), 400);
+        assert_eq!(err.status_code(), 422);
     }
 
     #[test]
