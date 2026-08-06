@@ -61,6 +61,10 @@ jobs:
       - name: clippy (client-gen, lib)
         run: cargo clippy -p ultimo --lib --features "client-gen" -- -D warnings
 
+      # oidc (JWKS verification via reqwest) — lib only.
+      - name: clippy (oidc, lib)
+        run: cargo clippy -p ultimo --lib --features "oidc" -- -D warnings
+
   # ── Unit + integration tests (no DB system deps) ──────────────────────
   test:
     name: test (${{ matrix.os }})
@@ -120,6 +124,12 @@ jobs:
           cargo test -p ultimo --features "api-key" --doc
           cargo test -p ultimo --features "jwt" --test authz
           cargo test -p ultimo --features "session" --doc
+
+      # OIDC/JWKS verification (RS256/ES256 against a provider's JWKS).
+      - name: OIDC/JWKS tests (oidc feature)
+        run: |
+          cargo test -p ultimo --features "oidc" --lib auth::jwks
+          cargo test -p ultimo --features "oidc" --test oidc
 
       # Static file serving + SPA fallback. Pure Rust, no system deps.
       # Tests in ultimo/tests/static_files.rs cover path traversal, ETag/304,

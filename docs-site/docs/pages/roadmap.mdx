@@ -61,10 +61,6 @@ One principle throughout: a **generic capability in core**, plus **thin presets
 / adapters** and **cookbook guides** — never bundled vendor SDKs (which bloat
 dependencies and rot as each vendor's API changes).
 
-- 🔑 **Auth providers (OIDC/JWKS)** — verify RS256/ES256 JWTs against a
-  provider's JWKS endpoint (caching + key rotation, `iss`/`aud` validation),
-  with presets/guides for Clerk, Cognito, Auth0, Supabase, WorkOS, Keycloak.
-  Extends the `jwt` feature.
 - 📈 **Observability** — OpenTelemetry traces + metrics, and a Prometheus
   endpoint (built on the `tracing` already used internally).
 - 🧰 **Redis** — one integration backing sessions, the rate-limit store, and
@@ -136,7 +132,7 @@ dependencies and rot as each vendor's API changes).
 | Typed Handler Extractors + Validation                   | ✅ Available     | 0.7.0    |
 | Typed RPC Subscriptions / SSE                           | 📋 Planned       | 0.7.0    |
 | OAuth2                                                  | 📋 Planned       | 0.7.0    |
-| Auth Providers (OIDC/JWKS + presets)                    | 📋 Planned       | 0.7.0    |
+| Auth Providers (OIDC/JWKS)                              | ✅ Available     | 0.7.0    |
 | Observability (OpenTelemetry + Prometheus)              | 📋 Planned       | 0.7.0    |
 | Streaming Responses                                     | 📋 Planned       | 0.7.0    |
 | Request Timeouts + HTTP Graceful Shutdown               | 📋 Planned       | 0.7.0    |
@@ -238,8 +234,9 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - ✅ **Typed handler extractors + validation-from-types** (type-safe input; `Path`/`Query`/`Json`/`Valid`, 400/422)
 - Typed RPC subscriptions / SSE (derived event types)
 - OAuth2 provider integration
-- **Auth providers (OIDC/JWKS)** — RS256/ES256 + remote JWKS, presets for
-  Clerk / Cognito / Auth0 / Supabase
+- ✅ **Auth providers (OIDC/JWKS)** — RS256/ES256 + remote JWKS (fetch/cache/
+  rotation), OIDC discovery, cookbook for Clerk / Cognito / Auth0 / Supabase
+  (`oidc` feature)
 - **Observability** — OpenTelemetry traces + metrics, Prometheus endpoint
 - Streaming responses
 - Request timeouts + HTTP graceful shutdown
