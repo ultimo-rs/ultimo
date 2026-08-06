@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-06
+
+### Added
+
+- **Typed handler extractors** — handlers can declare typed `Path<T>`, `Query<T>`, `Json<T>`, and `Valid<T>` parameters (up to 8) that are parsed automatically from the request; `Context` remains available as an identity extractor. Malformed input returns **400**; `Valid<T>` validation failures return **422**. (#167)
+
+### Changed
+
+- **BREAKING:** the route methods (`get`/`post`/`put`/`delete`/`patch`/`options`) and `IntoHandler` are now generic over the handler's extractor argument tuple (`IntoHandler<Args>`). Existing `|ctx: Context| async move { … }` handlers compile and behave unchanged (`Context` implements the new `FromRequest` extractor trait); only explicit turbofish calls to the route methods would need updating. (#167)
+- **`UltimoError::Validation` now maps to HTTP 422** (Unprocessable Entity) instead of 400, matching typed-extractor validation semantics. Affects all `validate()` callers. (#167)
+
 ## [0.6.1] - 2026-08-06
 
 ### Added
