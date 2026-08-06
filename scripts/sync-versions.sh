@@ -63,6 +63,12 @@ if [ -f CLAUDE.md ]; then
   echo "  updated CLAUDE.md"
 fi
 
+# AGENTS.md: Current version: **X.X.X**
+if [ -f AGENTS.md ]; then
+  sed -i.bak -E "s/(Current version: \*\*)[0-9]+\.[0-9]+\.[0-9]+(\*\*)/\1$VERSION\2/" AGENTS.md && rm -f AGENTS.md.bak
+  echo "  updated AGENTS.md"
+fi
+
 # Blog comparison post: "Current version" table cell
 BLOG_COMPARE="website/content/posts/ultimo-vs-axum-comparison.mdx"
 if [ -f "$BLOG_COMPARE" ]; then
