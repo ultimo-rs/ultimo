@@ -20,13 +20,9 @@ a stable **1.0**.
   from your Rust types (tRPC-style subscriptions, in Rust).
 - ❗ **End-to-end typed errors** — RPC errors surfaced as typed results in the
   generated client.
-- 🎯 **Typed handler extractors** — declare typed path / query / body / header
-  params on a handler; they're parsed and validated automatically, with a
-  structured **422** on bad input. Ultimo already gives type-safe _output_ (the
-  TS client); this gives type-safe _input_ — the handler signature becomes the
-  contract. Inspired by FastAPI / axum.
 - ✅ **Validation from types** — derive request validation from the type
-  (Pydantic-style), wired into the extractor and RPC boundary.
+  (Pydantic-style), wired into the extractor and RPC boundary. _(Shipped with
+  typed extractors — see the `Valid<T>` extractor.)_
 - 🪄 **`#[derive(UltimoType)]`** — a thin wrapper so client types derive without
   adding `ts-rs` to your own `Cargo.toml`.
 
@@ -137,7 +133,7 @@ dependencies and rot as each vendor's API changes).
 | Interactive API Docs (`serve_docs`)                     | ✅ Available     | 0.5.1    |
 | Deployment Guides                                       | ✅ Available     | 0.5.1    |
 | Advanced Rate Limiting                                  | ✅ Available     | 0.5.1    |
-| Typed Handler Extractors + Validation                   | 📋 Planned       | 0.7.0    |
+| Typed Handler Extractors + Validation                   | ✅ Available     | 0.7.0    |
 | Typed RPC Subscriptions / SSE                           | 📋 Planned       | 0.7.0    |
 | OAuth2                                                  | 📋 Planned       | 0.7.0    |
 | Auth Providers (OIDC/JWKS + presets)                    | 📋 Planned       | 0.7.0    |
@@ -239,7 +235,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
 ### v0.7.0 — Real-time, auth, & production gaps
 
-- **Typed handler extractors + validation-from-types** (type-safe input)
+- ✅ **Typed handler extractors + validation-from-types** (type-safe input; `Path`/`Query`/`Json`/`Valid`, 400/422)
 - Typed RPC subscriptions / SSE (derived event types)
 - OAuth2 provider integration
 - **Auth providers (OIDC/JWKS)** — RS256/ES256 + remote JWKS, presets for

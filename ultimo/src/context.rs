@@ -20,6 +20,7 @@ use tokio::sync::RwLock;
 use crate::database::Database;
 
 /// Request wraps the incoming HTTP request and provides easy access to request data
+#[derive(Clone)]
 pub struct Request {
     method: hyper::Method,
     uri: hyper::Uri,
@@ -79,6 +80,11 @@ impl Request {
                 }
             })
         })
+    }
+
+    /// The raw query string (everything after `?`), if present.
+    pub fn query_string(&self) -> Option<&str> {
+        self.uri.query()
     }
 
     /// Get all query parameters at once
@@ -218,6 +224,7 @@ fn parse_forwarded_for(header: &str) -> Option<IpAddr> {
 }
 
 /// Context holds request data and provides response building methods
+#[derive(Clone)]
 pub struct Context {
     pub req: Request,
     state: Arc<RwLock<HashMap<String, String>>>,

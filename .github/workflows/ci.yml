@@ -77,6 +77,9 @@ jobs:
       - name: Library unit tests
         run: cargo test -p ultimo --lib
 
+      - name: Typed extractor tests
+        run: cargo test -p ultimo --test extractors
+
       # The integration tests in ultimo/tests/*.rs are NOT covered by `--lib`
       # and require BOTH the `websocket` and `test-helpers` features to compile.
       # This is the gap that previously let them rot silently.

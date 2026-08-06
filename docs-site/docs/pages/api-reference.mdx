@@ -565,6 +565,40 @@ use ultimo::rpc::{JsonRpcRequest, JsonRpcResponse, JsonRpcErrorResponse, JsonRpc
 
 ---
 
+## Typed extractors
+
+Handlers may take typed parameters instead of a raw `Context`. Each implements
+`FromRequest` and is parsed from the request automatically; a failure
+short-circuits with the right status.
+
+```rust
+use ultimo::extract::{Path, Query, Json, Valid};
+
+// GET /users/:id?verbose=true
+app.get("/users/:id", |Path(id): Path<u32>, Query(opts): Query<Opts>| async move {
+    // id: u32, opts: Opts — already parsed
+});
+
+// POST /users — deserialize the JSON body AND validate it
+app.post("/users", |Valid(body): Valid<CreateUser>| async move {
+    // body: CreateUser — validated (422 if invalid)
+});
+```
+
+| Extractor | Source | On failure |
+|---|---|---|
+| `Path<T>` | route `:params` — a single scalar (`Path<u32>`) or a struct of param names | 400 |
+| `Query<T>` | query string | 400 |
+| `Json<T>` | request body | 400 |
+| `Valid<T>` | request body + `validator` | 400 (parse) · **422** (invalid) |
+| `Context` | the whole request | — |
+
+Handlers may take up to 8 extractors. `|ctx: Context|` handlers keep working
+unchanged (`Context` is itself an extractor). Validation failures return **422
+Unprocessable Entity**.
+
+---
+
 ## Middleware
 
 ### Built-in Middleware

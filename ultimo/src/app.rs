@@ -156,32 +156,56 @@ impl Ultimo {
     }
 
     /// Add a GET route
-    pub fn get(&mut self, path: &str, handler: impl IntoHandler + 'static) -> &mut Self {
+    pub fn get<Args>(
+        &mut self,
+        path: &str,
+        handler: impl IntoHandler<Args> + 'static,
+    ) -> &mut Self {
         self.add_route(Method::GET, path, handler)
     }
 
     /// Add a POST route
-    pub fn post(&mut self, path: &str, handler: impl IntoHandler + 'static) -> &mut Self {
+    pub fn post<Args>(
+        &mut self,
+        path: &str,
+        handler: impl IntoHandler<Args> + 'static,
+    ) -> &mut Self {
         self.add_route(Method::POST, path, handler)
     }
 
     /// Add a PUT route
-    pub fn put(&mut self, path: &str, handler: impl IntoHandler + 'static) -> &mut Self {
+    pub fn put<Args>(
+        &mut self,
+        path: &str,
+        handler: impl IntoHandler<Args> + 'static,
+    ) -> &mut Self {
         self.add_route(Method::PUT, path, handler)
     }
 
     /// Add a DELETE route
-    pub fn delete(&mut self, path: &str, handler: impl IntoHandler + 'static) -> &mut Self {
+    pub fn delete<Args>(
+        &mut self,
+        path: &str,
+        handler: impl IntoHandler<Args> + 'static,
+    ) -> &mut Self {
         self.add_route(Method::DELETE, path, handler)
     }
 
     /// Add a PATCH route
-    pub fn patch(&mut self, path: &str, handler: impl IntoHandler + 'static) -> &mut Self {
+    pub fn patch<Args>(
+        &mut self,
+        path: &str,
+        handler: impl IntoHandler<Args> + 'static,
+    ) -> &mut Self {
         self.add_route(Method::PATCH, path, handler)
     }
 
     /// Add an OPTIONS route
-    pub fn options(&mut self, path: &str, handler: impl IntoHandler + 'static) -> &mut Self {
+    pub fn options<Args>(
+        &mut self,
+        path: &str,
+        handler: impl IntoHandler<Args> + 'static,
+    ) -> &mut Self {
         self.add_route(Method::OPTIONS, path, handler)
     }
 
@@ -297,11 +321,11 @@ impl Ultimo {
     }
 
     /// Add a route with any method
-    fn add_route(
+    fn add_route<Args>(
         &mut self,
         method: Method,
         path: &str,
-        handler: impl IntoHandler + 'static,
+        handler: impl IntoHandler<Args> + 'static,
     ) -> &mut Self {
         let handler_id = self.handlers.len();
         self.handlers.push(handler.into_handler());
