@@ -1023,6 +1023,7 @@ All features are off by default (`default = []`).
 - `static-files` - Static file serving + SPA fallback (`serve_static`, `serve_spa`) ([Static Files](/static-files))
 - `compression` - Automatic gzip/brotli response compression (`compression()`, `Compression`) ([Compression](/middleware#compression))
 - `client-gen` - Derive RPC client TypeScript types from Rust types via `ts-rs`; `query`/`mutation` infer types from `#[derive(TS)]` structs (string-typed `query_with_types`/`mutation_with_types` remain as escape hatches)
+- `oidc` - Verify RS256/ES256 tokens against a provider's JWKS endpoint (`Jwt::jwks`, `Jwt::oidc`, `Jwt::jwks_from_set`) with fetch/cache/rotation ([JWT](/jwt))
 - `testing` - Testing utilities: `TestClient`, assertions, helpers ([Testing](/testing))
 - `test-helpers` - WebSocket test helpers (for integration tests)
 - `sqlx-postgres` / `sqlx-mysql` / `sqlx-sqlite` - SQLx integration per backend

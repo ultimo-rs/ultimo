@@ -94,6 +94,47 @@ By default the middleware returns **`401 Unauthorized`** (with a
 request passes through with no claims attached, and your handler decides what to
 do when `ctx.jwt_claims()` is `None`.
 
+## OIDC providers (JWKS)
+
+Verify tokens issued by an OIDC provider (Clerk, Auth0, Cognito, Supabase, …)
+against its published **JWKS** — RS256/ES256 public keys, fetched and cached.
+Requires the `oidc` feature:
+
+```toml
+ultimo = { version = "0.7", features = ["oidc"] }
+```
+
+```rust
+// Discover the JWKS from the issuer (reads /.well-known/openid-configuration):
+app.use_middleware(
+    Jwt::oidc("https://your-tenant.auth0.com/")
+        .audience("your-api-identifier")
+        .build(),
+);
+
+// …or point directly at a JWKS URL:
+app.use_middleware(Jwt::jwks("https://example.com/.well-known/jwks.json").build());
+```
+
+Keys are fetched over HTTPS, cached per the endpoint's `Cache-Control: max-age`
+(1 hour otherwise), and refetched automatically when a token arrives with an
+unknown `kid` (key rotation). All the builder options above (`issuer`,
+`audience`, `leeway`, `from_bearer`, `from_cookie`, `optional`) apply. Only
+asymmetric algorithms are accepted on this path — `HS*`/`none` tokens are
+rejected, preventing algorithm-confusion attacks.
+
+### Issuer cookbook
+
+| Provider    | `issuer` for `Jwt::oidc(..)`                               |
+| ----------- | --------------------------------------------------------- |
+| Clerk       | `https://<subdomain>.clerk.accounts.dev`                  |
+| Auth0       | `https://<tenant>.auth0.com/`                             |
+| AWS Cognito | `https://cognito-idp.<region>.amazonaws.com/<pool-id>`    |
+| Supabase    | `https://<project>.supabase.co/auth/v1`                   |
+
+For air-gapped setups, `Jwt::jwks_from_set(set)` verifies against an in-memory
+`JwkSet` with no network access.
+
 ## Security notes
 
 - **HS256 only (today).** RS256/EdDSA (asymmetric keys) are planned. The

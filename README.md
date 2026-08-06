@@ -114,6 +114,7 @@ Everything is opt-in (`default = []`):
 | `static-files`                                       | Static file serving + SPA fallback (`serve_static`, `serve_spa`)  |
 | `compression`                                        | Automatic gzip/brotli response compression (pure Rust, no C deps) |
 | `client-gen`                                         | Derive RPC client TypeScript types from Rust types (via `ts-rs`)  |
+| `oidc`                                               | Verify OIDC/JWKS (RS256/ES256) tokens — Clerk, Auth0, Cognito, Supabase |
 | `testing`                                            | In-process `TestClient`, assertions, fixtures                     |
 | `test-helpers`                                       | WebSocket test helpers (for integration tests)                    |
 | `sqlx-postgres` · `sqlx-mysql` · `sqlx-sqlite`       | SQLx integration per backend                                      |
