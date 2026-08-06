@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.6.0...ultimo-v0.6.1) - 2026-08-06
+
+### Added
+
+- *(rpc)* generate TanStack Query React hooks (client-gen) ([#164](https://github.com/ultimo-rs/ultimo/pull/164))
+
 ## [0.6.0](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.5.1...ultimo-v0.6.0) - 2026-07-08
 
 ### Added
