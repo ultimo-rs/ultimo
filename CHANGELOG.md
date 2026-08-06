@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-06
+
+### Added
+
+- **OIDC / JWKS verification** (`oidc` feature) — verify RS256/ES256 tokens from an OIDC provider against its remote JWKS endpoint: `Jwt::oidc(issuer)` (OIDC discovery), `Jwt::jwks(url)`, and `Jwt::jwks_from_set(set)` (offline). Keys are fetched over HTTPS, cached per `Cache-Control`, and refetched on key rotation; only asymmetric algorithms are accepted (`HS*`/`none` rejected). Cookbook for Clerk / Auth0 / Cognito / Supabase in the JWT docs. (#169)
+
+### Changed
+
+- **BREAKING:** with the `oidc` feature enabled, `Jwt` no longer implements the `UnwindSafe`/`RefUnwindSafe` auto-traits (it now holds a JWKS fetch closure). The HS256 path and all existing methods are otherwise unchanged. (#169)
+
 ## [0.7.0] - 2026-08-06
 
 ### Added
