@@ -136,11 +136,16 @@ impl SseSender {
 /// Hand a [`SseSender`] to your producers and return the stream from
 /// [`Context::sse`](crate::context::Context::sse). When every sender is dropped
 /// the stream ends and the response closes.
-pub fn sse_channel() -> (SseSender, impl futures_util::Stream<Item = SseEvent> + Send + 'static) {
+pub fn sse_channel() -> (
+    SseSender,
+    impl futures_util::Stream<Item = SseEvent> + Send + 'static,
+) {
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SseEvent>();
-    let stream = futures_util::stream::unfold(rx, |mut rx| async move {
-        rx.recv().await.map(|ev| (ev, rx))
-    });
+    let stream =
+        futures_util::stream::unfold(
+            rx,
+            |mut rx| async move { rx.recv().await.map(|ev| (ev, rx)) },
+        );
     (SseSender { tx }, stream)
 }
 

@@ -97,7 +97,10 @@ async fn keep_alive_injects_ping_when_idle() {
     });
     let out = body(app.oneshot(get("/ka")).await).await;
     assert!(out.starts_with("data: x\n\n"), "got: {out:?}");
-    assert!(out.contains(": ping\n\n"), "expected a ping comment, got: {out:?}");
+    assert!(
+        out.contains(": ping\n\n"),
+        "expected a ping comment, got: {out:?}"
+    );
     assert!(out.ends_with("data: y\n\n"), "got: {out:?}");
 }
 
