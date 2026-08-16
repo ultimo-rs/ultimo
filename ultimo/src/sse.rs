@@ -105,6 +105,45 @@ impl SseEvent {
     }
 }
 
+/// The client disconnected: the SSE stream's receiver was dropped.
+#[derive(Debug)]
+pub struct SseClosed;
+
+impl std::fmt::Display for SseClosed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SSE client disconnected")
+    }
+}
+
+impl std::error::Error for SseClosed {}
+
+/// Sends events into an SSE stream created by [`sse_channel`]. Cloneable and
+/// `Send`, so it can be shared across tasks (broadcast, notifications).
+#[derive(Clone)]
+pub struct SseSender {
+    tx: tokio::sync::mpsc::UnboundedSender<SseEvent>,
+}
+
+impl SseSender {
+    /// Push an event to the client. Returns [`SseClosed`] if the client is gone.
+    pub fn send(&self, event: SseEvent) -> std::result::Result<(), SseClosed> {
+        self.tx.send(event).map_err(|_| SseClosed)
+    }
+}
+
+/// Create an SSE `(sender, stream)` pair for the push/broadcast case.
+///
+/// Hand a [`SseSender`] to your producers and return the stream from
+/// [`Context::sse`](crate::context::Context::sse). When every sender is dropped
+/// the stream ends and the response closes.
+pub fn sse_channel() -> (SseSender, impl futures_util::Stream<Item = SseEvent> + Send + 'static) {
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SseEvent>();
+    let stream = futures_util::stream::unfold(rx, |mut rx| async move {
+        rx.recv().await.map(|ev| (ev, rx))
+    });
+    (SseSender { tx }, stream)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

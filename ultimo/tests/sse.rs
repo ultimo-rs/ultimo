@@ -100,3 +100,20 @@ async fn keep_alive_injects_ping_when_idle() {
     assert!(out.contains(": ping\n\n"), "expected a ping comment, got: {out:?}");
     assert!(out.ends_with("data: y\n\n"), "got: {out:?}");
 }
+
+#[tokio::test]
+async fn sse_channel_delivers_pushed_events() {
+    use ultimo::sse_channel;
+    let mut app = Ultimo::new_without_defaults();
+    app.get("/push", |ctx: Context| async move {
+        let (tx, rx) = sse_channel();
+        tx.send(SseEvent::data("a")).unwrap();
+        tx.send(SseEvent::data("b")).unwrap();
+        drop(tx); // end the stream so the response completes
+        ctx.sse(rx).await
+    });
+    assert_eq!(
+        body(app.oneshot(get("/push")).await).await,
+        "data: a\n\ndata: b\n\n"
+    );
+}

@@ -73,7 +73,7 @@ pub use rpc::{
     error_code, JsonRpcError, JsonRpcErrorResponse, JsonRpcOutput, JsonRpcRequest, JsonRpcResponse,
 };
 pub use rpc::{RpcRegistry, RpcRequest, RpcResponse};
-pub use sse::SseEvent;
+pub use sse::{sse_channel, SseEvent, SseSender};
 pub use validation::validate;
 
 /// Prelude module for convenient imports
@@ -87,7 +87,7 @@ pub mod prelude {
         JsonRpcError, JsonRpcErrorResponse, JsonRpcOutput, JsonRpcRequest, JsonRpcResponse,
     };
     pub use crate::rpc::{RpcRegistry, RpcRequest, RpcResponse};
-    pub use crate::sse::SseEvent;
+    pub use crate::sse::{sse_channel, SseEvent, SseSender};
     pub use crate::validation::validate;
     pub use serde::{Deserialize, Serialize};
     pub use serde_json::json;
