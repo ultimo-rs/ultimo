@@ -1,0 +1,91 @@
+# Server-Sent Events (SSE)
+
+Push typed events from the server to the browser over a long-lived
+`text/event-stream` response, consumed by the native `EventSource`. Built on
+[streaming responses](/streaming); always available (no Cargo feature).
+
+## Emitting events
+
+```rust
+use ultimo::prelude::*;
+use ultimo::SseEvent;
+
+async fn events(ctx: Context) -> Result<Response> {
+    let evs = vec![
+        SseEvent::new(&json!({ "user": "ada" }))?.event("join"),
+        SseEvent::new(&json!({ "msg": "hello" }))?.event("message"),
+    ];
+    ctx.sse(futures_util::stream::iter(evs)).await
+}
+
+// SSE is a GET; `app.sse` reads as intent (sugar over `app.get`).
+app.sse("/events", events);
+```
+
+Each `SseEvent::new(&value)` serializes your Rust type to JSON in the `data:`
+field. `.event(name)` sets the event type the client listens for; `.id(..)` and
+`.retry(..)` set the SSE `id:`/`retry:` fields.
+
+## Push / broadcast
+
+Use `sse_channel()` when events originate outside the handler (a broadcast hub,
+a background task):
+
+```rust
+use ultimo::{sse_channel, SseEvent};
+
+async fn feed(ctx: Context) -> Result<Response> {
+    let (tx, rx) = sse_channel();
+    tokio::spawn(async move {
+        for n in 0..5 {
+            if tx.send(SseEvent::new(&json!({ "n": n })).unwrap()).is_err() {
+                break; // client disconnected
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    });
+    ctx.sse(rx).await
+}
+```
+
+`SseSender` is `Clone + Send`, so share it across tasks. When every sender is
+dropped the stream ends and the response closes.
+
+## Keep-alive
+
+Idle connections and proxies can drop a quiet stream. `sse_keep_alive` injects a
+`: ping` comment when idle:
+
+```rust
+ctx.sse_keep_alive(rx, std::time::Duration::from_secs(15)).await
+```
+
+## Reconnection
+
+The browser's `EventSource` reconnects automatically and sends the last seen
+`id:` back as the `Last-Event-ID` header. Read it to resume:
+
+```rust
+let resume_from = ctx.last_event_id();
+```
+
+The framework does not buffer past events — replay from `resume_from` is your
+application's responsibility.
+
+## Consuming from the browser
+
+```ts
+const es = new EventSource("/events");
+es.addEventListener("message", (e) => {
+  const data = JSON.parse(e.data);
+  console.log(data);
+});
+es.onerror = () => {
+  // EventSource retries automatically; close to stop.
+};
+```
+
+## Full example
+
+See [`examples/sse`](https://github.com/ultimo-rs/ultimo/tree/main/examples/sse):
+`cargo run -p sse-example`, then open `http://127.0.0.1:3000`.

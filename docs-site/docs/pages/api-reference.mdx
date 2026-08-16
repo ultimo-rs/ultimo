@@ -11,6 +11,13 @@ variants: `Full` (buffered — the fast path, produced by `text`/`json`/`html`) 
 `Stream` (produced by `Context::stream`). `BoxError` is the streaming error type
 (`Box<dyn std::error::Error + Send + Sync>`).
 
+### `SseEvent`
+
+A Server-Sent Event. `SseEvent::new(&payload)` serializes a `Serialize` value to
+the `data:` field; `SseEvent::data(text)` / `SseEvent::comment(text)` for raw text
+/ keep-alive lines; chain `.event(name)`, `.id(id)`, `.retry(duration)`. Pair with
+`sse_channel() -> (SseSender, Stream)` for push/broadcast. See [SSE](/sse).
+
 ### `Ultimo`
 
 The main application struct that manages routing, middleware, and server lifecycle.
@@ -226,6 +233,29 @@ async fn download(ctx: Context) -> Result<Response> {
     ctx.stream(futures_util::stream::iter(chunks)).await
 }
 ```
+
+##### `sse<S>(&self, events: S) -> Result<Response>`
+
+Return a Server-Sent Events response streaming `SseEvent`s. Sets
+`Content-Type: text/event-stream`, `Cache-Control: no-cache`, and
+`X-Accel-Buffering: no`; no `Content-Length`.
+
+```rust
+use ultimo::SseEvent;
+
+async fn events(ctx: Context) -> Result<Response> {
+    let evs = vec![SseEvent::new(&json!({ "tick": 1 }))?.event("tick")];
+    ctx.sse(futures_util::stream::iter(evs)).await
+}
+```
+
+##### `sse_keep_alive<S>(&self, events: S, interval: Duration) -> Result<Response>`
+
+Like `sse`, but injects a `: ping` comment when idle for `interval`.
+
+##### `last_event_id(&self) -> Option<String>`
+
+The `Last-Event-ID` request header, for app-driven resume.
 
 ##### `redirect(&self, location: &str) -> Result<Response>`
 

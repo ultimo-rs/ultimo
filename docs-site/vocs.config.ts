@@ -96,6 +96,10 @@ export default defineConfig({
           link: "/streaming",
         },
         {
+          text: "Server-Sent Events",
+          link: "/sse",
+        },
+        {
           text: "WebSocket",
           link: "/websocket",
         },
