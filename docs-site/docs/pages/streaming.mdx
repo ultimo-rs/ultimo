@@ -1,0 +1,60 @@
+# Streaming Responses
+
+Return a response body incrementally instead of buffering it all in memory.
+Useful for large downloads, proxied bodies, and as the foundation for
+Server-Sent Events.
+
+Streaming is always available — no Cargo feature required.
+
+## `ctx.stream(...)`
+
+`ctx.stream` takes a `Stream` of byte chunks and sends them as they arrive. The
+response is chunked (no `Content-Length`).
+
+```rust
+use hyper::body::Bytes;
+use ultimo::prelude::*;
+use ultimo::response::BoxError;
+
+async fn numbers(ctx: Context) -> Result<Response> {
+    // Any `Stream<Item = Result<Bytes, BoxError>>` works.
+    let chunks: Vec<std::result::Result<Bytes, BoxError>> =
+        (0..5).map(|n| Ok(Bytes::from(format!("line {n}\n")))).collect();
+    ctx.stream(futures_util::stream::iter(chunks)).await
+}
+```
+
+Set a content type first if you need one:
+
+```rust
+async fn csv(ctx: Context) -> Result<Response> {
+    ctx.header("Content-Type", "text/csv").await;
+    let rows: Vec<std::result::Result<Bytes, BoxError>> = vec![
+        Ok(Bytes::from("a,b,c\n")),
+        Ok(Bytes::from("1,2,3\n")),
+    ];
+    ctx.stream(futures_util::stream::iter(rows)).await
+}
+```
+
+## Errors
+
+If a stream item yields `Err(_)`, the response connection is aborted. Emit
+`Ok(_)` chunks for normal data and reserve `Err(_)` for genuine failures.
+
+## Interaction with compression
+
+The `compression` middleware **skips streaming bodies** — it never buffers a
+stream (that would defeat streaming and risk unbounded memory). Buffered
+responses (`text`/`json`/`html`) are still compressed as usual.
+
+## The body type
+
+`Response` is `hyper::Response<UltimoBody>`. `UltimoBody::Full` is the buffered
+fast path (what `text`/`json`/`html` produce); `UltimoBody::Stream` is what
+`ctx.stream` produces. You rarely construct it directly.
+
+## Full example
+
+See [`examples/streaming`](https://github.com/ultimo-rs/ultimo/tree/main/examples/streaming):
+`cargo run -p streaming-example`, then open `http://127.0.0.1:3000`.

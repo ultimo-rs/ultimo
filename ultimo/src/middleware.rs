@@ -3,9 +3,12 @@
 //! Middleware can execute before and after handlers, modify context,
 //! and short-circuit request handling.
 
-use crate::{context::Context, error::Result, response::Response};
-use http_body_util::Full;
-use hyper::{body::Bytes, Response as HyperResponse};
+use crate::{
+    context::Context,
+    error::Result,
+    response::{Response, UltimoBody},
+};
+use hyper::Response as HyperResponse;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -189,7 +192,7 @@ pub mod builtin {
                             .header("Access-Control-Allow-Origin", origin)
                             .header("Access-Control-Allow-Methods", methods)
                             .header("Access-Control-Allow-Headers", headers)
-                            .body(Full::new(Bytes::new()))
+                            .body(UltimoBody::empty())
                             .unwrap();
                         return Ok(response);
                     }
@@ -569,7 +572,7 @@ pub mod builtin {
                     } else {
                         Ok(HyperResponse::builder()
                             .status(403)
-                            .body(Full::new(Bytes::from("Forbidden")))
+                            .body(UltimoBody::full("Forbidden"))
                             .unwrap())
                     }
                 })
@@ -726,7 +729,7 @@ pub mod builtin {
                             .status(429)
                             .header("Retry-After", window_secs.to_string())
                             .header("Content-Type", "text/plain")
-                            .body(Full::new(Bytes::from("Too Many Requests")))
+                            .body(UltimoBody::full("Too Many Requests"))
                             .unwrap())
                     }
                 })
@@ -850,12 +853,22 @@ pub mod builtin {
 
                     // Decompose response so we can inspect and replace the body.
                     let (parts, body) = res.into_parts();
-                    // Full<Bytes> is infallible — unwrap is safe.
-                    let body_bytes = body.collect().await.unwrap().to_bytes();
+
+                    // Never buffer a streaming body — pass it through untouched.
+                    let body_bytes = match body {
+                        UltimoBody::Stream(_) => {
+                            return Ok(hyper::Response::from_parts(parts, body));
+                        }
+                        // `Full<Bytes>` is infallible — unwrap is safe.
+                        UltimoBody::Full(full) => full.collect().await.unwrap().to_bytes(),
+                    };
 
                     // Skip below min_size.
                     if body_bytes.len() < min_size {
-                        return Ok(hyper::Response::from_parts(parts, Full::new(body_bytes)));
+                        return Ok(hyper::Response::from_parts(
+                            parts,
+                            UltimoBody::full(body_bytes),
+                        ));
                     }
 
                     // Skip binary content types.
@@ -877,7 +890,10 @@ pub mod builtin {
                         || SKIP_EXACT.iter().any(|e| ct.starts_with(e));
 
                     if skip {
-                        return Ok(hyper::Response::from_parts(parts, Full::new(body_bytes)));
+                        return Ok(hyper::Response::from_parts(
+                            parts,
+                            UltimoBody::full(body_bytes),
+                        ));
                     }
 
                     // Choose algorithm: prefer brotli > gzip > identity.
@@ -895,7 +911,7 @@ pub mod builtin {
                         }
                         let len = compressed.len();
                         let mut res =
-                            hyper::Response::from_parts(parts, Full::new(Bytes::from(compressed)));
+                            hyper::Response::from_parts(parts, UltimoBody::full(compressed));
                         res.headers_mut().insert(
                             CONTENT_ENCODING,
                             hyper::header::HeaderValue::from_static("br"),
@@ -914,7 +930,7 @@ pub mod builtin {
                         }
                         let len = compressed.len();
                         let mut res =
-                            hyper::Response::from_parts(parts, Full::new(Bytes::from(compressed)));
+                            hyper::Response::from_parts(parts, UltimoBody::full(compressed));
                         res.headers_mut().insert(
                             CONTENT_ENCODING,
                             hyper::header::HeaderValue::from_static("gzip"),
@@ -926,7 +942,10 @@ pub mod builtin {
                         Ok(res)
                     } else {
                         // No matching encoding — pass through unmodified.
-                        Ok(hyper::Response::from_parts(parts, Full::new(body_bytes)))
+                        Ok(hyper::Response::from_parts(
+                            parts,
+                            UltimoBody::full(body_bytes),
+                        ))
                     }
                 })
             })

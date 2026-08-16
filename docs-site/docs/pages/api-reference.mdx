@@ -4,6 +4,13 @@ Complete API reference for the Ultimo web framework.
 
 ## Core Types
 
+### `UltimoBody`
+
+The response body type (`type Response = hyper::Response<UltimoBody>`). Two
+variants: `Full` (buffered — the fast path, produced by `text`/`json`/`html`) and
+`Stream` (produced by `Context::stream`). `BoxError` is the streaming error type
+(`Box<dyn std::error::Error + Send + Sync>`).
+
 ### `Ultimo`
 
 The main application struct that manages routing, middleware, and server lifecycle.
@@ -200,6 +207,24 @@ Return an HTML response with `Content-Type: text/html`.
 
 ```rust
 ctx.html("<h1>Hello</h1>").await
+```
+
+##### `stream<S>(&self, body: S) -> Result<Response>`
+
+Return a chunked/streaming response body from a `Stream<Item = Result<Bytes, BoxError>>`.
+No `Content-Length` is set. Queued `header`/`status` are applied.
+
+```rust
+use hyper::body::Bytes;
+use ultimo::response::BoxError;
+
+async fn download(ctx: Context) -> Result<Response> {
+    let chunks: Vec<std::result::Result<Bytes, BoxError>> = vec![
+        Ok(Bytes::from("part-1")),
+        Ok(Bytes::from("part-2")),
+    ];
+    ctx.stream(futures_util::stream::iter(chunks)).await
+}
 ```
 
 ##### `redirect(&self, location: &str) -> Result<Response>`

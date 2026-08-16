@@ -3,13 +3,94 @@
 //! Internal response building that gets wrapped by Context methods.
 
 use crate::error::{Result, UltimoError};
+use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::Full;
-use hyper::{body::Bytes, header::HeaderValue, Response as HyperResponse, StatusCode};
+use hyper::body::{Body as HttpBody, Bytes, Frame, SizeHint};
+use hyper::{header::HeaderValue, Response as HyperResponse, StatusCode};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::pin::Pin;
+use std::task::{Context as TaskContext, Poll};
+
+/// Boxed error carried by a streaming response body. A stream item that yields
+/// `Err(_)` aborts the response connection.
+pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
+
+/// The response body used throughout Ultimo.
+///
+/// `Full` is the buffered fast path — the overwhelmingly common case, with no
+/// per-response boxing. `Stream` carries an incrementally produced body (see
+/// [`Context::stream`](crate::context::Context::stream)).
+pub enum UltimoBody {
+    /// A fully-buffered body.
+    Full(Full<Bytes>),
+    /// A streaming body.
+    Stream(UnsyncBoxBody<Bytes, BoxError>),
+}
+
+impl UltimoBody {
+    /// An empty buffered body.
+    pub fn empty() -> Self {
+        UltimoBody::Full(Full::new(Bytes::new()))
+    }
+
+    /// A buffered body from any bytes-like value.
+    pub fn full(bytes: impl Into<Bytes>) -> Self {
+        UltimoBody::Full(Full::new(bytes.into()))
+    }
+
+    /// A streaming body produced from a `Stream` of byte chunks.
+    ///
+    /// Each `Ok(bytes)` becomes a data frame; an `Err(_)` aborts the connection.
+    /// The response is sent chunked (no `Content-Length`).
+    pub fn stream<S>(stream: S) -> Self
+    where
+        S: futures_util::Stream<Item = std::result::Result<Bytes, BoxError>> + Send + 'static,
+    {
+        use futures_util::TryStreamExt;
+        use http_body_util::{BodyExt, StreamBody};
+        let body = StreamBody::new(stream.map_ok(Frame::data));
+        UltimoBody::Stream(body.boxed_unsync())
+    }
+}
+
+impl HttpBody for UltimoBody {
+    type Data = Bytes;
+    type Error = BoxError;
+
+    fn poll_frame(
+        self: Pin<&mut Self>,
+        cx: &mut TaskContext<'_>,
+    ) -> Poll<Option<std::result::Result<Frame<Self::Data>, Self::Error>>> {
+        match self.get_mut() {
+            // `Full`'s error is `Infallible`; box it to unify the error type.
+            UltimoBody::Full(f) => match Pin::new(f).poll_frame(cx) {
+                Poll::Ready(Some(Ok(frame))) => Poll::Ready(Some(Ok(frame))),
+                Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Box::new(e) as BoxError))),
+                Poll::Ready(None) => Poll::Ready(None),
+                Poll::Pending => Poll::Pending,
+            },
+            UltimoBody::Stream(s) => Pin::new(s).poll_frame(cx),
+        }
+    }
+
+    fn is_end_stream(&self) -> bool {
+        match self {
+            UltimoBody::Full(f) => f.is_end_stream(),
+            UltimoBody::Stream(s) => s.is_end_stream(),
+        }
+    }
+
+    fn size_hint(&self) -> SizeHint {
+        match self {
+            UltimoBody::Full(f) => f.size_hint(),
+            UltimoBody::Stream(s) => s.size_hint(),
+        }
+    }
+}
 
 /// HTTP Response type used throughout Ultimo
-pub type Response = HyperResponse<Full<Bytes>>;
+pub type Response = HyperResponse<UltimoBody>;
 
 /// Response builder for constructing HTTP responses
 #[derive(Debug)]
@@ -83,7 +164,7 @@ impl ResponseBuilder {
         // Set body
         let body = self.body.unwrap_or_default();
         response
-            .body(Full::new(Bytes::from(body)))
+            .body(UltimoBody::full(body))
             .map_err(|e| UltimoError::Internal(format!("Failed to build response: {}", e)))
     }
 }
@@ -183,5 +264,36 @@ mod tests {
         assert!(result.is_ok());
         let response = result.unwrap();
         assert_eq!(response.status(), StatusCode::CREATED);
+    }
+
+    #[tokio::test]
+    async fn ultimo_body_full_round_trips() {
+        use http_body_util::BodyExt;
+        let body = UltimoBody::full("hello world");
+        let bytes = body.collect().await.unwrap().to_bytes();
+        assert_eq!(&bytes[..], b"hello world");
+    }
+
+    #[tokio::test]
+    async fn ultimo_body_empty_is_zero_length() {
+        use http_body_util::BodyExt;
+        use hyper::body::Body as _;
+        let body = UltimoBody::empty();
+        assert!(body.is_end_stream());
+        let bytes = body.collect().await.unwrap().to_bytes();
+        assert_eq!(bytes.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn ultimo_body_stream_concatenates_chunks() {
+        use http_body_util::BodyExt;
+        let chunks: Vec<std::result::Result<Bytes, BoxError>> = vec![
+            Ok(Bytes::from("foo")),
+            Ok(Bytes::from("bar")),
+            Ok(Bytes::from("baz")),
+        ];
+        let body = UltimoBody::stream(futures_util::stream::iter(chunks));
+        let bytes = body.collect().await.unwrap().to_bytes();
+        assert_eq!(&bytes[..], b"foobarbaz");
     }
 }

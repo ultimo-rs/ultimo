@@ -97,7 +97,7 @@ async fn image_content_type_not_compressed() {
         Ok(hyper::Response::builder()
             .status(200)
             .header("content-type", "image/png")
-            .body(Full::new(Bytes::from(vec![0u8; 2048])))
+            .body(ultimo::response::UltimoBody::full(vec![0u8; 2048]))
             .unwrap())
     });
 
@@ -151,7 +151,7 @@ async fn already_encoded_response_not_double_compressed() {
             .status(200)
             .header("content-type", "text/plain")
             .header("content-encoding", "gzip") // already encoded
-            .body(Full::new(Bytes::from(vec![0u8; 2048])))
+            .body(ultimo::response::UltimoBody::full(vec![0u8; 2048]))
             .unwrap())
     });
 

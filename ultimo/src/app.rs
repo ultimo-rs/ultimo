@@ -32,11 +32,8 @@ use crate::websocket::{ChannelManager, WebSocketConfig, WebSocketHandler, WebSoc
 
 /// WebSocket handler function type
 #[cfg(feature = "websocket")]
-type BoxedWebSocketHandler = Arc<
-    dyn Fn(WebSocketUpgrade<()>) -> hyper::Response<http_body_util::Full<bytes::Bytes>>
-        + Send
-        + Sync,
->;
+type BoxedWebSocketHandler =
+    Arc<dyn Fn(WebSocketUpgrade<()>) -> crate::response::Response + Send + Sync>;
 
 /// Main Ultimo application
 pub struct Ultimo {

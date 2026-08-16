@@ -550,19 +550,28 @@ impl Context {
         headers.insert(name.into(), value.into());
     }
 
+    /// Snapshot the queued response status (defaulting to 200) and headers, so
+    /// the buffered (`build_response`) and streaming (`stream`) paths apply them
+    /// the same way and can't drift.
+    async fn response_meta(&self) -> (u16, Vec<(String, String)>) {
+        let status = self.response_status.read().await.unwrap_or(200);
+        let headers = self
+            .response_headers
+            .read()
+            .await
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        (status, headers)
+    }
+
     /// Build response with collected status and headers
     async fn build_response(&self, mut builder: ResponseBuilder) -> ResponseBuilder {
-        // Apply status if set
-        if let Some(status) = *self.response_status.read().await {
-            builder = builder.status(status);
+        let (status, headers) = self.response_meta().await;
+        builder = builder.status(status);
+        for (name, value) in headers {
+            builder = builder.header(name, value);
         }
-
-        // Apply headers
-        let headers = self.response_headers.read().await;
-        for (name, value) in headers.iter() {
-            builder = builder.header(name.clone(), value.clone());
-        }
-
         builder
     }
 
@@ -582,6 +591,55 @@ impl Context {
     pub async fn html(&self, html: impl Into<String>) -> Result<Response> {
         let builder = self.build_response(ResponseBuilder::new()).await;
         builder.html(html).build()
+    }
+
+    /// Return a streaming response body.
+    ///
+    /// Each `Ok(bytes)` item is sent as a chunk; the response is chunked (no
+    /// `Content-Length`). Any queued `header`/`status` set on the context is
+    /// applied, except `Content-Length`/`Transfer-Encoding` (which would
+    /// conflict with the chunked framing and are dropped). If no `Content-Type`
+    /// was set, it defaults to `application/octet-stream`. An `Err(_)` item
+    /// aborts the connection.
+    ///
+    /// ```no_run
+    /// # use ultimo::prelude::*;
+    /// # use ultimo::response::BoxError;
+    /// # use hyper::body::Bytes;
+    /// # async fn h(ctx: Context) -> ultimo::error::Result<ultimo::response::Response> {
+    /// let chunks: Vec<std::result::Result<Bytes, BoxError>> = vec![Ok(Bytes::from("hi"))];
+    /// ctx.stream(futures_util::stream::iter(chunks)).await
+    /// # }
+    /// ```
+    pub async fn stream<S>(&self, body: S) -> Result<Response>
+    where
+        S: futures_util::Stream<Item = std::result::Result<Bytes, crate::response::BoxError>>
+            + Send
+            + 'static,
+    {
+        let (status, headers) = self.response_meta().await;
+        let mut builder = hyper::Response::builder()
+            .status(hyper::StatusCode::from_u16(status).unwrap_or(hyper::StatusCode::OK));
+        let mut has_content_type = false;
+        for (name, value) in headers {
+            // A streaming body is chunked with unknown length — never carry a
+            // Content-Length or Transfer-Encoding from the queued headers, or
+            // the framing conflicts with hyper's chunked encoding.
+            match name.to_ascii_lowercase().as_str() {
+                "content-length" | "transfer-encoding" => continue,
+                "content-type" => has_content_type = true,
+                _ => {}
+            }
+            builder = builder.header(name, value);
+        }
+        // Default a content type so intermediaries don't content-sniff (which
+        // can buffer the whole body and defeat streaming).
+        if !has_content_type {
+            builder = builder.header("Content-Type", "application/octet-stream");
+        }
+        builder
+            .body(crate::response::UltimoBody::stream(body))
+            .map_err(|e| UltimoError::Internal(format!("Failed to build response: {}", e)))
     }
 
     /// Return a redirect response
