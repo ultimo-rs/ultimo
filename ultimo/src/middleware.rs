@@ -853,8 +853,15 @@ pub mod builtin {
 
                     // Decompose response so we can inspect and replace the body.
                     let (parts, body) = res.into_parts();
-                    // Full<Bytes> is infallible — unwrap is safe.
-                    let body_bytes = body.collect().await.unwrap().to_bytes();
+
+                    // Never buffer a streaming body — pass it through untouched.
+                    let body_bytes = match body {
+                        UltimoBody::Stream(_) => {
+                            return Ok(hyper::Response::from_parts(parts, body));
+                        }
+                        // `Full<Bytes>` is infallible — unwrap is safe.
+                        UltimoBody::Full(full) => full.collect().await.unwrap().to_bytes(),
+                    };
 
                     // Skip below min_size.
                     if body_bytes.len() < min_size {
