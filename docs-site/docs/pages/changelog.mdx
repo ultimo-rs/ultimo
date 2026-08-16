@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-16
+
+### Added
+
+- Typed Server-Sent Events — `app.sse`/`ctx.sse`, `SseEvent`, `sse_keep_alive`, `sse_channel`, `ctx.last_event_id` ([#173](https://github.com/ultimo-rs/ultimo/pull/173))
+
+### Changed
+
+- **[breaking]** Streaming response bodies — `Response` now wraps `UltimoBody` (buffered fast-path + streaming variant) with `ctx.stream` ([#171](https://github.com/ultimo-rs/ultimo/pull/171))
+
 ## [0.8.0] - 2026-08-06
 
 ### Added
