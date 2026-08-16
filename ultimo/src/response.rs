@@ -3,7 +3,7 @@
 //! Internal response building that gets wrapped by Context methods.
 
 use crate::error::{Result, UltimoError};
-use http_body_util::combinators::BoxBody;
+use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::Full;
 use hyper::body::{Body as HttpBody, Bytes, Frame, SizeHint};
 use hyper::{header::HeaderValue, Response as HyperResponse, StatusCode};
@@ -25,7 +25,7 @@ pub enum UltimoBody {
     /// A fully-buffered body.
     Full(Full<Bytes>),
     /// A streaming body.
-    Stream(BoxBody<Bytes, BoxError>),
+    Stream(UnsyncBoxBody<Bytes, BoxError>),
 }
 
 impl UltimoBody {
@@ -37,6 +37,20 @@ impl UltimoBody {
     /// A buffered body from any bytes-like value.
     pub fn full(bytes: impl Into<Bytes>) -> Self {
         UltimoBody::Full(Full::new(bytes.into()))
+    }
+
+    /// A streaming body produced from a `Stream` of byte chunks.
+    ///
+    /// Each `Ok(bytes)` becomes a data frame; an `Err(_)` aborts the connection.
+    /// The response is sent chunked (no `Content-Length`).
+    pub fn stream<S>(stream: S) -> Self
+    where
+        S: futures_util::Stream<Item = std::result::Result<Bytes, BoxError>> + Send + 'static,
+    {
+        use futures_util::TryStreamExt;
+        use http_body_util::{BodyExt, StreamBody};
+        let body = StreamBody::new(stream.map_ok(Frame::data));
+        UltimoBody::Stream(body.boxed_unsync())
     }
 }
 
@@ -268,5 +282,18 @@ mod tests {
         assert!(body.is_end_stream());
         let bytes = body.collect().await.unwrap().to_bytes();
         assert_eq!(bytes.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn ultimo_body_stream_concatenates_chunks() {
+        use http_body_util::BodyExt;
+        let chunks: Vec<std::result::Result<Bytes, BoxError>> = vec![
+            Ok(Bytes::from("foo")),
+            Ok(Bytes::from("bar")),
+            Ok(Bytes::from("baz")),
+        ];
+        let body = UltimoBody::stream(futures_util::stream::iter(chunks));
+        let bytes = body.collect().await.unwrap().to_bytes();
+        assert_eq!(&bytes[..], b"foobarbaz");
     }
 }
