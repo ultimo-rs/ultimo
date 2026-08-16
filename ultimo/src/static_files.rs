@@ -2,9 +2,10 @@
 //!
 //! Enabled by the `static-files` Cargo feature.
 
-use crate::{error::UltimoError, response::Response};
-use bytes::Bytes;
-use http_body_util::Full;
+use crate::{
+    error::UltimoError,
+    response::{Response, UltimoBody},
+};
 use hyper::{header, StatusCode};
 use std::path::Path;
 
@@ -67,7 +68,7 @@ pub(crate) async fn serve_file(
         if inm.trim() == etag.as_str() {
             return Ok(hyper::Response::builder()
                 .status(StatusCode::NOT_MODIFIED)
-                .body(Full::new(Bytes::new()))
+                .body(UltimoBody::empty())
                 .unwrap());
         }
     }
@@ -87,6 +88,6 @@ pub(crate) async fn serve_file(
         .header(header::CONTENT_TYPE, mime)
         .header(header::ETAG, etag)
         .header(header::CONTENT_LENGTH, content.len())
-        .body(Full::new(Bytes::from(content)))
+        .body(UltimoBody::full(content))
         .unwrap())
 }

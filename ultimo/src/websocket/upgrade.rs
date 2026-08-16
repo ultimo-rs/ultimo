@@ -4,8 +4,6 @@ use super::connection::{ConnectionHandler, WebSocket};
 use super::frame::Message;
 use super::pubsub::ChannelManager;
 use super::WebSocketConfig;
-use bytes::Bytes;
-use http_body_util::Full;
 use hyper::header::{
     CONNECTION, ORIGIN, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE,
 };
@@ -92,7 +90,7 @@ where
     }
 
     /// Set callback to be executed when WebSocket is upgraded
-    pub fn on_upgrade<F, Fut>(self, callback: F) -> HyperResponse<Full<Bytes>>
+    pub fn on_upgrade<F, Fut>(self, callback: F) -> crate::response::Response
     where
         F: FnOnce(WebSocket<T>) -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static,
@@ -102,7 +100,7 @@ where
         if !is_valid_upgrade_request(&self.request) {
             return HyperResponse::builder()
                 .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::from("Invalid WebSocket upgrade request")))
+                .body(crate::response::UltimoBody::full("Invalid WebSocket upgrade request"))
                 .unwrap();
         }
 
@@ -110,7 +108,7 @@ where
         if !origin_allowed(&self.allowed_origins, request_origin(&self.request)) {
             return HyperResponse::builder()
                 .status(StatusCode::FORBIDDEN)
-                .body(Full::new(Bytes::from("Origin not allowed")))
+                .body(crate::response::UltimoBody::full("Origin not allowed"))
                 .unwrap();
         }
 
@@ -120,7 +118,7 @@ where
             None => {
                 return HyperResponse::builder()
                     .status(StatusCode::BAD_REQUEST)
-                    .body(Full::new(Bytes::from("Missing Sec-WebSocket-Key header")))
+                    .body(crate::response::UltimoBody::full("Missing Sec-WebSocket-Key header"))
                     .unwrap();
             }
         };
@@ -140,7 +138,7 @@ where
             response = response.header(key, value);
         }
 
-        let response = response.body(Full::new(Bytes::new())).unwrap();
+        let response = response.body(crate::response::UltimoBody::empty()).unwrap();
 
         // Spawn upgrade handler
         let data = self.data.expect("WebSocket data not set");
@@ -195,7 +193,7 @@ where
     }
 
     /// Set callback that receives incoming messages through a channel
-    pub fn on_upgrade_with_receiver<F, Fut>(self, callback: F) -> HyperResponse<Full<Bytes>>
+    pub fn on_upgrade_with_receiver<F, Fut>(self, callback: F) -> crate::response::Response
     where
         F: FnOnce(
                 WebSocket<T>,
@@ -211,7 +209,7 @@ where
         if !is_valid_upgrade_request(&self.request) {
             return HyperResponse::builder()
                 .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::from("Invalid WebSocket upgrade request")))
+                .body(crate::response::UltimoBody::full("Invalid WebSocket upgrade request"))
                 .unwrap();
         }
 
@@ -219,7 +217,7 @@ where
         if !origin_allowed(&self.allowed_origins, request_origin(&self.request)) {
             return HyperResponse::builder()
                 .status(StatusCode::FORBIDDEN)
-                .body(Full::new(Bytes::from("Origin not allowed")))
+                .body(crate::response::UltimoBody::full("Origin not allowed"))
                 .unwrap();
         }
 
@@ -229,7 +227,7 @@ where
             None => {
                 return HyperResponse::builder()
                     .status(StatusCode::BAD_REQUEST)
-                    .body(Full::new(Bytes::from("Missing Sec-WebSocket-Key header")))
+                    .body(crate::response::UltimoBody::full("Missing Sec-WebSocket-Key header"))
                     .unwrap();
             }
         };
@@ -249,7 +247,7 @@ where
             response = response.header(key, value);
         }
 
-        let response = response.body(Full::new(Bytes::new())).unwrap();
+        let response = response.body(crate::response::UltimoBody::empty()).unwrap();
 
         // Spawn upgrade handler
         let data = self.data.expect("WebSocket data not set");
@@ -298,7 +296,7 @@ where
     }
 
     /// Build the upgrade response without a callback (for manual handling)
-    pub fn build(self) -> HyperResponse<Full<Bytes>>
+    pub fn build(self) -> crate::response::Response
     where
         T: Default,
     {
