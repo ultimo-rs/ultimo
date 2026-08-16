@@ -34,6 +34,7 @@ async fn ctx_stream_sends_chunks_without_content_length() {
     assert_eq!(&body[..], b"chunk-1;chunk-2;chunk-3");
 }
 
+#[cfg(feature = "compression")]
 #[tokio::test]
 async fn compression_passes_streaming_bodies_through() {
     use ultimo::middleware::builtin::compression;
@@ -62,6 +63,7 @@ async fn compression_passes_streaming_bodies_through() {
     assert_eq!(body.len(), 100 * 64);
 }
 
+#[cfg(feature = "compression")]
 #[tokio::test]
 async fn compression_still_compresses_buffered_bodies() {
     use ultimo::middleware::builtin::compression;

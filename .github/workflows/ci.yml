@@ -141,7 +141,7 @@ jobs:
       # Tests in ultimo/tests/compression.rs cover gzip, brotli, skip rules,
       # Vary header, double-compress guard, and builder min_size override.
       - name: Compression tests (compression feature)
-        run: cargo test -p ultimo --features "compression" --test compression
+        run: cargo test -p ultimo --features "compression" --test compression --test streaming
 
       # TypeScript client generation (ts-rs type derivation). Covers the decl
       # collector, derived query/mutation, and the golden-file client test.
