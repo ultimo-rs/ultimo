@@ -161,6 +161,17 @@ impl Ultimo {
         self.add_route(Method::GET, path, handler)
     }
 
+    /// Register an SSE route. SSE responses are served over `GET`, so this is
+    /// sugar over [`get`](Self::get) that reads as intent. Return
+    /// [`Context::sse`](crate::context::Context::sse) from the handler.
+    pub fn sse<Args>(
+        &mut self,
+        path: &str,
+        handler: impl IntoHandler<Args> + 'static,
+    ) -> &mut Self {
+        self.get(path, handler)
+    }
+
     /// Add a POST route
     pub fn post<Args>(
         &mut self,

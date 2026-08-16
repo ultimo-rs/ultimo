@@ -117,3 +117,15 @@ async fn sse_channel_delivers_pushed_events() {
         "data: a\n\ndata: b\n\n"
     );
 }
+
+#[tokio::test]
+async fn app_sse_registers_a_get_route() {
+    let mut app = Ultimo::new_without_defaults();
+    app.sse("/events", |ctx: Context| async move {
+        ctx.sse(futures_util::stream::iter(vec![SseEvent::data("hi")]))
+            .await
+    });
+    let resp = app.oneshot(get("/events")).await;
+    assert_eq!(resp.status(), 200);
+    assert_eq!(body(resp).await, "data: hi\n\n");
+}
