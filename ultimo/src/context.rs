@@ -668,6 +668,31 @@ impl Context {
         self.stream(bytes).await
     }
 
+    /// Like [`sse`](Self::sse), but injects a `: ping` comment whenever the
+    /// event stream is idle for `interval`, so proxies and idle connections
+    /// aren't dropped. Terminates when the event stream ends.
+    pub async fn sse_keep_alive<S>(
+        &self,
+        events: S,
+        interval: std::time::Duration,
+    ) -> Result<Response>
+    where
+        S: futures_util::Stream<Item = crate::sse::SseEvent> + Send + 'static,
+    {
+        use futures_util::StreamExt;
+        let merged = futures_util::stream::unfold(
+            (Box::pin(events), interval),
+            |(mut events, interval)| async move {
+                match tokio::time::timeout(interval, events.next()).await {
+                    Ok(Some(ev)) => Some((ev, (events, interval))),
+                    Ok(None) => None, // event stream ended → stop
+                    Err(_) => Some((crate::sse::SseEvent::comment("ping"), (events, interval))),
+                }
+            },
+        );
+        self.sse(merged).await
+    }
+
     /// The `Last-Event-ID` request header, if present, for app-driven resume.
     pub fn last_event_id(&self) -> Option<String> {
         self.req.header("last-event-id")

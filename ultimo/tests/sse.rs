@@ -63,3 +63,40 @@ async fn ctx_last_event_id_reads_header() {
         .unwrap();
     assert_eq!(body(app.oneshot(req).await).await, "42");
 }
+
+#[tokio::test]
+async fn keep_alive_passes_events_through_and_terminates() {
+    use std::time::Duration;
+    let mut app = Ultimo::new_without_defaults();
+    app.get("/ka", |ctx: Context| async move {
+        let evs = vec![SseEvent::data("a"), SseEvent::data("b")];
+        // Long interval → no ping fires; stream still ends when events end.
+        ctx.sse_keep_alive(futures_util::stream::iter(evs), Duration::from_secs(60))
+            .await
+    });
+    assert_eq!(
+        body(app.oneshot(get("/ka")).await).await,
+        "data: a\n\ndata: b\n\n"
+    );
+}
+
+#[tokio::test]
+async fn keep_alive_injects_ping_when_idle() {
+    use std::time::Duration;
+    let mut app = Ultimo::new_without_defaults();
+    app.get("/ka", |ctx: Context| async move {
+        use futures_util::StreamExt;
+        // One event, then a gap longer than the ping interval, then end.
+        let s = futures_util::stream::once(async { SseEvent::data("x") }).chain(
+            futures_util::stream::once(async {
+                tokio::time::sleep(Duration::from_millis(60)).await;
+                SseEvent::data("y")
+            }),
+        );
+        ctx.sse_keep_alive(s, Duration::from_millis(10)).await
+    });
+    let out = body(app.oneshot(get("/ka")).await).await;
+    assert!(out.starts_with("data: x\n\n"), "got: {out:?}");
+    assert!(out.contains(": ping\n\n"), "expected a ping comment, got: {out:?}");
+    assert!(out.ends_with("data: y\n\n"), "got: {out:?}");
+}
