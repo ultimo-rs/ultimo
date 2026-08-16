@@ -584,6 +584,39 @@ impl Context {
         builder.html(html).build()
     }
 
+    /// Return a streaming response body.
+    ///
+    /// Each `Ok(bytes)` item is sent as a chunk; the response has no
+    /// `Content-Length` (chunked transfer). Any queued `header`/`status` set on
+    /// the context is applied. An `Err(_)` item aborts the connection.
+    ///
+    /// ```no_run
+    /// # use ultimo::prelude::*;
+    /// # use ultimo::response::BoxError;
+    /// # use hyper::body::Bytes;
+    /// # async fn h(ctx: Context) -> ultimo::error::Result<ultimo::response::Response> {
+    /// let chunks: Vec<std::result::Result<Bytes, BoxError>> = vec![Ok(Bytes::from("hi"))];
+    /// ctx.stream(futures_util::stream::iter(chunks)).await
+    /// # }
+    /// ```
+    pub async fn stream<S>(&self, body: S) -> Result<Response>
+    where
+        S: futures_util::Stream<Item = std::result::Result<Bytes, crate::response::BoxError>>
+            + Send
+            + 'static,
+    {
+        let status = self.response_status.read().await.unwrap_or(200);
+        let mut builder = hyper::Response::builder()
+            .status(hyper::StatusCode::from_u16(status).unwrap_or(hyper::StatusCode::OK));
+        let headers = self.response_headers.read().await;
+        for (name, value) in headers.iter() {
+            builder = builder.header(name.clone(), value.clone());
+        }
+        builder
+            .body(crate::response::UltimoBody::stream(body))
+            .map_err(|e| UltimoError::Internal(format!("Failed to build response: {}", e)))
+    }
+
     /// Return a redirect response
     pub async fn redirect(&self, location: &str) -> Result<Response> {
         let status = self.response_status.read().await.unwrap_or(302);
