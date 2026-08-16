@@ -51,11 +51,44 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Use the PAT so commits this job pushes to the release PR branch
+          # (the version sync below) re-trigger CI, same rationale as the PR itself.
+          token: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
       - name: Run release-plz (release-pr)
+        id: release-pr
         uses: release-plz/action@v0.5
         with:
           command: release-pr
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # release-plz bumps only the Cargo workspace version + per-crate changelog.
+      # Propagate that to the repo's derived version surfaces (docs/website
+      # package.json, hero badge, install snippets, CLAUDE.md/AGENTS.md/blog) and
+      # promote the root + docs changelogs — the surfaces the version-sync gate
+      # checks — then push them onto the release PR branch. Without this, every
+      # release PR fails version-sync. Self-healing: re-runs re-apply the sync.
+      - name: Sync derived version surfaces onto the release PR
+        if: ${{ steps.release-pr.outputs.pr != '' }}
+        env:
+          RELEASE_PR: ${{ steps.release-pr.outputs.pr }}
+        run: |
+          set -euo pipefail
+          BRANCH=$(printf '%s' "$RELEASE_PR" | jq -r '.head_branch // empty')
+          if [ -z "$BRANCH" ]; then
+            echo "No release PR branch reported; nothing to sync."
+            exit 0
+          fi
+          git fetch origin "$BRANCH"
+          git checkout "$BRANCH"
+          bash scripts/sync-versions.sh
+          if git diff --quiet; then
+            echo "Derived surfaces already in sync."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: sync derived version surfaces + changelogs"
+          git push origin "$BRANCH"

@@ -87,4 +87,59 @@ if [ -f "$ROADMAP" ]; then
   echo "  updated $ROADMAP — (Current) → v$VERSION"
 fi
 
+# Promote the hand-maintained root changelogs (CHANGELOG.md + the docs-site
+# changelog page) to the release version. release-plz maintains the per-crate
+# `ultimo/CHANGELOG.md` from Conventional Commits but never touches these two
+# files, yet `check-versions.sh` requires their newest released heading to match
+# the workspace version. Mirror the newest per-crate section into them so a
+# release PR passes the version-sync gate without hand editing.
+CRATE_CHANGELOG="ultimo/CHANGELOG.md"
+promote_changelog() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+  [ -f "$CRATE_CHANGELOG" ] || return 0
+  # Idempotent: skip if this version is already the newest released entry.
+  if grep -q "^## \[$VERSION\]" "$file"; then
+    return 0
+  fi
+
+  # Extract the newest released section from the per-crate changelog (from its
+  # first non-Unreleased `## [` heading up to the next `## [` heading), and
+  # rewrite the heading `## [x.y.z](compare-url) - DATE` → `## [x.y.z] - DATE`.
+  local block
+  block=$(awk '
+    /^## \[/ {
+      if ($0 ~ /Unreleased/) next
+      sec++
+      grab = (sec == 1) ? 1 : 0
+    }
+    grab { print }
+  ' "$CRATE_CHANGELOG" | sed -E "s/^## \[$VERSION\]\([^)]*\)/## [$VERSION]/")
+
+  if [ -z "$block" ] || ! printf '%s' "$block" | grep -q "^## \[$VERSION\]"; then
+    echo "  ⚠️  could not extract v$VERSION section from $CRATE_CHANGELOG; skipping $file"
+    return 0
+  fi
+
+  # Insert the block right after the `## [Unreleased]` heading.
+  local tmp
+  tmp=$(mktemp)
+  printf '%s\n' "$block" > "$tmp"
+  awk -v blockfile="$tmp" '
+    /^## \[Unreleased\]/ && !done {
+      print
+      print ""
+      while ((getline line < blockfile) > 0) print line
+      done = 1
+      next
+    }
+    { print }
+  ' "$file" > "$file.new" && mv "$file.new" "$file"
+  rm -f "$tmp"
+  echo "  promoted $file — [Unreleased] → [$VERSION]"
+}
+
+promote_changelog CHANGELOG.md
+promote_changelog docs-site/docs/pages/changelog.mdx
+
 echo "✅ Done. Review with: git diff"
