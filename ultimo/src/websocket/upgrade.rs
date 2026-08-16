@@ -100,7 +100,9 @@ where
         if !is_valid_upgrade_request(&self.request) {
             return HyperResponse::builder()
                 .status(StatusCode::BAD_REQUEST)
-                .body(crate::response::UltimoBody::full("Invalid WebSocket upgrade request"))
+                .body(crate::response::UltimoBody::full(
+                    "Invalid WebSocket upgrade request",
+                ))
                 .unwrap();
         }
 
@@ -118,7 +120,9 @@ where
             None => {
                 return HyperResponse::builder()
                     .status(StatusCode::BAD_REQUEST)
-                    .body(crate::response::UltimoBody::full("Missing Sec-WebSocket-Key header"))
+                    .body(crate::response::UltimoBody::full(
+                        "Missing Sec-WebSocket-Key header",
+                    ))
                     .unwrap();
             }
         };
@@ -209,7 +213,9 @@ where
         if !is_valid_upgrade_request(&self.request) {
             return HyperResponse::builder()
                 .status(StatusCode::BAD_REQUEST)
-                .body(crate::response::UltimoBody::full("Invalid WebSocket upgrade request"))
+                .body(crate::response::UltimoBody::full(
+                    "Invalid WebSocket upgrade request",
+                ))
                 .unwrap();
         }
 
@@ -227,7 +233,9 @@ where
             None => {
                 return HyperResponse::builder()
                     .status(StatusCode::BAD_REQUEST)
-                    .body(crate::response::UltimoBody::full("Missing Sec-WebSocket-Key header"))
+                    .body(crate::response::UltimoBody::full(
+                        "Missing Sec-WebSocket-Key header",
+                    ))
                     .unwrap();
             }
         };

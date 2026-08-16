@@ -865,7 +865,10 @@ pub mod builtin {
 
                     // Skip below min_size.
                     if body_bytes.len() < min_size {
-                        return Ok(hyper::Response::from_parts(parts, UltimoBody::full(body_bytes)));
+                        return Ok(hyper::Response::from_parts(
+                            parts,
+                            UltimoBody::full(body_bytes),
+                        ));
                     }
 
                     // Skip binary content types.
@@ -887,7 +890,10 @@ pub mod builtin {
                         || SKIP_EXACT.iter().any(|e| ct.starts_with(e));
 
                     if skip {
-                        return Ok(hyper::Response::from_parts(parts, UltimoBody::full(body_bytes)));
+                        return Ok(hyper::Response::from_parts(
+                            parts,
+                            UltimoBody::full(body_bytes),
+                        ));
                     }
 
                     // Choose algorithm: prefer brotli > gzip > identity.
@@ -936,7 +942,10 @@ pub mod builtin {
                         Ok(res)
                     } else {
                         // No matching encoding — pass through unmodified.
-                        Ok(hyper::Response::from_parts(parts, UltimoBody::full(body_bytes)))
+                        Ok(hyper::Response::from_parts(
+                            parts,
+                            UltimoBody::full(body_bytes),
+                        ))
                     }
                 })
             })

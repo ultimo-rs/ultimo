@@ -53,7 +53,9 @@ async fn compression_passes_streaming_bodies_through() {
         .unwrap();
     let resp = app.oneshot(req).await;
     assert!(
-        resp.headers().get(hyper::header::CONTENT_ENCODING).is_none(),
+        resp.headers()
+            .get(hyper::header::CONTENT_ENCODING)
+            .is_none(),
         "streaming bodies must not be compressed"
     );
     let body = resp.into_body().collect().await.unwrap().to_bytes();
