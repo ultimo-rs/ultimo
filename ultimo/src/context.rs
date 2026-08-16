@@ -642,6 +642,62 @@ impl Context {
             .map_err(|e| UltimoError::Internal(format!("Failed to build response: {}", e)))
     }
 
+    /// Return a Server-Sent Events response streaming typed events.
+    ///
+    /// Sets `Content-Type: text/event-stream`, `Cache-Control: no-cache`, and
+    /// `X-Accel-Buffering: no`, then streams each [`SseEvent`](crate::sse::SseEvent)
+    /// encoded to the SSE wire format (chunked, no `Content-Length`).
+    ///
+    /// ```no_run
+    /// # use ultimo::prelude::*;
+    /// # use ultimo::SseEvent;
+    /// # async fn h(ctx: Context) -> ultimo::error::Result<ultimo::response::Response> {
+    /// let evs = vec![SseEvent::new(&json!({ "hello": "world" }))?];
+    /// ctx.sse(futures_util::stream::iter(evs)).await
+    /// # }
+    /// ```
+    pub async fn sse<S>(&self, events: S) -> Result<Response>
+    where
+        S: futures_util::Stream<Item = crate::sse::SseEvent> + Send + 'static,
+    {
+        use futures_util::StreamExt;
+        self.header("Content-Type", "text/event-stream").await;
+        self.header("Cache-Control", "no-cache").await;
+        self.header("X-Accel-Buffering", "no").await;
+        let bytes = events.map(|e| Ok::<_, crate::response::BoxError>(e.encode()));
+        self.stream(bytes).await
+    }
+
+    /// Like [`sse`](Self::sse), but injects a `: ping` comment whenever the
+    /// event stream is idle for `interval`, so proxies and idle connections
+    /// aren't dropped. Terminates when the event stream ends.
+    pub async fn sse_keep_alive<S>(
+        &self,
+        events: S,
+        interval: std::time::Duration,
+    ) -> Result<Response>
+    where
+        S: futures_util::Stream<Item = crate::sse::SseEvent> + Send + 'static,
+    {
+        use futures_util::StreamExt;
+        let merged = futures_util::stream::unfold(
+            (Box::pin(events), interval),
+            |(mut events, interval)| async move {
+                match tokio::time::timeout(interval, events.next()).await {
+                    Ok(Some(ev)) => Some((ev, (events, interval))),
+                    Ok(None) => None, // event stream ended → stop
+                    Err(_) => Some((crate::sse::SseEvent::comment("ping"), (events, interval))),
+                }
+            },
+        );
+        self.sse(merged).await
+    }
+
+    /// The `Last-Event-ID` request header, if present, for app-driven resume.
+    pub fn last_event_id(&self) -> Option<String> {
+        self.req.header("last-event-id")
+    }
+
     /// Return a redirect response
     pub async fn redirect(&self, location: &str) -> Result<Response> {
         let status = self.response_status.read().await.unwrap_or(302);
