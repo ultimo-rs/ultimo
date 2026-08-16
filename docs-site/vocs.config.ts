@@ -92,6 +92,10 @@ export default defineConfig({
           link: "/static-files",
         },
         {
+          text: "Streaming Responses",
+          link: "/streaming",
+        },
+        {
           text: "WebSocket",
           link: "/websocket",
         },
