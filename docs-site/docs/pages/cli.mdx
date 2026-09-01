@@ -248,6 +248,17 @@ the running server, rebuilds with `cargo build`, and restarts. Compilation
 errors are printed inline — the watcher stays active so the server restarts
 automatically once you fix the error.
 
+## MCP Server (for AI coding agents)
+
+`ultimo mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io)
+server over stdio, giving a coding agent live tools: search the docs, list/read
+examples, scaffold projects, and introspect a project's typed RPC surface. See
+[Using Ultimo with AI coding agents](/ai-agents) for the setup.
+
+```bash
+ultimo mcp   # speaks MCP over stdio (run by your agent, not directly)
+```
+
 ## Future Commands
 
 > ⚠️ **Not implemented yet.** These commands exist as placeholders and currently

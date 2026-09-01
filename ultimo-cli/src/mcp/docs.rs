@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 
 type FetchFut = Pin<Box<dyn Future<Output = anyhow::Result<String>> + Send>>;
 type FetchFn = Arc<dyn Fn() -> FetchFut + Send + Sync>;
+type CorpusCache = Arc<RwLock<Option<(Arc<Corpus>, Instant)>>>;
 
 /// One documentation page, parsed from a `## Heading` section of `llms-full.txt`.
 #[derive(Debug, Clone)]
@@ -135,7 +136,7 @@ fn snippet(body: &str, max: usize) -> String {
 #[derive(Clone)]
 pub struct DocsCorpus {
     fetch: FetchFn,
-    cache: Arc<RwLock<Option<(Arc<Corpus>, Instant)>>>,
+    cache: CorpusCache,
     ttl: Duration,
 }
 

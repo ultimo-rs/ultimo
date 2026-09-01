@@ -19,7 +19,8 @@ fn help_lists_the_real_subcommands() {
         .stdout(contains("generate"))
         .stdout(contains("new"))
         .stdout(contains("dev"))
-        .stdout(contains("build"));
+        .stdout(contains("build"))
+        .stdout(contains("mcp"));
 }
 
 #[test]
