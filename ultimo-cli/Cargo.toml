@@ -23,6 +23,8 @@ anyhow = "1.0"
 colored = "2.1"
 notify = "8"
 notify-debouncer-mini = "0.5"
+rmcp = { version = "0.16", features = ["server", "transport-io", "macros"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 
 [dev-dependencies]
 assert_cmd = "2"

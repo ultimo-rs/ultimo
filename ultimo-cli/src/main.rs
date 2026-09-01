@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 mod dev;
 mod generate;
+mod mcp;
 mod new;
 
 #[derive(Parser)]
@@ -59,11 +60,20 @@ enum Commands {
         #[arg(short, long, default_value = "release")]
         profile: String,
     },
+
+    /// Run a Model Context Protocol server (stdio) for AI coding agents
+    Mcp,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+
+    // The MCP server speaks JSON-RPC over stdout — it must emit no banner or any
+    // other stdout noise, so handle it before printing anything.
+    if let Commands::Mcp = cli.command {
+        return mcp::run().await;
+    }
 
     println!("{}", "⚡ Ultimo Framework CLI".bold().cyan());
     println!();
@@ -89,6 +99,8 @@ async fn main() -> anyhow::Result<()> {
                 "cargo build --release".cyan()
             );
         }
+        // Handled before the banner above.
+        Commands::Mcp => unreachable!(),
     }
 
     Ok(())
