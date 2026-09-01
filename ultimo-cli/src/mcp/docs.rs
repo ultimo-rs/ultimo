@@ -87,7 +87,7 @@ impl Corpus {
             .filter(|(score, _)| *score > 0)
             .collect();
 
-        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.sort_by_key(|(score, _)| std::cmp::Reverse(*score));
 
         if scored.is_empty() {
             return format!("No Ultimo docs match '{query}'.");
