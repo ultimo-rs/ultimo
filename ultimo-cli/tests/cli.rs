@@ -63,6 +63,68 @@ fn new_scaffolds_a_project() {
 }
 
 #[test]
+fn new_scaffold_pins_current_ultimo_version() {
+    let tmp = tempfile::tempdir().unwrap();
+    ultimo()
+        .current_dir(tmp.path())
+        .args(["new", "demo", "--template", "basic"])
+        .assert()
+        .success();
+
+    let cargo = fs::read_to_string(tmp.path().join("demo/Cargo.toml")).unwrap();
+    // The scaffold must pin the current `ultimo` major.minor, derived from this
+    // CLI's own version so it can never drift back to a stale pin.
+    let v = env!("CARGO_PKG_VERSION");
+    let mut it = v.split('.');
+    let majmin = format!("{}.{}", it.next().unwrap(), it.next().unwrap());
+    assert!(
+        cargo.contains(&format!("ultimo = \"{majmin}\"")),
+        "expected `ultimo = \"{majmin}\"` in Cargo.toml:\n{cargo}"
+    );
+    assert!(
+        !cargo.contains("ultimo = \"0.1\""),
+        "stale `ultimo = \"0.1\"` pin still present:\n{cargo}"
+    );
+}
+
+#[test]
+fn new_scaffold_writes_agents_md() {
+    let tmp = tempfile::tempdir().unwrap();
+    ultimo()
+        .current_dir(tmp.path())
+        .args(["new", "demo", "--template", "basic"])
+        .assert()
+        .success();
+
+    let agents = fs::read_to_string(tmp.path().join("demo/AGENTS.md"))
+        .expect("scaffold must write an AGENTS.md for coding agents");
+    assert!(
+        agents.contains("Ultimo"),
+        "AGENTS.md should orient an agent: {agents}"
+    );
+}
+
+#[test]
+fn rpc_scaffold_has_a_real_generate_client_bin() {
+    let tmp = tempfile::tempdir().unwrap();
+    ultimo()
+        .current_dir(tmp.path())
+        .args(["new", "demo", "--template", "rpc"])
+        .assert()
+        .success();
+
+    let gen = fs::read_to_string(tmp.path().join("demo/src/bin/generate-client.rs")).unwrap();
+    assert!(
+        gen.contains("generate_client_file"),
+        "generate-client bin must call the real generator, not a placeholder:\n{gen}"
+    );
+    assert!(
+        !gen.contains("Would generate"),
+        "placeholder generate-client bin still present:\n{gen}"
+    );
+}
+
+#[test]
 fn generate_runs_the_convention_bin_and_writes_output() {
     // A minimal cargo project whose generate-client bin writes its first arg.
     let tmp = tempfile::tempdir().unwrap();
