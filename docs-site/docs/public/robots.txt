@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# Machine-readable documentation for LLMs and coding agents:
+#   https://docs.ultimo.dev/llms.txt        — index of docs pages with summaries
+#   https://docs.ultimo.dev/llms-full.txt   — the full documentation corpus

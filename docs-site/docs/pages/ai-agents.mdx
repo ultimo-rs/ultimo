@@ -1,0 +1,69 @@
+# Using Ultimo with AI coding agents
+
+Ultimo is built to be **easy for coding agents to build with** — Cursor, Claude
+Code, GitHub Copilot, and friends. This page shows how to point your agent at
+Ultimo's machine-readable docs, drop in a project ruleset, and (soon) connect the
+Ultimo MCP server.
+
+## Why Ultimo is agent-friendly
+
+- **Typed contracts, generated clients.** You write your API once in Rust
+  (`RpcRegistry`), and the TypeScript client — types and all — is generated from
+  it. The agent never hand-writes or guesses client types; they're derived. See
+  [TypeScript Clients](/typescript) and the [RPC System](/rpc).
+- **Scaffolds that build.** `ultimo new` produces projects that compile out of the
+  box, with dependency pins that track the current release — no stale-version
+  dead ends.
+- **One obvious way.** Convention-over-config and opt-in Cargo features mean fewer
+  choices for an agent to get wrong.
+
+## 1. Point your agent at the docs
+
+Ultimo's docs are published in the machine-readable
+[llms.txt](https://llmstxt.org) format, which agents fetch to ground themselves
+in the current API instead of stale training data:
+
+- **Index:** [`https://docs.ultimo.dev/llms.txt`](https://docs.ultimo.dev/llms.txt) — every page with a one-line summary.
+- **Full corpus:** [`https://docs.ultimo.dev/llms-full.txt`](https://docs.ultimo.dev/llms-full.txt) — the complete docs in one file.
+
+Most agents pick these up automatically when you add the docs site as a
+documentation source. In Cursor, add `https://docs.ultimo.dev` under
+**Settings → Indexing → Docs**; in Claude Code, reference the URL in your prompt
+or `CLAUDE.md`.
+
+## 2. Use Context7
+
+Ultimo is indexed on [Context7](https://context7.com/ultimo-rs/ultimo), which
+serves version-accurate snippets to agents on demand. If your agent supports the
+Context7 MCP server, it can pull Ultimo examples mid-task. Point it at the library
+id `ultimo-rs/ultimo`.
+
+## 3. Add a project ruleset
+
+Every project scaffolded with `ultimo new` includes an **`AGENTS.md`** — working
+notes that orient an agent to that project's conventions (how to add a route or
+RPC procedure, the feature flags, the run/test/generate commands). It follows the
+[AGENTS.md](https://agents.md) open standard, which Cursor, Claude Code, and
+others read automatically.
+
+If you started from an existing project, drop an `AGENTS.md` at its root with the
+same content — see the scaffolded file for a template.
+
+## 4. The Ultimo MCP server (coming soon)
+
+An `ultimo mcp` server is in development. It will give your agent live, typed
+tools instead of guesswork — searching the docs, listing runnable examples,
+scaffolding projects, and **introspecting your project's RPC surface** (so the
+agent can ask "what's my typed API?" and get an exact answer). Tracked on the
+[roadmap](/roadmap); this page will document the setup when it ships.
+
+## Prompting tips
+
+- Ask the agent to **regenerate the client** (`ultimo generate -o ./client.ts`)
+  after changing any RPC type — the generated client is the source of truth for
+  the frontend.
+- Handlers return `Result<Response>`; nudge the agent to return
+  `Err(UltimoError::…)` for error cases rather than panicking.
+- Point it at the specific docs page for the feature it's using (e.g.
+  [Authentication](/jwt), [Sessions](/sessions), [WebSocket](/websocket),
+  [SSE](/sse)) — each page's examples are self-contained and compile.

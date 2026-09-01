@@ -28,6 +28,10 @@ export default defineConfig({
           link: "/api-reference",
         },
         {
+          text: "AI Coding Agents",
+          link: "/ai-agents",
+        },
+        {
           text: "Performance",
           link: "/performance",
         },
