@@ -1,7 +1,7 @@
 export const siteConfig = {
   name: "Ultimo",
   description:
-    "A modern, high-performance web framework for Rust. Type-safe, fast, and developer friendly.",
+    "A modern, high-performance web framework for Rust. Type-safe, fast, and built for you and your coding agent.",
   links: {
     docs: "https://docs.ultimo.dev",
     github: "https://github.com/ultimo-rs/ultimo",

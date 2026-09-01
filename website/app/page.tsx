@@ -1,3 +1,4 @@
+import { AiNativeSection } from "@/components/ai-native-section";
 import { BlogSection } from "@/components/blog-section";
 import { ComparisonSection } from "@/components/comparison-section";
 import { CTASection } from "@/components/cta-section";
@@ -15,6 +16,7 @@ export default function Home() {
         <HeroSection />
         <UseCasesSection />
         <FeaturesSection />
+        <AiNativeSection />
         <StatsSection />
         <SecuritySection />
         <TypeSafeSection />

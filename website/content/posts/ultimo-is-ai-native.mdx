@@ -1,0 +1,62 @@
+---
+title: "Ultimo is AI-Native: Building Rust Backends with Coding Agents"
+description: "Most software is now written with AI coding agents. Here's how Ultimo is designed to be the easiest Rust web framework for them to build with — typed codegen, scaffolds that build, and docs made to be read by machines."
+date: "2026-09-01"
+author: "Ultimo Team"
+tags: ["ai", "developer-experience", "typescript"]
+---
+
+# Ultimo is AI-Native: Building Rust Backends with Coding Agents
+
+The way software gets written has changed. A large and growing share of code is now produced by developers working *with* AI coding agents — Cursor, Claude Code, GitHub Copilot — rather than typed character by character. That shifts what makes a web framework good. The question is no longer only "is this ergonomic for a human?" but "can an agent build with this reliably, without dead ends?"
+
+Ultimo is built with that second question in mind. This post lays out what "AI-native" means for a framework, and the concrete things Ultimo does about it.
+
+## What makes a framework agent-friendly
+
+Agents fail in specific, predictable ways: they hallucinate APIs from stale training data, they copy examples that don't compile, they scaffold a project that won't build, and they lose the thread between the backend and the frontend types. An agent-native framework removes those failure modes.
+
+Three levers matter most:
+
+1. **Typed contracts the agent can't get wrong.** If types flow automatically from one source, the agent never has to hand-maintain a second copy.
+2. **Deterministic, buildable starting points.** Scaffolds and examples that compile the moment they're generated.
+3. **Docs written to be read by machines.** So the agent grounds itself in the *current* API, not last year's.
+
+## Typed codegen: write it once in Rust
+
+Ultimo's headline feature is also its most AI-native one. You define your API surface once as an `RpcRegistry` in Rust, and the fully typed TypeScript client — types and all — is *generated* from it:
+
+```rust
+rpc.query("getUser", |input: GetUserInput| async move {
+    Ok(User { /* ... */ })
+});
+```
+
+```bash
+ultimo generate -o ./client.ts
+```
+
+The agent writing the frontend never guesses the shape of `User` or the signature of `getUser` — they're derived from the Rust types. There's no second schema to drift out of sync, and a type change on the backend surfaces as a compile error on the frontend.
+
+## Scaffolds that build
+
+`ultimo new` produces projects that compile out of the box. Dependency pins track the current release automatically, so an agent never lands in the classic trap of a scaffold pinned to a version that no longer exists. The `rpc` template ships a real, working client generator wired to a shared registry — not a placeholder the agent has to reverse-engineer.
+
+Every scaffolded project also includes an **`AGENTS.md`** — a short ruleset, in the open [AGENTS.md](https://agents.md) format, that orients an agent to that project's conventions: how to add a route or an RPC procedure, which Cargo features exist, and the run/test/generate commands.
+
+## Docs made for machines
+
+Ultimo's documentation is published in the [`llms.txt`](https://llmstxt.org) format that coding agents fetch to ground themselves:
+
+- [`docs.ultimo.dev/llms.txt`](https://docs.ultimo.dev/llms.txt) — an index of every page with a summary.
+- [`docs.ultimo.dev/llms-full.txt`](https://docs.ultimo.dev/llms-full.txt) — the full corpus in one file.
+
+Ultimo is also indexed on [Context7](https://context7.com/ultimo-rs/ultimo), which serves version-accurate snippets to agents on demand. Every docs example is self-contained and compiles — because agents copy them verbatim.
+
+## What's next: the Ultimo MCP server
+
+The next step is an `ultimo mcp` server that gives an agent *live, typed tools* instead of guesswork: search the docs, list runnable examples, scaffold a project, and — the differentiator — **introspect your project's RPC surface**, so the agent can ask "what's my typed API?" and get an exact answer. It's on the [roadmap](https://docs.ultimo.dev/roadmap).
+
+## Try it
+
+If you build with a coding agent, point it at Ultimo's docs and let it go. The full guide is at [Using Ultimo with AI coding agents](https://docs.ultimo.dev/ai-agents).
