@@ -49,13 +49,35 @@ others read automatically.
 If you started from an existing project, drop an `AGENTS.md` at its root with the
 same content — see the scaffolded file for a template.
 
-## 4. The Ultimo MCP server (coming soon)
+## 4. The Ultimo MCP server
 
-An `ultimo mcp` server is in development. It will give your agent live, typed
-tools instead of guesswork — searching the docs, listing runnable examples,
-scaffolding projects, and **introspecting your project's RPC surface** (so the
-agent can ask "what's my typed API?" and get an exact answer). Tracked on the
-[roadmap](/roadmap); this page will document the setup when it ships.
+The CLI ships a [Model Context Protocol](https://modelcontextprotocol.io) server
+that gives your agent live, typed tools instead of guesswork. Install the CLI
+(`cargo install ultimo-cli`) and register the server with your agent:
+
+```json
+{
+  "mcpServers": {
+    "ultimo": { "command": "ultimo", "args": ["mcp"] }
+  }
+}
+```
+
+(In Claude Code: `claude mcp add ultimo -- ultimo mcp`. In Cursor: add the block
+above to `~/.cursor/mcp.json`.)
+
+The server exposes these tools:
+
+| Tool | What it does |
+|---|---|
+| `search_docs` | Search the current Ultimo docs and return the most relevant sections. |
+| `get_doc` | Return a named docs page in full. |
+| `list_examples` / `get_example` | List runnable examples and read their source. |
+| `scaffold` | Create a new Ultimo project from a template (`basic`/`rpc`/…). |
+| `introspect_rpc` | Build a project's `RpcRegistry` and return its generated typed client + procedure list — the agent asks "what's my typed API?" and gets an exact answer. |
+
+The docs tools stay current by reading the live `llms.txt` corpus, so the agent
+is grounded in the deployed API rather than stale memory.
 
 ## Prompting tips
 

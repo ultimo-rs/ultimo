@@ -9,6 +9,10 @@ homepage.workspace = true
 repository.workspace = true
 keywords = ["cli", "codegen", "typescript", "web", "framework"]
 categories = ["command-line-utilities", "development-tools"]
+# The CLI's MCP server (rmcp, edition 2024) needs a newer toolchain than the
+# `ultimo` library, which keeps its MSRV. This only affects building the CLI
+# from source; installing a released binary is unaffected.
+rust-version = "1.88"
 
 [[bin]]
 name = "ultimo"
@@ -23,6 +27,8 @@ anyhow = "1.0"
 colored = "2.1"
 notify = "8"
 notify-debouncer-mini = "0.5"
+rmcp = { version = "3", features = ["server", "transport-io", "macros"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 
 [dev-dependencies]
 assert_cmd = "2"
