@@ -31,10 +31,22 @@ any of it requires a deliberate version bump:
 ### On a RELEASE (automated by release-plz — rarely done by hand)
 
 release-plz opens a release PR that bumps `version` in root `Cargo.toml`
-(`[workspace.package]`, shared by both crates) and writes the `CHANGELOG.md`
-section from commits. Merging it publishes **`ultimo` then `ultimo-cli`** to
-crates.io and tags a release. A published vuln/serious bug → **`cargo yank`** it
-and ship a fixed patch.
+(`[workspace.package]`, shared by both crates) and writes the per-crate
+`ultimo/CHANGELOG.md` / `ultimo-cli/CHANGELOG.md` from commits. Merging it
+publishes **`ultimo` then `ultimo-cli`** to crates.io and tags a release. A
+published vuln/serious bug → **`cargo yank`** it and ship a fixed patch.
+
+**Version must be in sync EVERYWHERE — one source of truth (`Cargo.toml`).** The
+`version-sync` CI gate (`scripts/check-versions.sh`) fails a PR if any surface
+drifts: `website/package.json`, `docs-site/package.json`, the website hero badge,
+the `ultimo = "x.y"` install snippets across README + docs, `CLAUDE.md`/`AGENTS.md`,
+the blog comparison post, and the root `CHANGELOG.md` + `docs-site/.../changelog.mdx`
+(plus the git tag + GitHub release, done by release-plz). release-plz only bumps
+`Cargo.toml` + the per-crate changelogs, so the release workflow auto-runs
+`scripts/sync-versions.sh` on the release PR to propagate the rest (it mirrors the
+new changelog section from whichever crate — library or CLI — was released). If
+`version-sync` ever fails on a release PR, run `bash scripts/sync-versions.sh` and
+commit — don't hand-edit the surfaces one by one.
 
 ## Workspace layout
 
