@@ -11,6 +11,7 @@
     <a href="https://github.com/ultimo-rs/ultimo/blob/main/SECURITY.md"><img src="https://img.shields.io/badge/unsafe-forbidden-success.svg?style=flat-square" alt="Unsafe forbidden" /></a>
     <a href="https://deps.rs/repo/github/ultimo-rs/ultimo"><img src="https://deps.rs/repo/github/ultimo-rs/ultimo/status.svg?style=flat-square" alt="Dependency status" /></a>
     <img src="https://img.shields.io/badge/MSRV-1.86-blue.svg?style=flat-square" alt="MSRV 1.86" />
+    <a href="https://context7.com/ultimo-rs/ultimo"><img src="https://img.shields.io/badge/Context7-indexed-4B32C3.svg?style=flat-square" alt="Context7 indexed" /></a>
   </p>
 
   <p>
@@ -45,6 +46,7 @@ the framework is 100% safe Rust (`#![forbid(unsafe_code)]`).
 - ⚡ **Fast** — native Rust on the Hyper + Tokio core, O(1) constant-time routing, benchmarks regression-guarded in CI ([details](https://docs.ultimo.dev/performance)).
 - 🗄️ **Databases** — first-class SQLx and Diesel integration (PostgreSQL / MySQL / SQLite).
 - 🧪 **Testing utilities** — in-process `TestClient`, response assertions, and fixtures.
+- 🤖 **Built for coding agents** — typed Rust→TS codegen, scaffolds that build, [`llms.txt`](https://docs.ultimo.dev/llms.txt) docs, and [Context7](https://context7.com/ultimo-rs/ultimo). See [Using Ultimo with AI coding agents](https://docs.ultimo.dev/ai-agents).
 
 ## Quick start
 
