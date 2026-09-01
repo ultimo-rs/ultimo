@@ -2,6 +2,7 @@
 
 import {
   BookOpen,
+  Bot,
   Code2,
   FileType,
   Globe,
@@ -117,6 +118,18 @@ const featureCategories = [
           "Project scaffolding (ultimo new)",
           "Helpful error messages",
           "Great documentation",
+        ],
+      },
+      {
+        title: "AI-Native DX",
+        description:
+          "Built to be easy for coding agents to build with — Cursor, Claude Code, Copilot.",
+        icon: Bot,
+        details: [
+          "Typed Rust → TypeScript codegen",
+          "Scaffolds that build out of the box",
+          "llms.txt docs + Context7 indexed",
+          "AGENTS.md ruleset in every project",
         ],
       },
     ],
