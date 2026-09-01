@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1](https://github.com/ultimo-rs/ultimo/compare/ultimo-cli-v0.9.0...ultimo-cli-v0.9.1) - 2026-09-01
+
+### Added
+
+- *(cli)* ultimo mcp server for AI coding agents ([#179](https://github.com/ultimo-rs/ultimo/pull/179))
+- *(cli)* agent-proof scaffolding ([#176](https://github.com/ultimo-rs/ultimo/pull/176))
+
 ## [0.6.0](https://github.com/ultimo-rs/ultimo/compare/ultimo-cli-v0.5.1...ultimo-cli-v0.6.0) - 2026-07-08
 
 ### Added
