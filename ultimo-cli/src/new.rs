@@ -3,6 +3,85 @@ use colored::Colorize;
 use std::fs;
 use std::path::Path;
 
+/// The `ultimo` crate version scaffolds should pin, as a `major.minor` (`^`-compatible)
+/// requirement. Derived from this CLI's own version (the CLI and framework share the
+/// workspace version), so scaffolds always track the current release and never drift
+/// back to a stale hardcoded pin.
+fn ultimo_dep_version() -> String {
+    let v = env!("CARGO_PKG_VERSION");
+    let mut parts = v.split('.');
+    format!(
+        "{}.{}",
+        parts.next().unwrap_or("0"),
+        parts.next().unwrap_or("0")
+    )
+}
+
+/// The `ts-rs` version scaffolds pin when they generate TypeScript types.
+const TS_RS_DEP: &str = "12";
+
+/// Write a consumer-facing `AGENTS.md` into a scaffolded project — orientation for
+/// a coding agent *building on* this app (distinct from the Ultimo repo's own
+/// maintainer-facing AGENTS.md). Kept generic so it fits every template.
+fn write_agents_md(name: &str, project_dir: &Path) -> Result<()> {
+    let agents = format!(
+        r#"# {name} — working notes for coding agents
+
+This is an [Ultimo](https://docs.ultimo.dev) app (Rust web framework on Hyper + Tokio).
+When editing it, follow these conventions.
+
+## Commands
+
+- `cargo run` — start the server.
+- `cargo test` — run tests.
+- `ultimo dev` — hot-reload dev server (rebuilds on change).
+- `ultimo generate -o ./client.ts` — regenerate the typed TypeScript client (RPC projects).
+
+## Adding a route
+
+Handlers take a `Context` and return `Result<Response>`. Build responses with
+`ctx.json(..)`, `ctx.text(..)`, `ctx.html(..)`, `ctx.stream(..)`, or `ctx.sse(..)`:
+
+```rust
+app.get("/hello", |ctx: Context| async move {{
+    ctx.json(serde_json::json!({{ "message": "hi" }})).await
+}});
+```
+
+## Adding a typed RPC procedure (RPC projects)
+
+Register on the `RpcRegistry`, then regenerate the client so the frontend types
+stay in sync:
+
+```rust
+registry.query("getThing", |input: GetThingInput| async move {{
+    Ok(Thing {{ /* ... */ }})
+}});
+// then: ultimo generate -o ./client.ts
+```
+
+Derive `TS` on request/response types (`#[derive(TS)]`) so their TypeScript types
+are generated automatically.
+
+## Conventions
+
+- Return `Result<Response>` from handlers; return `Err(UltimoError::…)` for error
+  responses (they become proper HTTP status codes).
+- Optional capabilities are Cargo features (auth, sessions, csrf, websocket,
+  static-files, compression, client-gen, database). Enable them in `Cargo.toml`.
+- Prefer the built-in middleware (`ultimo::middleware::builtin`) over hand-rolling.
+
+## Docs for agents
+
+- Full docs: https://docs.ultimo.dev  ·  machine-readable: https://docs.ultimo.dev/llms.txt
+- Context7: https://context7.com/ultimo-rs/ultimo
+"#,
+        name = name
+    );
+    fs::write(project_dir.join("AGENTS.md"), agents)?;
+    Ok(())
+}
+
 pub async fn run(name: String, template: String) -> Result<()> {
     println!("🚀 Creating new project: {}", name.green());
     println!("📦 Template: {}", template);
@@ -25,6 +104,9 @@ pub async fn run(name: String, template: String) -> Result<()> {
             template
         ),
     }
+
+    // Every scaffold gets a consumer-facing AGENTS.md for coding agents.
+    write_agents_md(&name, project_dir)?;
 
     println!("✅ Project created successfully!");
     println!();
@@ -51,12 +133,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ultimo = "0.1"
+ultimo = "{ultimo}"
 tokio = {{ version = "1.35", features = ["full"] }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
 "#,
-        name
+        name,
+        ultimo = ultimo_dep_version(),
     );
     fs::write(project_dir.join("Cargo.toml"), cargo_toml)?;
 
@@ -74,10 +157,10 @@ struct User {
 #[tokio::main]
 async fn main() {
     let mut app = Ultimo::new();
-    
+
     // Add CORS middleware
     app.use_middleware(ultimo::middleware::builtin::cors());
-    
+
     // Routes
     app.get("/", |ctx: Context| async move {
         ctx.text("Welcome to Ultimo! 🚀").await
@@ -190,13 +273,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ultimo = "0.1"
+ultimo = "{ultimo}"
 tokio = {{ version = "1.35", features = ["full"] }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
-ts-rs = "8.1"
+ts-rs = "{tsrs}"
 "#,
-        name
+        name,
+        ultimo = ultimo_dep_version(),
+        tsrs = TS_RS_DEP,
     );
     fs::write(project_dir.join("backend/Cargo.toml"), backend_cargo)?;
 
@@ -735,118 +820,134 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ultimo = "0.1"
+ultimo = {{ version = "{ultimo}", features = ["client-gen"] }}
 tokio = {{ version = "1.35", features = ["full"] }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
-ts-rs = "8.1"
+ts-rs = "{tsrs}"
 "#,
-        name
+        name,
+        ultimo = ultimo_dep_version(),
+        tsrs = TS_RS_DEP,
     );
     fs::write(project_dir.join("Cargo.toml"), cargo_toml)?;
 
-    // main.rs
-    let main_rs = r#"use ultimo::prelude::*;
+    // src/api.rs — the single source of truth for the RPC surface. Both the
+    // server (main.rs) and the client generator (src/bin/generate-client.rs)
+    // build this same registry, so the typed client can never drift from the API.
+    let api_rs = r#"//! RPC surface: types + the registry. `main.rs` mounts it; the
+//! `generate-client` binary rebuilds it to emit the typed TypeScript client.
+//! Add procedures here, then run `ultimo generate -o ./client.ts`.
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
+use ultimo::rpc::{RpcRegistry, TS};
 
-#[derive(Debug, Serialize, Deserialize, TS)]
-#[ts(export)]
-struct User {
-    id: u32,
-    name: String,
-    email: String,
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct User {
+    pub id: u32,
+    pub name: String,
+    pub email: String,
 }
 
-#[derive(Debug, Deserialize, TS)]
-#[ts(export)]
-struct CreateUserRequest {
-    name: String,
-    email: String,
+#[derive(Debug, Deserialize, Serialize, TS)]
+pub struct GetUserInput {
+    pub id: u32,
 }
 
-#[derive(Debug, Serialize, TS)]
-#[ts(export)]
-struct CreateUserResponse {
-    id: u32,
-    name: String,
-    email: String,
+#[derive(Debug, Deserialize, Serialize, TS)]
+pub struct CreateUserInput {
+    pub name: String,
+    pub email: String,
 }
 
-#[tokio::main]
-async fn main() {
-    let mut app = Ultimo::new();
-    
-    // Add CORS middleware
-    app.use_middleware(
-        middleware::builtin::Cors::new()
-            .allow_origin("http://localhost:5173")
-            .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-            .allow_headers(vec!["Content-Type", "Authorization"])
-            .build(),
-    );
-    
-    // RPC-style routes with type-safe handlers
-    app.get("/api/users", |ctx: Context| async move {
-        let users = vec![
-            User {
-                id: 1,
-                name: "Alice".to_string(),
-                email: "alice@example.com".to_string(),
-            },
-            User {
-                id: 2,
-                name: "Bob".to_string(),
-                email: "bob@example.com".to_string(),
-            },
-        ];
-        
-        ctx.json(&users).await
-    });
-    
-    app.get("/api/users/:id", |ctx: Context| async move {
-        let id: u32 = ctx.req.param("id")?.parse().unwrap_or(0);
-        
-        let user = User {
-            id,
+/// Build the RPC registry. Each `query`/`mutation` becomes a typed method on the
+/// generated TypeScript client.
+pub fn registry() -> RpcRegistry {
+    let rpc = RpcRegistry::new();
+
+    // Query: read-only. Input and output types are derived into TypeScript.
+    rpc.query("getUser", |input: GetUserInput| async move {
+        // Replace with your real data source.
+        Ok(User {
+            id: input.id,
             name: "Alice".to_string(),
             email: "alice@example.com".to_string(),
-        };
-        
-        ctx.json(&user).await
+        })
     });
-    
-    app.post("/api/users", |ctx: Context| async move {
-        let body: CreateUserRequest = ctx.req.json().await?;
-        
-        let user = CreateUserResponse {
+
+    // Mutation: writes. Same typed pipeline.
+    rpc.mutation("createUser", |input: CreateUserInput| async move {
+        Ok(User {
             id: 3,
-            name: body.name,
-            email: body.email,
-        };
-        
-        ctx.json(&user).await
+            name: input.name,
+            email: input.email,
+        })
     });
-    
-    println!("🚀 RPC Server running on http://localhost:3000");
-    println!("📝 Generate TypeScript client with: ultimo generate -o ./client");
-    app.listen("127.0.0.1:3000").await.unwrap();
+
+    rpc
+}
+"#;
+    fs::write(project_dir.join("src/api.rs"), api_rs)?;
+
+    // main.rs — mounts the registry as a JSON-RPC 2.0 endpoint at POST /rpc.
+    let main_rs = r#"mod api;
+
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let rpc = api::registry();
+
+    let mut app = Ultimo::new();
+    app.use_middleware(ultimo::middleware::builtin::cors());
+
+    // Single JSON-RPC 2.0 endpoint: every procedure dispatches through POST /rpc
+    // (supports single calls, batches, and notifications).
+    let handler = rpc.clone();
+    app.post("/rpc", move |ctx: Context| {
+        let rpc = handler.clone();
+        async move {
+            let body = ctx.req.bytes().await?;
+            let output = rpc.handle_request(&body).await;
+            match output.into_body() {
+                Some(bytes) => {
+                    let value: serde_json::Value = serde_json::from_slice(&bytes)
+                        .map_err(|e| UltimoError::Internal(e.to_string()))?;
+                    ctx.json(value).await
+                }
+                None => {
+                    // A notification (no id) produces no response body.
+                    ctx.status(204).await;
+                    ctx.text("").await
+                }
+            }
+        }
+    });
+
+    println!("🚀 Ultimo RPC server on http://127.0.0.1:3000  (POST /rpc)");
+    println!("📝 Regenerate the typed client: ultimo generate -o ./client.ts");
+    app.listen("127.0.0.1:3000").await
 }
 "#;
     fs::write(project_dir.join("src/main.rs"), main_rs)?;
 
-    // src/bin/generate-client.rs — works with `ultimo generate`
-    let generate_client = r#"//! TypeScript client generator — run via `ultimo generate -o ./client.ts`
+    // src/bin/generate-client.rs — the real generator `ultimo generate` runs.
+    // It rebuilds the same registry via `#[path]` and writes the typed client to
+    // the path given as its first argument (the convention `ultimo generate` expects).
+    let generate_client = r#"//! Typed TypeScript client generator. Run via `ultimo generate -o ./client.ts`,
+//! or directly: `cargo run --bin generate-client -- ./client.ts`.
+#[path = "../api.rs"]
+mod api;
+
 fn main() {
     let out = std::env::args()
         .nth(1)
-        .expect("usage: generate-client <output-path>");
+        .unwrap_or_else(|| "client.ts".to_string());
 
-    // In a real project, build the same RpcRegistry as your server
-    // and call rpc.generate_client_file(&out).
-    // For now this is a placeholder — see https://docs.ultimo.dev/typescript
-    println!("✅ Would generate TypeScript client to: {out}");
-    println!("   Implement this binary to call rpc.generate_client_file(&out)");
+    api::registry()
+        .generate_client_file(&out)
+        .expect("failed to write TypeScript client");
+
+    println!("✅ TypeScript client generated: {out}");
 }
 "#;
     fs::write(
@@ -858,44 +959,45 @@ fn main() {
     let readme = format!(
         r#"# {}
 
-RPC-style API with type-safe TypeScript client generation.
+Type-safe JSON-RPC API with a generated TypeScript client.
 
-## Getting Started
+## How it works
 
-1. Start the server:
+`src/api.rs` is the single source of truth: it defines the request/response types
+and builds the `RpcRegistry`. The server (`src/main.rs`) mounts that registry at
+`POST /rpc`, and `src/bin/generate-client.rs` rebuilds the same registry to emit a
+fully typed TypeScript client — so the client can never drift from the API.
+
+## Getting started
+
+1. Run the server:
 ```bash
 cargo run
 ```
 
-2. Generate TypeScript client:
+2. Regenerate the typed client whenever `src/api.rs` changes:
 ```bash
-ultimo generate -o ./client
+ultimo generate -o ./client.ts
 ```
 
-3. Use the generated types in your frontend:
+3. Call it from your frontend:
 ```typescript
-import {{ User, CreateUserRequest }} from './client/bindings';
+import {{ UltimoRpcClient }} from './client';
 
-const user: User = await fetch('http://localhost:3000/api/users/1').then(r => r.json());
+const client = new UltimoRpcClient('http://localhost:3000/rpc');
+const user = await client.getUser({{ id: 1 }});     // typed
+await client.createUser({{ name: 'Ada', email: 'ada@example.com' }});
 ```
 
-## Features
+## Adding a procedure
 
-- ✅ Type-safe RPC-style endpoints
-- ✅ Automatic TypeScript type generation with ts-rs
-- ✅ CORS enabled for frontend integration
-- ✅ JSON request/response handling
+Add a `query` (read) or `mutation` (write) in `src/api.rs::registry()`, deriving
+`TS` on its input/output types, then re-run `ultimo generate`.
 
-## API Endpoints
+## Learn more
 
-- `GET /api/users` - List all users
-- `GET /api/users/:id` - Get user by ID
-- `POST /api/users` - Create new user
-
-## Learn More
-
-- [Ultimo Documentation](https://docs.ultimo.dev)
-- [ts-rs Documentation](https://github.com/Aleph-Alpha/ts-rs)
+- Ultimo docs: https://docs.ultimo.dev  ·  RPC guide: https://docs.ultimo.dev/rpc
+- For coding agents: see `AGENTS.md` in this project.
 "#,
         name
     );
@@ -927,11 +1029,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ultimo = "0.1"
+ultimo = "{ultimo}"
 tokio = {{ version = "1", features = ["full"] }}
 serde = {{ version = "1", features = ["derive"] }}
 "#,
-        name
+        name,
+        ultimo = ultimo_dep_version(),
     );
     fs::write(project_dir.join("Cargo.toml"), cargo_toml)?;
 

@@ -226,6 +226,12 @@ ultimo new my-app --template fullstack
 
 Available templates: `basic`, `fullstack`, `api-only`, `rpc`, `production`.
 
+Every scaffold builds out of the box (dependency pins track the current release)
+and includes an **`AGENTS.md`** — working notes that orient a coding agent
+(Cursor, Claude Code, Copilot) to the project's conventions. The `rpc` template
+ships a real `src/bin/generate-client.rs` wired to a shared `src/api.rs`
+registry, so `ultimo generate` produces a typed client immediately.
+
 ## Development Server
 
 Start a hot-reload development server that watches for file changes and
