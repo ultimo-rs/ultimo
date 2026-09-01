@@ -208,8 +208,12 @@ jobs:
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
       - uses: Swatinem/rust-cache@v2
+      # Only the `ultimo` library carries the advertised MSRV — it's the crate
+      # downstream users depend on. `ultimo-cli` (a standalone install-and-run
+      # tool) has a higher MSRV via its rmcp-based MCP server (edition 2024); it
+      # is built on stable by the `test` jobs.
       - name: cargo check (default + websocket + static-files + compression)
-        run: cargo check -p ultimo -p ultimo-cli --features "websocket,static-files,compression"
+        run: cargo check -p ultimo --features "websocket,static-files,compression"
 
   # ── Public-API breaking-change detection ──────────────────────────────
   # Guards the pre-1.0 public API against accidental SemVer breakage by
