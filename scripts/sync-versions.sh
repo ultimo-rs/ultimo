@@ -93,31 +93,45 @@ fi
 # files, yet `check-versions.sh` requires their newest released heading to match
 # the workspace version. Mirror the newest per-crate section into them so a
 # release PR passes the version-sync gate without hand editing.
-CRATE_CHANGELOG="ultimo/CHANGELOG.md"
+# A release may bump the library, the CLI, or both, so mirror the `## [VERSION]`
+# section from whichever per-crate changelog actually carries it (prefer the
+# library's when both do).
+pick_crate_changelog() {
+  local f
+  for f in ultimo/CHANGELOG.md ultimo-cli/CHANGELOG.md; do
+    [ -f "$f" ] && grep -q "^## \[$VERSION\]" "$f" && {
+      echo "$f"
+      return
+    }
+  done
+}
+
 promote_changelog() {
   local file="$1"
   [ -f "$file" ] || return 0
-  [ -f "$CRATE_CHANGELOG" ] || return 0
   # Idempotent: skip if this version is already the newest released entry.
   if grep -q "^## \[$VERSION\]" "$file"; then
     return 0
   fi
 
-  # Extract the newest released section from the per-crate changelog (from its
-  # first non-Unreleased `## [` heading up to the next `## [` heading), and
+  local src
+  src=$(pick_crate_changelog)
+  if [ -z "$src" ]; then
+    echo "  ⚠️  no per-crate changelog has a v$VERSION section; skipping $file"
+    return 0
+  fi
+
+  # Extract that exact `## [VERSION]` section (up to the next `## [` heading) and
   # rewrite the heading `## [x.y.z](compare-url) - DATE` → `## [x.y.z] - DATE`.
   local block
-  block=$(awk '
-    /^## \[/ {
-      if ($0 ~ /Unreleased/) next
-      sec++
-      grab = (sec == 1) ? 1 : 0
-    }
+  block=$(awk -v ver="$VERSION" '
+    index($0, "## [" ver "]") == 1 { grab = 1; print; next }
+    grab && /^## \[/ { grab = 0 }
     grab { print }
-  ' "$CRATE_CHANGELOG" | sed -E "s/^## \[$VERSION\]\([^)]*\)/## [$VERSION]/")
+  ' "$src" | sed -E "s/^## \[$VERSION\]\([^)]*\)/## [$VERSION]/")
 
   if [ -z "$block" ] || ! printf '%s' "$block" | grep -q "^## \[$VERSION\]"; then
-    echo "  ⚠️  could not extract v$VERSION section from $CRATE_CHANGELOG; skipping $file"
+    echo "  ⚠️  could not extract v$VERSION section from $src; skipping $file"
     return 0
   fi
 
