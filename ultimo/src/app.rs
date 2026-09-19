@@ -442,6 +442,50 @@ impl Ultimo {
         self
     }
 
+    /// Mount an [`RpcRegistry`](crate::rpc::RpcRegistry) at `path` as a single
+    /// JSON-RPC 2.0 endpoint (`POST`), handling single calls, batches, and
+    /// notifications per the spec.
+    ///
+    /// This only applies to [`RpcMode::JsonRpc`](crate::rpc::RpcMode) (the
+    /// default) — a single endpoint dispatches every procedure by name.
+    /// [`RpcMode::Rest`](crate::rpc::RpcMode) mounts one route per procedure
+    /// instead, which doesn't fit this one-call shape — wire up routes
+    /// yourself for that mode (see the [RPC guide](https://docs.ultimo.dev/rpc)).
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use ultimo::prelude::*;
+    /// use ultimo::rpc::RpcRegistry;
+    ///
+    /// let mut app = Ultimo::new();
+    /// let rpc = RpcRegistry::new();
+    /// rpc.register("ping", |_: serde_json::Value| async move {
+    ///     Ok(serde_json::json!("pong"))
+    /// });
+    /// app.mount_rpc("/rpc", rpc);
+    /// ```
+    pub fn mount_rpc(&mut self, path: &str, rpc: crate::rpc::RpcRegistry) -> &mut Self {
+        self.post(path, move |ctx: Context| {
+            let rpc = rpc.clone();
+            async move {
+                let body = ctx.req.bytes().await?;
+                let output = rpc.handle_request(&body).await;
+                match output.into_body() {
+                    Some(bytes) => {
+                        let value: serde_json::Value = serde_json::from_slice(&bytes)
+                            .map_err(|e| UltimoError::Internal(e.to_string()))?;
+                        ctx.json(value).await
+                    }
+                    None => {
+                        // A notification (no id) produces no response body.
+                        ctx.status(204).await;
+                        ctx.text("").await
+                    }
+                }
+            }
+        })
+    }
+
     /// Handle an incoming HTTP request
     async fn handle_request(&self, req: HyperRequest<Incoming>, peer_addr: SocketAddr) -> Response {
         // Check for WebSocket upgrade request (needs the live `Incoming` body)
@@ -883,5 +927,65 @@ mod oneshot_tests {
             .body(Full::new(bytes::Bytes::new()))
             .unwrap();
         assert_eq!(app.oneshot(req).await.status(), 404);
+    }
+
+    #[tokio::test]
+    async fn mount_rpc_single_call_returns_200_with_result() {
+        let mut app = Ultimo::new_without_defaults();
+        let rpc = crate::rpc::RpcRegistry::new();
+        rpc.register("add", |input: serde_json::Value| async move {
+            let a = input.get("a").and_then(|v| v.as_i64()).unwrap_or(0);
+            let b = input.get("b").and_then(|v| v.as_i64()).unwrap_or(0);
+            Ok(serde_json::to_value(a + b).unwrap())
+        });
+        app.mount_rpc("/rpc", rpc);
+
+        let body = serde_json::to_vec(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "add",
+            "params": {"a": 3, "b": 4},
+            "id": 1
+        }))
+        .unwrap();
+        let req = HyperRequest::builder()
+            .method("POST")
+            .uri("/rpc")
+            .body(Full::new(bytes::Bytes::from(body)))
+            .unwrap();
+
+        let resp = app.oneshot(req).await;
+        assert_eq!(resp.status(), 200);
+        let text = body_string(resp).await;
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(value["result"], 7);
+    }
+
+    #[tokio::test]
+    async fn mount_rpc_notification_returns_204_with_empty_body() {
+        let mut app = Ultimo::new_without_defaults();
+        let rpc = crate::rpc::RpcRegistry::new();
+        rpc.register("add", |input: serde_json::Value| async move {
+            let a = input.get("a").and_then(|v| v.as_i64()).unwrap_or(0);
+            let b = input.get("b").and_then(|v| v.as_i64()).unwrap_or(0);
+            Ok(serde_json::to_value(a + b).unwrap())
+        });
+        app.mount_rpc("/rpc", rpc);
+
+        // No "id" field => a notification, which produces no response body.
+        let body = serde_json::to_vec(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "add",
+            "params": {"a": 1, "b": 2}
+        }))
+        .unwrap();
+        let req = HyperRequest::builder()
+            .method("POST")
+            .uri("/rpc")
+            .body(Full::new(bytes::Bytes::from(body)))
+            .unwrap();
+
+        let resp = app.oneshot(req).await;
+        assert_eq!(resp.status(), 204);
+        assert_eq!(body_string(resp).await, "");
     }
 }

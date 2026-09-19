@@ -147,25 +147,7 @@ async fn main() -> ultimo::Result<()> {
     });
 
     // Mount JSON-RPC endpoint (supports single, batch, notifications, and legacy format)
-    let rpc_handler = rpc.clone();
-    app.post("/api", move |ctx: Context| {
-        let rpc = rpc_handler.clone();
-        async move {
-            let body = ctx.req.bytes().await?;
-            let output = rpc.handle_request(&body).await;
-            match output.into_body() {
-                Some(bytes) => {
-                    let value: serde_json::Value = serde_json::from_slice(&bytes)
-                        .map_err(|e| UltimoError::Internal(e.to_string()))?;
-                    ctx.json(value).await
-                }
-                None => {
-                    ctx.status(204).await;
-                    ctx.text("").await
-                }
-            }
-        }
-    });
+    app.mount_rpc("/api", rpc);
 
     println!("🌐 Server starting on http://127.0.0.1:3000");
     println!();

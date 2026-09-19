@@ -146,6 +146,21 @@ app.serve_docs("/docs", spec);
 
 See [OpenAPI](/openapi).
 
+##### `mount_rpc(&mut self, path: &str, rpc: RpcRegistry)`
+
+Mount an `RpcRegistry` at `path` as a single JSON-RPC 2.0 `POST` endpoint —
+single calls, batches, and notifications, per spec. JSON-RPC mode
+(`RpcMode::JsonRpc`, the default) only; REST mode needs one route per
+procedure instead.
+
+```rust
+let rpc = RpcRegistry::new();
+rpc.register_with_types(/* ... */);
+app.mount_rpc("/rpc", rpc);
+```
+
+See [RPC](/rpc).
+
 ##### `oneshot(&self, req: hyper::Request<Full<Bytes>>) -> Response`
 
 Dispatch a fully-buffered request through the app **in-process** (no socket).

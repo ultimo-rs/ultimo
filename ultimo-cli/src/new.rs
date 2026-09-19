@@ -418,26 +418,7 @@ async fn main() -> ultimo::Result<()> {
 
     // Single JSON-RPC 2.0 endpoint: every procedure dispatches through POST
     // /rpc (supports single calls, batches, and notifications).
-    let handler = rpc.clone();
-    app.post("/rpc", move |ctx: Context| {
-        let rpc = handler.clone();
-        async move {
-            let body = ctx.req.bytes().await?;
-            let output = rpc.handle_request(&body).await;
-            match output.into_body() {
-                Some(bytes) => {
-                    let value: serde_json::Value = serde_json::from_slice(&bytes)
-                        .map_err(|e| UltimoError::Internal(e.to_string()))?;
-                    ctx.json(value).await
-                }
-                None => {
-                    // A notification (no id) produces no response body.
-                    ctx.status(204).await;
-                    ctx.text("").await
-                }
-            }
-        }
-    });
+    app.mount_rpc("/rpc", rpc);
 
     println!("🚀 Backend running on http://localhost:3001  (POST /rpc)");
     println!("📝 Typed client regenerated: frontend/src/generated/client.ts");
@@ -915,26 +896,7 @@ async fn main() -> ultimo::Result<()> {
 
     // Single JSON-RPC 2.0 endpoint: every procedure dispatches through POST /rpc
     // (supports single calls, batches, and notifications).
-    let handler = rpc.clone();
-    app.post("/rpc", move |ctx: Context| {
-        let rpc = handler.clone();
-        async move {
-            let body = ctx.req.bytes().await?;
-            let output = rpc.handle_request(&body).await;
-            match output.into_body() {
-                Some(bytes) => {
-                    let value: serde_json::Value = serde_json::from_slice(&bytes)
-                        .map_err(|e| UltimoError::Internal(e.to_string()))?;
-                    ctx.json(value).await
-                }
-                None => {
-                    // A notification (no id) produces no response body.
-                    ctx.status(204).await;
-                    ctx.text("").await
-                }
-            }
-        }
-    });
+    app.mount_rpc("/rpc", rpc);
 
     println!("🚀 Ultimo RPC server on http://127.0.0.1:3000  (POST /rpc)");
     println!("📝 Regenerate the typed client: ultimo generate -o ./client.ts");
