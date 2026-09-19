@@ -233,10 +233,10 @@ jobs:
           feature-group: all-features
 
   # ── Dependency security advisories (RUSTSEC) ──────────────────────────
-  # Fails on NEW vulnerabilities. The --ignore list holds known advisories that
-  # all require the sqlx 0.7 -> 0.8 upgrade (tracked separately); revisit/remove
-  # these once sqlx is bumped. rsa (RUSTSEC-2023-0071) has no upstream fix and is
-  # only reachable via the optional sqlx-mysql backend.
+  # Fails on NEW vulnerabilities. The --ignore list holds two advisories with
+  # no compatible fixed version available yet: idna (RUSTSEC-2024-0421, via
+  # url/reqwest) and rsa (RUSTSEC-2023-0071, no upstream fix; only reachable
+  # via the optional sqlx-mysql backend). Revisit/remove once each has a fix.
   audit:
     name: cargo-audit
     runs-on: ubuntu-latest
@@ -247,14 +247,12 @@ jobs:
         with:
           tool: cargo-audit
       - name: cargo audit (committed Cargo.lock)
+        # Keep in sync with deny.toml's [advisories].ignore — same two
+        # advisories (idna, rsa), no compatible fixed version available yet.
         run: |
           cargo audit \
-            --ignore RUSTSEC-2024-0363 \
             --ignore RUSTSEC-2024-0421 \
-            --ignore RUSTSEC-2023-0071 \
-            --ignore RUSTSEC-2026-0104 \
-            --ignore RUSTSEC-2026-0098 \
-            --ignore RUSTSEC-2026-0099
+            --ignore RUSTSEC-2023-0071
 
   # ── Supply-chain checks (cargo-deny) ──────────────────────────────────
   # Advisories (RUSTSEC), banned/duplicate deps, and source pinning. License
