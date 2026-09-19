@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-09-19
+
+### Added
+
+- *(app)* add Ultimo::mount_rpc() to mount an RpcRegistry in one call ([#188](https://github.com/ultimo-rs/ultimo/pull/188))
+
+### Fixed
+
+- *(middleware)* logger() is a silent no-op without a tracing subscriber ([#187](https://github.com/ultimo-rs/ultimo/pull/187))
+- *(rpc)* bare Vec<T>/Option<T> RPC types drop TS decls; fullstack template now uses RpcRegistry ([#184](https://github.com/ultimo-rs/ultimo/pull/184))
+
 ## [0.9.1] - 2026-09-01
 
 ### Added
