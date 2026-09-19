@@ -57,3 +57,55 @@ fn rest_client_has_derived_types_and_signatures() {
     // No dangling/hardcoded interface.
     assert!(!client.contains("export interface User"));
 }
+
+#[derive(serde::Serialize, serde::Deserialize, TS)]
+struct Game {
+    id: u32,
+    home_team: String,
+    away_team: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, TS)]
+struct Empty {}
+
+#[test]
+fn bare_vec_return_type_still_exports_inner_struct() {
+    let rpc = RpcRegistry::new();
+    rpc.query("getGames", |_: Empty| async move {
+        Ok(vec![Game {
+            id: 1,
+            home_team: "A".into(),
+            away_team: "B".into(),
+        }])
+    });
+
+    let client = rpc.generate_typescript_client();
+
+    assert!(
+        client.contains("Promise<Array<Game>>"),
+        "signature missing:\n{client}"
+    );
+    assert!(
+        client.contains("export type Game = "),
+        "Game's own declaration must be emitted for a bare Vec<Game> root type:\n{client}"
+    );
+}
+
+#[test]
+fn bare_option_return_type_still_exports_inner_struct() {
+    let rpc = RpcRegistry::new();
+    rpc.query("maybeGetGame", |_: Empty| async move {
+        Ok(Some(Game {
+            id: 1,
+            home_team: "A".into(),
+            away_team: "B".into(),
+        }))
+    });
+
+    let client = rpc.generate_typescript_client();
+
+    assert!(
+        client.contains("export type Game = "),
+        "Game's own declaration must be emitted for a bare Option<Game> root type:\n{client}"
+    );
+}

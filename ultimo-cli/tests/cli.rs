@@ -126,6 +126,47 @@ fn rpc_scaffold_has_a_real_generate_client_bin() {
 }
 
 #[test]
+fn fullstack_scaffold_actually_uses_rpc_registry() {
+    let tmp = tempfile::tempdir().unwrap();
+    ultimo()
+        .current_dir(tmp.path())
+        .args(["new", "demo", "--template", "fullstack"])
+        .assert()
+        .success();
+
+    let backend_cargo = fs::read_to_string(tmp.path().join("demo/backend/Cargo.toml")).unwrap();
+    assert!(
+        backend_cargo.contains("client-gen"),
+        "fullstack backend must enable client-gen to use RpcRegistry::query/mutation:\n{backend_cargo}"
+    );
+
+    let api = fs::read_to_string(tmp.path().join("demo/backend/src/api.rs")).unwrap();
+    assert!(
+        api.contains("RpcRegistry") && api.contains(".query(") && api.contains(".mutation("),
+        "fullstack backend must build a real RpcRegistry with at least one query and mutation:\n{api}"
+    );
+
+    let main = fs::read_to_string(tmp.path().join("demo/backend/src/main.rs")).unwrap();
+    assert!(
+        main.contains("handle_request") && main.contains("generate_client_file"),
+        "fullstack backend must mount the registry via handle_request and generate a real client:\n{main}"
+    );
+
+    let gen =
+        fs::read_to_string(tmp.path().join("demo/backend/src/bin/generate-client.rs")).unwrap();
+    assert!(
+        gen.contains("generate_client_file"),
+        "generate-client bin must call the real generator, not a placeholder:\n{gen}"
+    );
+
+    let app = fs::read_to_string(tmp.path().join("demo/frontend/src/App.tsx")).unwrap();
+    assert!(
+        app.contains("UltimoRpcClient"),
+        "frontend must call the backend through the generated typed client:\n{app}"
+    );
+}
+
+#[test]
 fn generate_runs_the_convention_bin_and_writes_output() {
     // A minimal cargo project whose generate-client bin writes its first arg.
     let tmp = tempfile::tempdir().unwrap();

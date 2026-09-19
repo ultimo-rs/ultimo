@@ -114,6 +114,12 @@ fn collect_type_decls<T: ts_rs::TS + 'static>(
                 self.decls.insert(name, U::decl(self.cfg));
             }
             U::visit_dependencies(self); // always recurse into inner types
+                                         // Container types (`Vec<T>`, `Option<T>`, ...) declare their
+                                         // dependency on `T` as `Dependency::Transitive` in `visit_dependencies`
+                                         // (ts-rs convention: depends on `T`'s dependencies, not `T` itself), so
+                                         // when such a container is the ROOT type (e.g. a bare `Vec<Game>` RPC
+                                         // return type), `T` itself is only reached via `visit_generics`.
+            U::visit_generics(self);
         }
     }
 
