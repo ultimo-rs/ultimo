@@ -125,6 +125,19 @@ async fn main() -> Result<()> {
 - No file generation overhead in production builds
 - Client generation completes before server accepts connections
 
+### Where the generated file lands
+
+`generate_client_file(path)` writes to exactly the path you give it, resolved
+relative to your program's current working directory — the same as any
+`std::fs::write` call. This is simpler (and different) than `ts-rs`'s own
+`#[ts(export, export_to = "...")]` attribute, which `TS` (re-exported as
+`ultimo::rpc::TS` under `client-gen`) still carries if you use it directly on a
+standalone type outside `RpcRegistry`: that attribute resolves `export_to`
+relative to `<CARGO_MANIFEST_DIR>/bindings/`, not the crate root, which is a
+common source of "the file didn't land where I expected" — see
+[RPC → Where the generated file lands](/rpc#where-the-generated-file-lands)
+for a worked example.
+
 ## Complete Example
 
 ### Backend

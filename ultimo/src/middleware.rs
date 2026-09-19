@@ -110,7 +110,27 @@ pub mod builtin {
     use std::time::Instant;
     use tracing::{error, info};
 
-    /// Logger middleware that logs request/response details
+    /// Logger middleware that logs request/response details.
+    ///
+    /// # Requires a `tracing` subscriber
+    /// This middleware only emits [`tracing`] events (`info!`/`error!`) — it does
+    /// not print anything itself. Without a subscriber installed, those events go
+    /// nowhere and requests will produce zero output, silently. Install one before
+    /// `app.listen(...)`, e.g. with the `tracing-subscriber` crate:
+    /// ```rust,no_run
+    /// tracing_subscriber::fmt().init();
+    /// ```
+    /// (`ultimo new` scaffolds do this for you; add it yourself in a hand-built app.)
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use ultimo::prelude::*;
+    ///
+    /// tracing_subscriber::fmt().init();
+    ///
+    /// let mut app = Ultimo::new();
+    /// app.use_middleware(ultimo::middleware::builtin::logger());
+    /// ```
     pub fn logger() -> BoxedMiddleware {
         Arc::new(|ctx, next| {
             Box::pin(async move {

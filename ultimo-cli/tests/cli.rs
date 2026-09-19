@@ -166,6 +166,51 @@ fn fullstack_scaffold_actually_uses_rpc_registry() {
     );
 }
 
+/// Every template that registers `logger()` must also install a `tracing`
+/// subscriber (in both `Cargo.toml` and `main.rs`) — otherwise `logger()` is a
+/// silent no-op and a user following the docs exactly gets zero output.
+#[test]
+fn every_scaffold_using_logger_installs_a_tracing_subscriber() {
+    let tmp = tempfile::tempdir().unwrap();
+    let templates_and_main_rs = [
+        ("basic", "demo/src/main.rs", "demo/Cargo.toml"),
+        ("api-only", "demo/src/main.rs", "demo/Cargo.toml"),
+        ("rpc", "demo/src/main.rs", "demo/Cargo.toml"),
+        ("production", "demo/src/main.rs", "demo/Cargo.toml"),
+        (
+            "fullstack",
+            "demo/backend/src/main.rs",
+            "demo/backend/Cargo.toml",
+        ),
+    ];
+
+    for (template, main_rs_path, cargo_toml_path) in templates_and_main_rs {
+        let dir = tmp.path().join(template);
+        fs::create_dir_all(&dir).unwrap();
+        ultimo()
+            .current_dir(&dir)
+            .args(["new", "demo", "--template", template])
+            .assert()
+            .success();
+
+        let main_rs = fs::read_to_string(dir.join(main_rs_path)).unwrap();
+        if !main_rs.contains("builtin::logger()") {
+            continue;
+        }
+
+        assert!(
+            main_rs.contains("tracing_subscriber::fmt()"),
+            "{template} registers logger() but never installs a tracing subscriber in main.rs:\n{main_rs}"
+        );
+
+        let cargo_toml = fs::read_to_string(dir.join(cargo_toml_path)).unwrap();
+        assert!(
+            cargo_toml.contains("tracing-subscriber"),
+            "{template} registers logger() but Cargo.toml doesn't depend on tracing-subscriber:\n{cargo_toml}"
+        );
+    }
+}
+
 #[test]
 fn generate_runs_the_convention_bin_and_writes_output() {
     // A minimal cargo project whose generate-client bin writes its first arg.
