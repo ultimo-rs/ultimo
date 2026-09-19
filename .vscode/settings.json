@@ -1,3 +1,10 @@
 {
-  "rust-analyzer.cargo.features": ["websocket", "test-helpers"]
+  "rust-analyzer.cargo.features": [
+    "websocket",
+    "test-helpers",
+    "testing",
+    "session",
+    "csrf",
+    "client-gen"
+  ]
 }
