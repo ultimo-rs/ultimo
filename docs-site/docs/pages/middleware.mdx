@@ -27,6 +27,17 @@ app.use_middleware(logger());
 
 Logs each request and response (method, path, status, duration) via `tracing`.
 
+`logger()` only emits `tracing` events — it doesn't print anything itself. Without
+a subscriber installed, those events go nowhere and you'll see no output at all,
+silently. Install one before `app.listen(...)`, e.g. with the `tracing-subscriber`
+crate:
+
+```rust
+tracing_subscriber::fmt().init();
+```
+
+(`ultimo new` scaffolds that use `logger()` already do this for you.)
+
 ### CORS
 
 Defaults (allow `*`, `GET`/`POST`, `Content-Type`):

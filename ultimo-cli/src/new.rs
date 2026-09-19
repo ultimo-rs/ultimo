@@ -137,6 +137,7 @@ ultimo = "{ultimo}"
 tokio = {{ version = "1.35", features = ["full"] }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
+tracing-subscriber = {{ version = "0.3", features = ["env-filter"] }}
 "#,
         name,
         ultimo = ultimo_dep_version(),
@@ -156,10 +157,21 @@ struct User {
 
 #[tokio::main]
 async fn main() {
+    // `logger()` below only emits `tracing` events — without a subscriber
+    // installed, they go nowhere. This prints them to stdout.
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
     let mut app = Ultimo::new();
 
     // Add CORS middleware
     app.use_middleware(ultimo::middleware::builtin::cors());
+    // Log every request/response
+    app.use_middleware(ultimo::middleware::builtin::logger());
 
     // Routes
     app.get("/", |ctx: Context| async move {
@@ -284,6 +296,7 @@ tokio = {{ version = "1.35", features = ["full"] }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
 ts-rs = "{tsrs}"
+tracing-subscriber = {{ version = "0.3", features = ["env-filter"] }}
 "#,
         name,
         name,
@@ -378,6 +391,13 @@ use ultimo::prelude::*;
 
 #[tokio::main]
 async fn main() -> ultimo::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
     let rpc = api::registry();
 
     rpc.generate_client_file("../frontend/src/generated/client.ts")
@@ -393,6 +413,8 @@ async fn main() -> ultimo::Result<()> {
             .allow_headers(vec!["Content-Type", "Authorization"])
             .build(),
     );
+    // Log every request/response
+    app.use_middleware(middleware::builtin::logger());
 
     // Single JSON-RPC 2.0 endpoint: every procedure dispatches through POST
     // /rpc (supports single calls, batches, and notifications).
@@ -737,11 +759,20 @@ struct User {
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
     let mut app = Ultimo::new();
-    
+
     // Add CORS middleware
     app.use_middleware(ultimo::middleware::builtin::cors());
-    
+    // Log every request/response
+    app.use_middleware(ultimo::middleware::builtin::logger());
+
     // Routes
     app.get("/", |ctx: Context| async move {
         ctx.text("API Server - Visit /users for data").await
@@ -797,6 +828,7 @@ tokio = {{ version = "1.35", features = ["full"] }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
 ts-rs = "{tsrs}"
+tracing-subscriber = {{ version = "0.3", features = ["env-filter"] }}
 "#,
         name,
         name,
@@ -868,10 +900,18 @@ use ultimo::prelude::*;
 
 #[tokio::main]
 async fn main() -> ultimo::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
     let rpc = api::registry();
 
     let mut app = Ultimo::new();
     app.use_middleware(ultimo::middleware::builtin::cors());
+    app.use_middleware(ultimo::middleware::builtin::logger());
 
     // Single JSON-RPC 2.0 endpoint: every procedure dispatches through POST /rpc
     // (supports single calls, batches, and notifications).
@@ -1005,6 +1045,7 @@ edition = "2021"
 ultimo = "{ultimo}"
 tokio = {{ version = "1", features = ["full"] }}
 serde = {{ version = "1", features = ["derive"] }}
+tracing-subscriber = {{ version = "0.3", features = ["env-filter"] }}
 "#,
         name,
         ultimo = ultimo_dep_version(),
@@ -1033,6 +1074,13 @@ type UserStore = Arc<Mutex<Vec<User>>>;
 
 #[tokio::main]
 async fn main() -> ultimo::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
     println!("🚀 Production REST API with OpenAPI");
     println!();
 

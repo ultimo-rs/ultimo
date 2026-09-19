@@ -220,6 +220,35 @@ This approach:
 - **Production**: Skips generation for faster startup
 - **No interruption**: Happens before the server starts listening, doesn't affect request handling
 
+### Where the generated file lands
+
+`generate_client_file(path)` writes to exactly the path you give it, resolved
+relative to your program's **current working directory** at runtime (typically
+your crate root, since that's where `cargo run` starts it) — the same as any
+`std::fs::write` call. From a `backend/` crate next to a `frontend/` crate,
+`rpc.generate_client_file("../frontend/src/lib/client.ts")` lands at
+`<workspace>/frontend/src/lib/client.ts`, exactly as it reads.
+
+This is **not** the same as `ts-rs`'s own `#[ts(export, export_to = "...")]`
+attribute, which `TS` (re-exported as `ultimo::rpc::TS` under `client-gen`)
+still carries if you reach for it directly — for example to export a
+standalone type that isn't part of any RPC procedure, like an SSE payload (see
+[Type Definitions](#type-definitions) below for the RPC-procedure case, which
+never needs `#[ts(export)]` at all). `export_to` on that attribute resolves
+relative to `<CARGO_MANIFEST_DIR>/bindings/`, **not** the crate root — a
+different, hidden base directory that `generate_client_file` doesn't have. The
+naive guess, `#[ts(export, export_to = "../frontend/src/lib/bindings.ts")]`
+from a `backend/` crate, expecting `<workspace>/frontend/...`, actually lands
+at `backend/bindings/../frontend/...` = `backend/frontend/...` — a stray
+directory nested *inside* `backend/`, easy to not notice since `cargo test`
+(which triggers the export) succeeds either way. To actually reach
+`<workspace>/frontend/...` from a `backend/` crate one level under the
+workspace root, you need one extra `..` to first escape the implicit
+`bindings/` directory: `#[ts(export, export_to = "../../frontend/src/lib/bindings.ts")]`.
+Prefer `generate_client_file` for anything reachable from `RpcRegistry`;
+reserve `#[ts(export, export_to = ...)]` for genuinely standalone types, and
+double-check the resulting path the first time you add it.
+
 ## Complete Example
 
 ### Backend
