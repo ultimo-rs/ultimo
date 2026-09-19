@@ -558,9 +558,13 @@ rpc.register_with_types(
 
 ## JSON-RPC 2.0 Protocol
 
-Ultimo's JSON-RPC mode is fully compliant with the [JSON-RPC 2.0 specification](https://www.jsonrpc.org/specification). Use `handle_request()` for spec-compliant dispatch with batch support, notifications, and structured errors.
+Ultimo's JSON-RPC mode is fully compliant with the [JSON-RPC 2.0 specification](https://www.jsonrpc.org/specification), with batch support, notifications, and structured errors.
 
 ### Basic Setup
+
+`app.mount_rpc(path, rpc)` mounts an `RpcRegistry` at a single `POST` endpoint
+that dispatches every procedure by name — single calls, batches, and
+notifications, per spec:
 
 ```rust
 use ultimo::prelude::*;
@@ -574,27 +578,37 @@ async fn main() -> Result<()> {
         Ok(AddOutput { sum: input.a + input.b })
     }, "{ a: number; b: number }".to_string(), "{ sum: number }".to_string());
 
-    // Use handle_request for full JSON-RPC 2.0 support
-    app.post("/rpc", move |ctx: Context| {
-        let rpc = rpc.clone();
-        async move {
-            let body = ctx.req.bytes().await?;
-            let output = rpc.handle_request(&body).await;
-            match output.into_body() {
-                Some(bytes) => {
-                    let value: serde_json::Value = serde_json::from_slice(&bytes)?;
-                    ctx.json(value).await
-                }
-                None => {
-                    ctx.status(204).await;
-                    ctx.text("").await
-                }
-            }
-        }
-    });
+    app.mount_rpc("/rpc", rpc);
 
     app.listen("127.0.0.1:3000").await
 }
+```
+
+`mount_rpc` is sugar over calling
+[`RpcRegistry::handle_request`](https://docs.rs/ultimo/latest/ultimo/rpc/struct.RpcRegistry.html#method.handle_request)
+yourself and translating its `JsonRpcOutput` into a `Response` — reach for the
+manual form only if you need custom behavior around the call (auth checks,
+different status codes, etc.) that doesn't fit a single route:
+
+```rust
+app.post("/rpc", move |ctx: Context| {
+    let rpc = rpc.clone();
+    async move {
+        let body = ctx.req.bytes().await?;
+        let output = rpc.handle_request(&body).await;
+        match output.into_body() {
+            Some(bytes) => {
+                let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+                ctx.json(value).await
+            }
+            None => {
+                // A notification (no id) produces no response body.
+                ctx.status(204).await;
+                ctx.text("").await
+            }
+        }
+    }
+});
 ```
 
 ### Single Request

@@ -148,8 +148,8 @@ fn fullstack_scaffold_actually_uses_rpc_registry() {
 
     let main = fs::read_to_string(tmp.path().join("demo/backend/src/main.rs")).unwrap();
     assert!(
-        main.contains("handle_request") && main.contains("generate_client_file"),
-        "fullstack backend must mount the registry via handle_request and generate a real client:\n{main}"
+        main.contains("mount_rpc") && main.contains("generate_client_file"),
+        "fullstack backend must mount the registry via mount_rpc and generate a real client:\n{main}"
     );
 
     let gen =

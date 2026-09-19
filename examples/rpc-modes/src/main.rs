@@ -206,25 +206,7 @@ async fn main() -> ultimo::Result<()> {
     println!();
 
     // Mount JSON-RPC 2.0 endpoint (supports single, batch, and notifications)
-    let rpc_handler = jsonrpc_rpc.clone();
-    jsonrpc_app.post("/rpc", move |ctx: Context| {
-        let rpc = rpc_handler.clone();
-        async move {
-            let body = ctx.req.bytes().await?;
-            let output = rpc.handle_request(&body).await;
-            match output.into_body() {
-                Some(bytes) => {
-                    let value: serde_json::Value = serde_json::from_slice(&bytes)
-                        .map_err(|e| ultimo::UltimoError::Internal(e.to_string()))?;
-                    ctx.json(value).await
-                }
-                None => {
-                    ctx.status(204).await;
-                    ctx.text("").await
-                }
-            }
-        }
-    });
+    jsonrpc_app.mount_rpc("/rpc", jsonrpc_rpc);
 
     println!("JSON-RPC Mode: Would listen on http://localhost:3000");
     println!();
