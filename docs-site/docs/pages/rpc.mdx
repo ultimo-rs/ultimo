@@ -8,19 +8,124 @@ The RPC system lets you define procedures in Rust that automatically generate ty
 
 ## REST Mode
 
-Each RPC procedure becomes its own HTTP endpoint:
+In REST mode, each RPC procedure gets its own generated TypeScript client
+method — but unlike JSON-RPC mode, there's no `mount_rpc`-style one-liner to
+mount it: `RpcMode::Rest` only affects the generated client's shape (`GET`
+for queries, `POST` for mutations) and `generate_openapi`'s output. You mount
+each procedure as its own route yourself, dispatching through
+[`RpcRegistry::call`](#calling-a-procedure-directly):
 
 ```rust
 use ultimo::prelude::*;
-use ultimo::rpc::RpcMode;
+use ultimo::rpc::{RpcMode, RpcRegistry, TS};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Serialize, TS)]
 struct GetUserInput {
     id: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+struct User {
+    id: u32,
+    name: String,
+    email: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, TS)]
+struct CreateUserInput {
+    name: String,
+    email: String,
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let mut app = Ultimo::new();
+
+    // Create RPC registry in REST mode. TS types are still derived
+    // automatically — REST mode only changes how the client dispatches.
+    let rpc = RpcRegistry::new_with_mode(RpcMode::Rest);
+
+    // Register a query (uses GET in the generated client)
+    rpc.query("getUser", |input: GetUserInput| async move {
+        Ok(User {
+            id: input.id,
+            name: "Alice".to_string(),
+            email: "alice@example.com".to_string(),
+        })
+    });
+
+    // Register a mutation (uses POST in the generated client)
+    rpc.mutation("createUser", |input: CreateUserInput| async move {
+        Ok(User {
+            id: 2,
+            name: input.name,
+            email: input.email,
+        })
+    });
+
+    // Generate TypeScript client
+    rpc.generate_client_file("../frontend/src/lib/client.ts")?;
+
+    // Mount each procedure as its own route — REST mode has no single-call
+    // mount helper (that's JSON-RPC mode's `app.mount_rpc`).
+    let get_user_rpc = rpc.clone();
+    app.get("/api/getUser", move |ctx: Context| {
+        let rpc = get_user_rpc.clone();
+        async move {
+            let id: u32 = ctx
+                .req
+                .query("id")
+                .and_then(|v| v.parse().ok())
+                .ok_or_else(|| UltimoError::BadRequest("missing or invalid 'id'".into()))?;
+            let result = rpc.call("getUser", serde_json::json!({ "id": id })).await?;
+            ctx.json(result).await
+        }
+    });
+
+    let create_user_rpc = rpc.clone();
+    app.post("/api/createUser", move |ctx: Context| {
+        let rpc = create_user_rpc.clone();
+        async move {
+            let input: CreateUserInput = ctx.req.json().await?;
+            let result = rpc.call("createUser", serde_json::to_value(input)?).await?;
+            ctx.json(result).await
+        }
+    });
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+**Manually mounted endpoints:**
+
+- `GET /api/getUser?id=1`
+- `POST /api/createUser`
+
+### Calling a procedure directly
+
+`RpcRegistry::call(name, params) -> Result<serde_json::Value>` dispatches one
+registered procedure by name, decoupled from any particular HTTP shape —
+that's what the manual routes above (and JSON-RPC mode's internal dispatch)
+are built on. Reach for it directly whenever you need to invoke a procedure
+from your own route or middleware, outside the request shapes `mount_rpc`
+or the REST routes above expect.
+
+## JSON-RPC Mode
+
+All procedures use a single endpoint, mounted in one call with `mount_rpc`:
+
+```rust
+use ultimo::prelude::*;
+use ultimo::rpc::{RpcRegistry, TS};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize, TS)]
+struct GetUserInput {
+    id: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
 struct User {
     id: u32,
     name: String,
@@ -31,81 +136,24 @@ struct User {
 async fn main() -> Result<()> {
     let mut app = Ultimo::new();
 
-    // Create RPC registry in REST mode
-    let rpc = RpcRegistry::new_with_mode(RpcMode::Rest);
-
-    // Register a query (uses GET)
-    rpc.query(
-        "getUser",
-        |input: GetUserInput| async move {
-            Ok(User {
-                id: input.id,
-                name: "Alice".to_string(),
-                email: "alice@example.com".to_string(),
-            })
-        },
-        "{ id: number }".to_string(),
-        "User".to_string(),
-    );
-
-    // Register a mutation (uses POST)
-    rpc.mutation(
-        "createUser",
-        |input: CreateUserInput| async move {
-            Ok(User { /* ... */ })
-        },
-        "{ name: string; email: string }".to_string(),
-        "User".to_string(),
-    );
-
-    // Generate TypeScript client
-    rpc.generate_client_file("../frontend/src/lib/client.ts")?;
-
-    app.listen("127.0.0.1:3000").await
-}
-```
-
-**Generated endpoints:**
-
-- `GET /api/getUser?id=1`
-- `POST /api/createUser`
-
-## JSON-RPC Mode
-
-All procedures use a single endpoint:
-
-```rust
-use ultimo::prelude::*;
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    let mut app = Ultimo::new();
-
     // Create RPC registry (JSON-RPC is default)
     let rpc = RpcRegistry::new();
 
-    // Register procedures
-    rpc.register_with_types(
-        "getUser",
-        |input: GetUserInput| async move {
-            Ok(User { /* ... */ })
-        },
-        "{ id: number }".to_string(),
-        "User".to_string(),
-    );
+    // Register procedures — types are derived from GetUserInput/User via TS
+    rpc.query("getUser", |input: GetUserInput| async move {
+        Ok(User {
+            id: input.id,
+            name: "Alice".to_string(),
+            email: "alice@example.com".to_string(),
+        })
+    });
 
     // Generate TypeScript client
     rpc.generate_client_file("../frontend/src/lib/client.ts")?;
 
-    // Single RPC endpoint
-    app.post("/rpc", move |ctx: Context| {
-        let rpc = rpc.clone();
-        async move {
-            let req: RpcRequest = ctx.req.json().await?;
-            let result = rpc.call(&req.method, req.params).await?;
-            ctx.json(result).await
-        }
-    });
+    // Single RPC endpoint — dispatches every procedure by name, and handles
+    // single calls, batches, and notifications per the JSON-RPC 2.0 spec.
+    app.mount_rpc("/rpc", rpc);
 
     app.listen("127.0.0.1:3000").await
 }
@@ -192,7 +240,7 @@ async fn main() -> Result<()> {
     let rpc = RpcRegistry::new();
 
     // Register your RPC methods...
-    rpc.register_with_types(/* ... */);
+    rpc.query("getUser", |input: GetUserInput| async move { /* ... */ });
 
     // Generate TypeScript client (development only)
     #[cfg(debug_assertions)]
@@ -201,14 +249,7 @@ async fn main() -> Result<()> {
         println!("✅ TypeScript client generated");
     }
 
-    app.post("/rpc", move |ctx: Context| {
-        let rpc = rpc.clone();
-        async move {
-            let req: RpcRequest = ctx.req.json().await?;
-            let result = rpc.call(&req.method, req.params).await?;
-            ctx.json(result).await
-        }
-    });
+    app.mount_rpc("/rpc", rpc);
 
     app.listen("127.0.0.1:3000").await
 }
@@ -255,22 +296,30 @@ double-check the resulting path the first time you add it.
 
 ```rust
 use ultimo::prelude::*;
+use ultimo::rpc::{RpcRegistry, TS};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+struct User {
+    id: u32,
+    name: String,
+    email: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, TS)]
 struct ListUsersInput {
     page: Option<u32>,
     limit: Option<u32>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, TS)]
 struct ListUsersOutput {
     users: Vec<User>,
     total: u32,
     page: u32,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Serialize, TS)]
 struct CreateUserInput {
     name: String,
     email: String,
@@ -281,50 +330,33 @@ async fn main() -> Result<()> {
     let mut app = Ultimo::new();
     let rpc = RpcRegistry::new();
 
-    // List users (query)
-    rpc.register_with_types(
-        "listUsers",
-        |input: ListUsersInput| async move {
-            let page = input.page.unwrap_or(1);
-            let limit = input.limit.unwrap_or(10);
+    // List users (query) — types are derived from ListUsersInput/ListUsersOutput
+    rpc.query("listUsers", |input: ListUsersInput| async move {
+        let page = input.page.unwrap_or(1);
+        let limit = input.limit.unwrap_or(10);
 
-            Ok(ListUsersOutput {
-                users: vec![],
-                total: 0,
-                page,
-            })
-        },
-        "{ page?: number; limit?: number }".to_string(),
-        "{ users: User[]; total: number; page: number }".to_string(),
-    );
+        Ok(ListUsersOutput {
+            users: vec![],
+            total: 0,
+            page,
+        })
+    });
 
     // Create user (mutation)
-    rpc.register_with_types(
-        "createUser",
-        |input: CreateUserInput| async move {
-            Ok(User {
-                id: 1,
-                name: input.name,
-                email: input.email,
-            })
-        },
-        "{ name: string; email: string }".to_string(),
-        "User".to_string(),
-    );
+    rpc.mutation("createUser", |input: CreateUserInput| async move {
+        Ok(User {
+            id: 1,
+            name: input.name,
+            email: input.email,
+        })
+    });
 
     // Generate client
     rpc.generate_client_file("../frontend/src/lib/client.ts")?;
     println!("✅ TypeScript client generated");
 
-    // Mount RPC endpoint
-    app.post("/rpc", move |ctx: Context| {
-        let rpc = rpc.clone();
-        async move {
-            let req: RpcRequest = ctx.req.json().await?;
-            let result = rpc.call(&req.method, req.params).await?;
-            ctx.json(result).await
-        }
-    });
+    // Mount RPC endpoint — single call, handles single/batch/notification requests
+    app.mount_rpc("/rpc", rpc);
 
     app.listen("127.0.0.1:3000").await
 }
@@ -335,74 +367,74 @@ async fn main() -> Result<()> {
 The `generate_client_file()` call produces a type-safe client:
 
 ```typescript
-// Auto-generated TypeScript client for Ultimo RPC (REST Mode)
+// Auto-generated TypeScript client for Ultimo RPC (JSON-RPC 2.0)
 // DO NOT EDIT - This file is automatically generated
 
+export interface JsonRpcError {
+  code: number;
+  message: string;
+  data?: unknown;
+}
+
+export class JsonRpcClientError extends Error {
+  constructor(public readonly error: JsonRpcError) {
+    super(error.message);
+    this.name = "JsonRpcClientError";
+  }
+}
+
 export class UltimoRpcClient {
-  constructor(private baseUrl: string = "/api") {}
+  private _idCounter = 0;
 
-  private async get<T>(path: string, params?: Record<string, any>): Promise<T> {
-    const url = new URL(this.baseUrl + path, window.location.origin);
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        url.searchParams.append(key, String(value));
-      });
-    }
+  constructor(private baseUrl: string = "/api/rpc") {}
 
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: response.statusText }));
-      throw new Error(error.message || "Request failed");
-    }
-
-    return response.json();
+  private nextId(): number {
+    return ++this._idCounter;
   }
 
-  private async post<T>(path: string, body: any): Promise<T> {
-    const response = await fetch(this.baseUrl + path, {
+  private async call<T>(method: string, params: unknown): Promise<T> {
+    const id = this.nextId();
+    const response = await fetch(this.baseUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method, params, id }),
     });
 
     if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: response.statusText }));
-      throw new Error(error.message || "Request failed");
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    if (data.error) {
+      throw new JsonRpcClientError(data.error);
+    }
+    return data.result as T;
   }
 
-  async listUsers(params: {
-    page?: number;
-    limit?: number;
-  }): Promise<{ users: User[]; total: number; page: number }> {
-    return this.get("/listUsers", params);
+  /** Send a notification (fire-and-forget, no response expected) */
+  async notify(method: string, params?: unknown): Promise<void> {
+    /* ... */
   }
 
-  async createUser(params: { name: string; email: string }): Promise<User> {
-    return this.post("/createUser", params);
+  /** Execute multiple RPC calls in a single HTTP request */
+  async batch(/* ... */) {
+    /* ... */
+  }
+
+  async listUsers(params: ListUsersInput): Promise<ListUsersOutput> {
+    return this.call("listUsers", params);
+  }
+
+  async createUser(params: CreateUserInput): Promise<User> {
+    return this.call("createUser", params);
   }
 }
 
 // Type Definitions
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-}
+export type User = { id: number, name: string, email: string, };
+export type ListUsersInput = { page: number | null, limit: number | null, };
+export type ListUsersOutput = { users: Array<User>, total: number, page: number, };
+export type CreateUserInput = { name: string, email: string, };
 ```
 
 ### Frontend with React Query
@@ -449,30 +481,60 @@ function UserList() {
 
 ## Type Definitions
 
-You can define complex TypeScript types:
+Nested structs, `Option`, `Vec`, and enums all derive into the matching
+TypeScript shape automatically — no manual type strings needed:
 
 ```rust
-rpc.register_with_types(
+use ultimo::rpc::TS;
+
+#[derive(Debug, Deserialize, Serialize, TS)]
+enum Role {
+    Admin,
+    User,
+}
+
+#[derive(Debug, Deserialize, Serialize, TS)]
+struct SearchFilters {
+    role: Option<Role>,
+    active: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Serialize, TS)]
+struct Pagination {
+    page: u32,
+    limit: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize, TS)]
+struct SearchUsersInput {
+    query: String,
+    filters: Option<SearchFilters>,
+    pagination: Option<Pagination>,
+}
+
+#[derive(Debug, Serialize, TS)]
+struct SearchUsersOutput {
+    results: Vec<User>,
+    total: u32,
+    has_more: bool,
+}
+
+rpc.query("searchUsers", |input: SearchUsersInput| async move {
+    // ...
+    Ok(SearchUsersOutput { results: vec![], total: 0, has_more: false })
+});
+```
+
+For a type that can't derive `TS` (e.g. one defined in another crate),
+`query_with_types`/`mutation_with_types` take the same handler with explicit
+TypeScript type strings instead:
+
+```rust
+rpc.query_with_types(
     "searchUsers",
     handler,
-    // Input type
-    r#"{
-      query: string;
-      filters?: {
-        role?: 'admin' | 'user';
-        active?: boolean;
-      };
-      pagination?: {
-        page: number;
-        limit: number;
-      };
-    }"#.to_string(),
-    // Output type
-    r#"{
-      results: User[];
-      total: number;
-      hasMore: boolean;
-    }"#.to_string(),
+    "{ query: string; filters?: { role?: 'admin' | 'user' } }".to_string(),
+    "{ results: User[]; total: number; hasMore: boolean }".to_string(),
 );
 ```
 
@@ -481,19 +543,24 @@ rpc.register_with_types(
 RPC procedures automatically handle errors:
 
 ```rust
-rpc.register_with_types(
-    "deleteUser",
-    |input: DeleteUserInput| async move {
-        let user = find_user(input.id)
-            .ok_or_else(|| ultimo::Error::NotFound("User not found".to_string()))?;
+#[derive(Debug, Deserialize, Serialize, TS)]
+struct DeleteUserInput {
+    id: u32,
+}
 
-        delete_user(user).await?;
+#[derive(Debug, Serialize, TS)]
+struct DeleteUserOutput {
+    success: bool,
+}
 
-        Ok(json!({ "success": true }))
-    },
-    "{ id: number }".to_string(),
-    "{ success: boolean }".to_string(),
-);
+rpc.mutation("deleteUser", |input: DeleteUserInput| async move {
+    let user = find_user(input.id)
+        .ok_or_else(|| UltimoError::NotFound("User not found".to_string()))?;
+
+    delete_user(user).await?;
+
+    Ok(DeleteUserOutput { success: true })
+});
 ```
 
 TypeScript client catches errors:
@@ -512,12 +579,12 @@ try {
 
 ```rust
 // Good
-rpc.register("getUserProfile", handler);
-rpc.register("updateUserEmail", handler);
+rpc.query("getUserProfile", handler);
+rpc.mutation("updateUserEmail", handler);
 
 // Bad
-rpc.register("get", handler);
-rpc.register("update", handler);
+rpc.query("get", handler);
+rpc.mutation("update", handler);
 ```
 
 ### ✅ Separate Queries and Mutations
@@ -535,9 +602,11 @@ rpc.mutation("deleteUser", handler);
 ### ✅ Validate Input
 
 ```rust
+use ultimo::rpc::TS;
+use ultimo::validate;
 use validator::Validate;
 
-#[derive(Deserialize, Validate)]
+#[derive(Debug, Deserialize, Serialize, TS, Validate)]
 struct CreateUserInput {
     #[validate(length(min = 3, max = 50))]
     name: String,
@@ -546,14 +615,11 @@ struct CreateUserInput {
     email: String,
 }
 
-rpc.register_with_types(
-    "createUser",
-    |input: CreateUserInput| async move {
-        input.validate()?;
-        // ... create user
-    },
-    // types...
-);
+rpc.mutation("createUser", |input: CreateUserInput| async move {
+    validate(&input)?;
+    // ... create user
+    Ok(User { id: 1, name: input.name, email: input.email })
+});
 ```
 
 ## JSON-RPC 2.0 Protocol
@@ -568,15 +634,27 @@ notifications, per spec:
 
 ```rust
 use ultimo::prelude::*;
+use ultimo::rpc::{RpcRegistry, TS};
+
+#[derive(Debug, Deserialize, Serialize, TS)]
+struct AddInput {
+    a: i32,
+    b: i32,
+}
+
+#[derive(Debug, Serialize, TS)]
+struct AddOutput {
+    sum: i32,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut app = Ultimo::new();
     let rpc = RpcRegistry::new();
 
-    rpc.register_with_types("add", |input: AddInput| async move {
+    rpc.query("add", |input: AddInput| async move {
         Ok(AddOutput { sum: input.a + input.b })
-    }, "{ a: number; b: number }".to_string(), "{ sum: number }".to_string());
+    });
 
     app.mount_rpc("/rpc", rpc);
 
