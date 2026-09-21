@@ -106,6 +106,24 @@ pick_crate_changelog() {
   done
 }
 
+# Commit titles land verbatim in the per-crate changelog (release-plz doesn't
+# escape them), and Rust generics like `Vec<T>` read as an unclosed JSX tag to
+# Vocs/MDX — it broke a real build (see PR mdx-changelog-escaping). Escape any
+# bare `<`/`>` outside backtick spans before writing into an `.mdx` file; the
+# plain `CHANGELOG.md` mirror is untouched so it stays byte-identical to the
+# per-crate source.
+escape_mdx() {
+  python3 -c '
+import re, sys
+def escape_line(line):
+    parts = re.split(r"(`[^`]*`)", line)
+    for i in range(0, len(parts), 2):  # even indices = outside backticks
+        parts[i] = parts[i].replace("<", "&lt;").replace(">", "&gt;")
+    return "".join(parts)
+sys.stdout.write("\n".join(escape_line(l) for l in sys.stdin.read().split("\n")))
+'
+}
+
 promote_changelog() {
   local file="$1"
   [ -f "$file" ] || return 0
@@ -134,6 +152,10 @@ promote_changelog() {
     echo "  ⚠️  could not extract v$VERSION section from $src; skipping $file"
     return 0
   fi
+
+  case "$file" in
+  *.mdx) block=$(printf '%s' "$block" | escape_mdx) ;;
+  esac
 
   # Insert the block right after the `## [Unreleased]` heading.
   local tmp
