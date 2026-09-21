@@ -8,21 +8,38 @@ Ultimo automatically generates type-safe TypeScript clients from your Rust RPC p
 
 ```rust
 use ultimo::prelude::*;
+use ultimo::rpc::{RpcRegistry, TS};
+
+#[derive(Debug, Deserialize, Serialize, TS)]
+struct GetUserInput {
+    id: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+struct User {
+    id: u32,
+    name: String,
+    email: String,
+}
 
 let rpc = RpcRegistry::new();
 
-rpc.register_with_types(
-    "getUser",
-    |input: GetUserInput| async move {
-        Ok(User { /* ... */ })
-    },
-    "{ id: number }".to_string(),
-    "User".to_string(),
-);
+// TS input/output types are derived automatically from GetUserInput/User —
+// no manual TypeScript strings needed.
+rpc.query("getUser", |input: GetUserInput| async move {
+    Ok(User {
+        id: input.id,
+        name: "Alice".to_string(),
+        email: "alice@example.com".to_string(),
+    })
+});
 
 // Generate client on server startup
 rpc.generate_client_file("../frontend/src/lib/client.ts")?;
 println!("✅ TypeScript client generated!");
+
+let mut app = Ultimo::new();
+app.mount_rpc("/rpc", rpc);
 ```
 
 ### 2. Use in TypeScript
@@ -30,7 +47,7 @@ println!("✅ TypeScript client generated!");
 ```typescript
 import { UltimoRpcClient } from "./lib/client";
 
-const client = new UltimoRpcClient();
+const client = new UltimoRpcClient("/rpc");
 
 // Fully type-safe!
 const user = await client.getUser({ id: 1 });
@@ -43,41 +60,63 @@ The generated client includes:
 
 ```typescript
 // Auto-generated type definitions
-interface User {
-  id: number;
-  name: string;
-  email: string;
+export type User = { id: number, name: string, email: string, };
+export type GetUserInput = { id: number, };
+
+export interface JsonRpcError {
+  code: number;
+  message: string;
+  data?: unknown;
 }
 
-interface GetUserInput {
-  id: number;
+export class JsonRpcClientError extends Error {
+  constructor(public readonly error: JsonRpcError) {
+    super(error.message);
+    this.name = "JsonRpcClientError";
+  }
 }
 
 // RPC client class
 export class UltimoRpcClient {
-  private baseUrl: string;
+  private _idCounter = 0;
 
-  constructor(baseUrl: string = "/rpc") {
-    this.baseUrl = baseUrl;
+  constructor(private baseUrl: string = "/api/rpc") {}
+
+  private nextId(): number {
+    return ++this._idCounter;
+  }
+
+  private async call<T>(method: string, params: unknown): Promise<T> {
+    const id = this.nextId();
+    const response = await fetch(this.baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method, params, id }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (data.error) {
+      throw new JsonRpcClientError(data.error);
+    }
+    return data.result as T;
   }
 
   async getUser(params: GetUserInput): Promise<User> {
     return this.call("getUser", params);
   }
 
-  private async call(method: string, params: any): Promise<any> {
-    const response = await fetch(this.baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method, params }),
-    });
+  /** Send a notification (fire-and-forget, no response expected) */
+  async notify(method: string, params?: unknown): Promise<void> {
+    /* ... */
+  }
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "RPC call failed");
-    }
-
-    return response.json();
+  /** Execute multiple RPC calls in a single HTTP request */
+  async batch(/* ... */) {
+    /* ... */
   }
 }
 ```
@@ -96,8 +135,8 @@ async fn main() -> Result<()> {
     let mut app = Ultimo::new();
     let rpc = RpcRegistry::new();
 
-    // Register RPC methods with type definitions
-    rpc.register_with_types(/* ... */);
+    // Register RPC methods — TS types are derived from the Rust types
+    rpc.query("getUser", |input: GetUserInput| async move { /* ... */ });
 
     // Auto-generate TypeScript client in development
     #[cfg(debug_assertions)]
@@ -106,14 +145,7 @@ async fn main() -> Result<()> {
         println!("✅ TypeScript client regenerated");
     }
 
-    app.post("/rpc", move |ctx: Context| {
-        let rpc = rpc.clone();
-        async move {
-            let req: RpcRequest = ctx.req.json().await?;
-            let result = rpc.call(&req.method, req.params).await?;
-            ctx.json(result).await
-        }
-    });
+    app.mount_rpc("/rpc", rpc);
 
     app.listen("127.0.0.1:3000").await
 }
@@ -144,16 +176,24 @@ for a worked example.
 
 ```rust
 use ultimo::prelude::*;
+use ultimo::rpc::{RpcRegistry, TS};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+struct User {
+    id: u32,
+    name: String,
+    email: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, TS)]
 struct ListUsersInput {
     page: Option<u32>,
     limit: Option<u32>,
     search: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, TS)]
 struct ListUsersOutput {
     users: Vec<User>,
     total: u32,
@@ -161,7 +201,7 @@ struct ListUsersOutput {
     has_more: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Serialize, TS)]
 struct CreateUserInput {
     name: String,
     email: String,
@@ -172,60 +212,34 @@ async fn main() -> Result<()> {
     let mut app = Ultimo::new();
     let rpc = RpcRegistry::new();
 
-    // List users
-    rpc.register_with_types(
-        "listUsers",
-        |input: ListUsersInput| async move {
-            let page = input.page.unwrap_or(1);
-            let limit = input.limit.unwrap_or(10);
+    // List users — types are derived from ListUsersInput/ListUsersOutput
+    rpc.query("listUsers", |input: ListUsersInput| async move {
+        let page = input.page.unwrap_or(1);
+        let limit = input.limit.unwrap_or(10);
 
-            let users = fetch_users(page, limit, input.search).await?;
-            let total = count_users().await?;
+        let users = fetch_users(page, limit, input.search).await?;
+        let total = count_users().await?;
 
-            Ok(ListUsersOutput {
-                users,
-                total,
-                page,
-                has_more: (page * limit) < total,
-            })
-        },
-        r#"{
-          page?: number;
-          limit?: number;
-          search?: string;
-        }"#.to_string(),
-        r#"{
-          users: User[];
-          total: number;
-          page: number;
-          has_more: boolean;
-        }"#.to_string(),
-    );
+        Ok(ListUsersOutput {
+            users,
+            total,
+            page,
+            has_more: (page * limit) < total,
+        })
+    });
 
     // Create user
-    rpc.register_with_types(
-        "createUser",
-        |input: CreateUserInput| async move {
-            validate_email(&input.email)?;
-            let user = create_user(input).await?;
-            Ok(user)
-        },
-        r#"{ name: string; email: string }"#.to_string(),
-        "User".to_string(),
-    );
+    rpc.mutation("createUser", |input: CreateUserInput| async move {
+        validate_email(&input.email)?;
+        let user = create_user(input).await?;
+        Ok(user)
+    });
 
     // Generate TypeScript client
     rpc.generate_client_file("../frontend/src/lib/ultimo-client.ts")?;
 
-    // Mount RPC endpoint
-    app.post("/rpc", move |ctx: Context| {
-        let rpc = rpc.clone();
-        async move {
-            let req: RpcRequest = ctx.req.json().await?;
-            let result = rpc.call(&req.method, req.params).await?;
-            ctx.json(result).await
-        }
-    });
+    // Mount RPC endpoint — single call, handles single/batch/notification requests
+    app.mount_rpc("/rpc", rpc);
 
     app.listen("127.0.0.1:3000").await
 }
@@ -236,80 +250,72 @@ async fn main() -> Result<()> {
 The `generate_client_file()` call produces `ultimo-client.ts` with full type safety:
 
 ```typescript
-// Auto-generated TypeScript client for Ultimo RPC (REST Mode)
+// Auto-generated TypeScript client for Ultimo RPC (JSON-RPC 2.0)
 // DO NOT EDIT - This file is automatically generated
 
+export interface JsonRpcError {
+  code: number;
+  message: string;
+  data?: unknown;
+}
+
+export class JsonRpcClientError extends Error {
+  constructor(public readonly error: JsonRpcError) {
+    super(error.message);
+    this.name = "JsonRpcClientError";
+  }
+}
+
 export class UltimoRpcClient {
-  constructor(private baseUrl: string = "/api") {}
+  private _idCounter = 0;
 
-  private async get<T>(path: string, params?: Record<string, any>): Promise<T> {
-    const url = new URL(this.baseUrl + path, window.location.origin);
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        url.searchParams.append(key, String(value));
-      });
-    }
+  constructor(private baseUrl: string = "/api/rpc") {}
 
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: response.statusText }));
-      throw new Error(error.message || "Request failed");
-    }
-
-    return response.json();
+  private nextId(): number {
+    return ++this._idCounter;
   }
 
-  private async post<T>(path: string, body: any): Promise<T> {
-    const response = await fetch(this.baseUrl + path, {
+  private async call<T>(method: string, params: unknown): Promise<T> {
+    const id = this.nextId();
+    const response = await fetch(this.baseUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method, params, id }),
     });
 
     if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: response.statusText }));
-      throw new Error(error.message || "Request failed");
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    if (data.error) {
+      throw new JsonRpcClientError(data.error);
+    }
+    return data.result as T;
   }
 
-  async listUsers(params: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  }): Promise<{
-    users: User[];
-    total: number;
-    page: number;
-    has_more: boolean;
-  }> {
-    return this.get("/listUsers", params);
+  async notify(method: string, params?: unknown): Promise<void> {
+    /* ... */
   }
 
-  async createUser(params: { name: string; email: string }): Promise<User> {
-    return this.post("/createUser", params);
+  async batch(/* ... */) {
+    /* ... */
+  }
+
+  async listUsers(params: ListUsersInput): Promise<ListUsersOutput> {
+    return this.call("listUsers", params);
+  }
+
+  async createUser(params: CreateUserInput): Promise<User> {
+    return this.call("createUser", params);
   }
 }
 
 // Type Definitions
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-}
+export type User = { id: number, name: string, email: string, };
+export type ListUsersInput = { page: number | null, limit: number | null, search: string | null, };
+export type ListUsersOutput = { users: Array<User>, total: number, page: number, has_more: boolean, };
+export type CreateUserInput = { name: string, email: string, };
 ```
 
 ### Frontend with React Query
@@ -404,100 +410,62 @@ const client = new UltimoRpcClient("/api/rpc");
 const client = new UltimoRpcClient(import.meta.env.VITE_API_URL || "/rpc");
 ```
 
+The generated client's `call()` method is private (not designed for
+subclassing — there's no `protected` hook to override), but it always calls
+the ambient `fetch`. Wrapping `fetch` once, before constructing the client,
+is the real way to add cross-cutting behavior — headers, error transforms,
+logging — to every request it makes:
+
 ### Authentication
 
-Add auth tokens to requests:
-
 ```typescript
-class AuthenticatedUltimoClient extends UltimoRpcClient {
-  private token: string | null = null;
+let authToken: string | null = null;
 
-  setToken(token: string) {
-    this.token = token;
-  }
-
-  protected async call(method: string, params: any): Promise<any> {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    if (this.token) {
-      headers["Authorization"] = `Bearer ${this.token}`;
-    }
-
-    const response = await fetch(this.baseUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ method, params }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "RPC call failed");
-    }
-
-    return response.json();
-  }
+export function setAuthToken(token: string) {
+  authToken = token;
 }
 
+const originalFetch = window.fetch;
+window.fetch = (input, init) => {
+  const headers = new Headers(init?.headers);
+  if (authToken) headers.set("Authorization", `Bearer ${authToken}`);
+  return originalFetch(input, { ...init, headers });
+};
+
 // Usage
-const client = new AuthenticatedUltimoClient();
-client.setToken("your-jwt-token");
+setAuthToken("your-jwt-token");
+const client = new UltimoRpcClient("/api/rpc");
 const user = await client.getUser({ id: 1 });
 ```
 
 ### Error Handling
 
 ```typescript
-class CustomErrorUltimoClient extends UltimoRpcClient {
-  protected async call(method: string, params: any): Promise<any> {
-    try {
-      return await super.call(method, params);
-    } catch (error) {
-      // Transform errors
-      if (error.message.includes("Unauthorized")) {
-        // Redirect to login
-        window.location.href = "/login";
-      }
-
-      // Log errors
-      console.error("RPC Error:", { method, params, error });
-
-      throw error;
-    }
+try {
+  const user = await client.getUser({ id: 1 });
+} catch (error) {
+  if (error instanceof JsonRpcClientError && error.error.code === -32001 /* your app's auth-error code */) {
+    window.location.href = "/login";
   }
+  console.error("RPC Error:", error);
+  throw error;
 }
 ```
 
 ### Request Interceptors
 
 ```typescript
-class InterceptedUltimoClient extends UltimoRpcClient {
-  private requestId = 0;
+let requestId = 0;
 
-  protected async call(method: string, params: any): Promise<any> {
-    const requestId = ++this.requestId;
-
-    console.log(`[${requestId}] Calling ${method}`, params);
-
-    const start = performance.now();
-
-    try {
-      const result = await super.call(method, params);
-      const duration = performance.now() - start;
-
-      console.log(`[${requestId}] Success (${duration.toFixed(2)}ms)`, result);
-
-      return result;
-    } catch (error) {
-      const duration = performance.now() - start;
-
-      console.error(`[${requestId}] Error (${duration.toFixed(2)}ms)`, error);
-
-      throw error;
-    }
-  }
-}
+const originalFetch = window.fetch;
+window.fetch = async (input, init) => {
+  const id = ++requestId;
+  const start = performance.now();
+  console.log(`[${id}] →`, init?.body);
+  const response = await originalFetch(input, init);
+  console.log(`[${id}] ← (${(performance.now() - start).toFixed(2)}ms)`, response.status);
+  return response;
+};
 ```
 
 ## React Hooks (TanStack Query)
@@ -599,19 +567,25 @@ import { rest } from "msw";
 
 const server = setupServer(
   rest.post("/rpc", async (req, res, ctx) => {
-    const { method, params } = await req.json();
+    const { method, params, id } = await req.json();
 
     if (method === "getUser") {
       return res(
         ctx.json({
-          id: params.id,
-          name: "Test User",
-          email: "test@example.com",
+          jsonrpc: "2.0",
+          result: { id: params.id, name: "Test User", email: "test@example.com" },
+          id,
         })
       );
     }
 
-    return res(ctx.status(404));
+    return res(
+      ctx.json({
+        jsonrpc: "2.0",
+        error: { code: -32601, message: `Procedure '${method}' not found` },
+        id,
+      })
+    );
   })
 );
 
@@ -636,20 +610,20 @@ echo "✅ TypeScript client updated"
 
 ### ✅ Version Your Client
 
+The generated file is regenerated on every backend change (see "Regenerate on
+Backend Changes" above) — don't hand-edit it. To tag requests with a client
+version, use the same `fetch`-wrapping technique as [Custom Client
+Configuration](#custom-client-configuration):
+
 ```typescript
 export const CLIENT_VERSION = "1.0.0";
 
-export class UltimoRpcClient {
-  private version = CLIENT_VERSION;
-
-  protected async call(method: string, params: any): Promise<any> {
-    const headers = {
-      "Content-Type": "application/json",
-      "X-Client-Version": this.version,
-    };
-    // ...
-  }
-}
+const originalFetch = window.fetch;
+window.fetch = (input, init) => {
+  const headers = new Headers(init?.headers);
+  headers.set("X-Client-Version", CLIENT_VERSION);
+  return originalFetch(input, { ...init, headers });
+};
 ```
 
 ### ✅ Handle Network Errors
