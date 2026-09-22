@@ -89,8 +89,11 @@ apply, not by forgetting:
    builds it. Pattern to copy: `examples/session-auth` (a Rust backend serving an
    HTML+JS page, `cargo run -p <example>`). Update it in *this* PR, don't defer.
 
-Also keep the **roadmap** (`docs-site/docs/pages/roadmap.mdx`) honest — move the
-feature from Planned to the shipped version section if it was listed.
+Also keep the **roadmap** (`docs-site/docs/pages/roadmap.mdx`) honest — if the
+feature was listed, flip its Feature Status row to `✅ Available` with the real
+shipped version, and check it off in its phase section (`### Phase N: ...` —
+phase names are thematic, not version numbers, so don't add a version-shaped
+heading).
 
 **Do not hand-edit `CHANGELOG.md`.** release-plz regenerates it from your
 conventional commits on release. Get the changelog right by writing good commit

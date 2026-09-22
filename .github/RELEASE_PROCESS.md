@@ -35,7 +35,10 @@ This document outlines the release process for Ultimo to ensure version consiste
 - [ ] Update version in `Cargo.toml` (workspace.package.version)
 - [ ] Update `CHANGELOG.md` with new version and date
 - [ ] Update `docs-site/docs/pages/changelog.mdx` with full release notes
-- [ ] Update `docs-site/docs/pages/roadmap.mdx` (move features from Next to Current)
+- [ ] Update `docs-site/docs/pages/roadmap.mdx` (flip shipped features' Feature
+      Status rows to `✅ Available` with the real version, and check them off
+      in their phase section — phase headings are thematic, not version
+      numbers)
 - [ ] Update `website/package.json` version
 - [ ] Run `./scripts/check-versions.sh` to verify all versions match
 - [ ] Commit with message: `chore: Prepare vX.Y.Z release`

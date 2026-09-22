@@ -105,7 +105,11 @@ docs-site changelog (`changelog.mdx`) to mirror the `CHANGELOG.md` entry.
 **On a MINOR release** (e.g. 0.3 → 0.4), also bump the floating install-version
 snippets in the docs-site pages — `getting-started.mdx`, `diesel.mdx`,
 `sqlx.mdx`, `api-reference.mdx`, `cli.mdx` (they pin `ultimo = "0.3"`, so patch
-releases need no change) — and refresh `roadmap.mdx`'s "(Current)" markers.
+releases need no change) — and, if the release shipped a roadmap feature,
+update `roadmap.mdx`'s Feature Status table (flip the row to `✅ Available`
+with the real version) and check off its bullet in the matching phase section.
+Phase headings (`### Phase N: ...`) are thematic groupings, not version
+numbers, so there's no "(Current)" marker to move automatically.
 
 > Future enhancement: have the sites read the version at build time from a single
 > generated file so even this step is automatic. Until then, `sync-versions.sh`
