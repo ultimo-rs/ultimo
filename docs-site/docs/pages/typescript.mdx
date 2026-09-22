@@ -2,11 +2,16 @@
 
 Ultimo automatically generates type-safe TypeScript clients from your Rust RPC procedures, enabling seamless full-stack development.
 
+> **`query`/`mutation` require the `client-gen` feature.** Every example on
+> this page uses them — add `features = ["client-gen"]` to your `ultimo`
+> dependency, or `.query()`/`.mutation()` won't resolve.
+
 ## Quick Start
 
 ### 1. Define RPC in Rust
 
 ```rust
+// Cargo.toml: ultimo = { version = "...", features = ["client-gen"] }
 use ultimo::prelude::*;
 use ultimo::rpc::{RpcRegistry, TS};
 
@@ -175,6 +180,7 @@ for a worked example.
 ### Backend
 
 ```rust
+// Cargo.toml: ultimo = { version = "...", features = ["client-gen"] }
 use ultimo::prelude::*;
 use ultimo::rpc::{RpcRegistry, TS};
 use serde::{Deserialize, Serialize};
