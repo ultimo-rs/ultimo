@@ -85,6 +85,27 @@ es.onerror = () => {
 };
 ```
 
+### Vite dev proxy buffers streaming responses
+
+If your frontend dev server proxies API requests to the backend (e.g. Vite's
+`server.proxy`, used by the `fullstack` template for `/rpc`), don't route SSE
+through it. Vite's proxy is built on `http-proxy`, which buffers long-lived
+responses instead of piping them through live — a `curl` against an Ultimo SSE
+endpoint returns events immediately, but the identical request through the
+Vite proxy emits nothing until the connection is torn down, making
+`EventSource` look hung for the life of the connection in dev.
+
+Point `EventSource` (and WebSocket connections — same underlying issue) at the
+backend origin directly in development instead:
+
+```ts
+const apiOrigin = import.meta.env.DEV ? "http://localhost:3001" : "";
+const es = new EventSource(`${apiOrigin}/events`);
+```
+
+Regular REST/RPC calls are unaffected — they're not long-lived, so the proxy
+buffers and forwards them the same way it would any other request.
+
 ## Full example
 
 See [`examples/sse`](https://github.com/ultimo-rs/ultimo/tree/main/examples/sse):

@@ -6,6 +6,13 @@ Ultimo's RPC system provides type-safe remote procedure calls with automatic Typ
 
 The RPC system lets you define procedures in Rust that automatically generate type-safe TypeScript clients. Choose between **REST mode** (individual endpoints) or **JSON-RPC mode** (single endpoint).
 
+> **`query`/`mutation` require the `client-gen` feature.** Every example on
+> this page uses them (the versions that derive TypeScript types from your
+> Rust types via `#[derive(TS)]`) — add `features = ["client-gen"]` to your
+> `ultimo` dependency, or `.query()`/`.mutation()` won't resolve. The
+> `query_with_types`/`mutation_with_types` escape hatch (manual TS strings)
+> doesn't need it.
+
 ## REST Mode
 
 In REST mode, each RPC procedure gets its own generated TypeScript client
@@ -16,6 +23,7 @@ each procedure as its own route yourself, dispatching through
 [`RpcRegistry::call`](#calling-a-procedure-directly):
 
 ```rust
+// Cargo.toml: ultimo = { version = "...", features = ["client-gen"] }
 use ultimo::prelude::*;
 use ultimo::rpc::{RpcMode, RpcRegistry, TS};
 use serde::{Deserialize, Serialize};
@@ -116,6 +124,7 @@ or the REST routes above expect.
 All procedures use a single endpoint, mounted in one call with `mount_rpc`:
 
 ```rust
+// Cargo.toml: ultimo = { version = "...", features = ["client-gen"] }
 use ultimo::prelude::*;
 use ultimo::rpc::{RpcRegistry, TS};
 use serde::{Deserialize, Serialize};
@@ -295,6 +304,7 @@ double-check the resulting path the first time you add it.
 ### Backend
 
 ```rust
+// Cargo.toml: ultimo = { version = "...", features = ["client-gen"] }
 use ultimo::prelude::*;
 use ultimo::rpc::{RpcRegistry, TS};
 use serde::{Deserialize, Serialize};

@@ -71,6 +71,13 @@ ws.addEventListener("message", (event) => {
 });
 ```
 
+Connect directly to the backend origin like this in development, rather than
+through a frontend dev server's proxy (e.g. Vite's `server.proxy`) — those
+proxies are built for short-lived request/response traffic and don't handle
+long-lived WebSocket/SSE connections well. See
+[SSE → Vite dev proxy buffers streaming responses](/sse#vite-dev-proxy-buffers-streaming-responses)
+for the full explanation (same underlying issue).
+
 ## Typed Context Data
 
 WebSocket connections can carry typed context data:
