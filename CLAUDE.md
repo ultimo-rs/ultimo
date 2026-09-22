@@ -149,10 +149,28 @@ throughout. Invoke it for any change to this repo.
 
 ## Roadmap
 
-- **v0.3.0 (current):** sessions + cookies, CSRF, security headers, testing utilities, `#![forbid(unsafe_code)]`, client-IP extraction — all shipped.
-- v0.4.0: **Security & Performance** (Ultimo's two headline pillars) — auth (JWT/API-key), authz guards, rate-limit/timeouts, IP allow/deny, continuous benchmarking + `/performance` page.
-- v0.5.0: static files + SPA fallback, compression, hot reload, dev dashboard, multi-language client gen, **deployment guides**.
-- v0.6.0: MCP server for AI-assisted development. v1.0.0: stable API + complete docs.
+Full detail: `docs-site/docs/pages/roadmap.mdx` (canonical — keep this summary
+in sync with it, not the other way around). Its milestone labels (v0.4.0,
+v0.7.0, …) group features thematically and don't track 1:1 with the published
+crate's SemVer — small additive/fix PRs bump the real version (currently
+0.9.2) independently of which roadmap milestone their feature belongs to.
+
+- **v0.4.0–v0.6.1: shipped.** Security & Performance (JWT/API-key/OIDC auth,
+  authz guards, security headers, CSRF, rate-limit, IP allow/deny, benchmark
+  suite), static files + SPA + compression, hot reload, `client-gen`
+  TypeScript type derivation, `ultimo generate` for real.
+- **v0.7.0: partially shipped.** Typed handler extractors + validation-from-types
+  and OIDC/JWKS auth providers are done. Still open: typed RPC
+  subscriptions/SSE event types, OAuth2 provider integration, observability
+  (OpenTelemetry + Prometheus), streaming responses, request timeouts +
+  graceful shutdown.
+- **v0.8.0: not started.** Redis integration (sessions/cache/rate-limit),
+  WebSocket compression, `#[derive(UltimoType)]` (drop the `ts-rs` dependency),
+  more built-in middleware (request-id, cache-control/ETag, server-timing,
+  basic-auth).
+- **v0.9.0 → v1.0.0 (stabilization):** end-to-end typed errors, public-API
+  audit + SemVer freeze, documentation completeness, production
+  battle-testing.
 
 ## Documentation surfaces (MUST keep current, in the same PR as the change)
 
