@@ -76,16 +76,12 @@ if [ -f "$BLOG_COMPARE" ]; then
   echo "  updated $BLOG_COMPARE"
 fi
 
-# Roadmap: move (Current) marker to the matching version header
-ROADMAP="docs-site/docs/pages/roadmap.mdx"
-if [ -f "$ROADMAP" ]; then
-  # Strip (Current) from all version headers
-  sed -i.bak -E 's/(### v[0-9]+\.[0-9]+\.[0-9]+) \(Current\)/\1/' "$ROADMAP" && rm -f "$ROADMAP.bak"
-  # Add (Current) to the header matching the workspace version
-  sed -i.bak -E "s/### v${VERSION}$/### v${VERSION} (Current)/" "$ROADMAP"
-  sed -i.bak -E "s/### v${VERSION} —/### v${VERSION} (Current) —/" "$ROADMAP" && rm -f "$ROADMAP.bak"
-  echo "  updated $ROADMAP — (Current) → v$VERSION"
-fi
+# roadmap.mdx's timeline uses named phases ("### Phase 4: Security &
+# Performance"), not version-numbered headers, since roadmap milestones don't
+# track 1:1 with the crate's SemVer — there's no "(Current)" marker to move
+# here automatically. Update docs-site/docs/pages/roadmap.mdx by hand when a
+# release finishes a phase: move its Feature Status rows from "📋 Planned |
+# <phase name>" to "✅ Available | <real shipped version>".
 
 # Promote the hand-maintained root changelogs (CHANGELOG.md + the docs-site
 # changelog page) to the release version. release-plz maintains the per-crate

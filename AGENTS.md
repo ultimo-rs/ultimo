@@ -180,7 +180,7 @@ The `ship-feature` skill walks these — summary of the rules:
 2. **`docs-site/docs/pages/api-reference.mdx`** — canonical public-API list. Update on any new/renamed/removed `pub` method/type, new middleware, new `Context`/`Ultimo`/`Request` method, or changed Cargo feature.
 3. **`docs-site/docs/pages/<feature>.mdx` + `docs-site/vocs.config.ts` sidebar** — any user-facing feature needs a docs-site page (Vocs → docs.ultimo.dev, auto-deploys on merge) AND a sidebar entry. Top-level `docs/` is internal notes only; writing there does NOT surface a feature to users.
 4. **`examples/`** — if usable from a frontend (routes/RPC, cookies, sessions, WebSocket, auth, SSE, file upload…), create/update a runnable example demonstrating it from a client and add it to workspace `members` so CI builds it. Pattern: `examples/session-auth` (Rust backend serving HTML+JS, `cargo run -p <example>`). Same PR — don't defer.
-5. Keep **`docs-site/docs/pages/roadmap.mdx`** honest — move shipped features to the right version section.
+5. Keep **`docs-site/docs/pages/roadmap.mdx`** honest — when a feature ships, flip its Feature Status row to `✅ Available` with the real shipped version, and check off (or move to shipped) its bullet in the matching phase section. Phase names (`### Phase N: ...`) are thematic, not version numbers — don't reintroduce version-shaped headings.
 
 ## Conventions
 

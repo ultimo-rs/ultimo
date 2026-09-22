@@ -93,62 +93,74 @@ dependencies and rot as each vendor's API changes).
 
 ## Feature Status
 
-| Feature                                                 | Status           | Version  |
-| ------------------------------------------------------- | ---------------- | -------- |
-| **Core Routing**                                        | ✅ Available     | 0.1.0    |
-| **Middleware**                                          | ✅ Available     | 0.1.0    |
-| **RPC System**                                          | ✅ Available     | 0.1.0    |
-| **TypeScript Generation**                               | ✅ Available     | 0.1.0    |
-| **OpenAPI Support**                                     | ✅ Available     | 0.1.0    |
-| **CLI Tools**                                           | ✅ Available     | 0.1.0    |
-| **CORS**                                                | ✅ Available     | 0.1.0    |
-| **Database Integration**                                | ✅ Available     | 0.1.0    |
-| **WebSocket Support**                                   | ✅ Available     | 0.2.1    |
-| **Sessions & Cookies**                                  | ✅ Available     | 0.3.0    |
-| **Testing Utilities**                                   | ✅ Available     | 0.3.0    |
-| **100% Safe Rust** (`forbid(unsafe)`)                   | ✅ Available     | 0.3.0    |
-| Security Headers (HSTS/CSP/…)                           | ✅ Available     | 0.4.0    |
-| CSRF Protection                                         | ✅ Available     | 0.4.0    |
-| Request Body-Size Limit                                 | ✅ Available     | 0.4.0    |
-| Real Client IP (proxy-aware)                            | ✅ Available     | 0.4.0    |
-| Auth: JWT middleware                                    | ✅ Available     | 0.4.0    |
-| Auth: API keys                                          | ✅ Available     | 0.4.0    |
-| Auth: authorization guards                              | ✅ Available     | 0.4.0    |
-| Benchmark Suite (criterion)                             | ✅ Available     | 0.4.0    |
-| Perf CI Regression Guard                                | ✅ Available     | 0.4.0    |
-| Static Files + SPA Fallback                             | ✅ Available     | 0.4.1    |
-| Compression (gzip/brotli)                               | ✅ Available     | 0.4.1    |
-| TypeScript Type Derivation (`client-gen`)               | ✅ Available     | 0.5.0    |
-| `ultimo generate` (runs generate-client)                | ✅ Available     | 0.5.0    |
-| IP Allow/Deny (CIDR)                                    | ✅ Available     | 0.5.1    |
-| Codegen: `ultimo new` scaffold + `--watch`              | ✅ Available     | 0.5.1    |
-| Frontend Client Adapters (TanStack Query hooks)         | ✅ Available     | 0.6.1    |
-| Rust Client Generation (`--target rust`)                | 📋 Planned       | 0.6.0    |
-| Interactive API Docs (`serve_docs`)                     | ✅ Available     | 0.5.1    |
-| Deployment Guides                                       | ✅ Available     | 0.5.1    |
-| Advanced Rate Limiting                                  | ✅ Available     | 0.5.1    |
-| Typed Handler Extractors + Validation                   | ✅ Available     | 0.7.0    |
-| Server-Sent Events (transport)                          | ✅ Available     | 0.9.1    |
-| Typed RPC Subscriptions (derived TS types)              | 📋 Planned       | post-1.0 |
-| OAuth2                                                  | 📋 Planned       | 0.7.0    |
-| Auth Providers (OIDC/JWKS)                              | ✅ Available     | 0.7.0    |
-| Observability (OpenTelemetry + Prometheus)              | 📋 Planned       | 0.7.0    |
-| Streaming Responses                                     | ✅ Available     | 0.9.0    |
-| Request Timeouts + HTTP Graceful Shutdown               | 📋 Planned       | 0.7.0    |
-| Redis (sessions · cache · rate-limit)                   | 📋 Planned       | 0.8.0    |
-| WebSocket Compression                                   | 📋 Planned       | 0.8.0    |
-| Hot Reload (`ultimo dev`)                               | ✅ Available     | 0.5.1    |
-| `#[derive(UltimoType)]`                                 | 📋 Planned       | 0.8.0    |
-| Built-in Middleware Pack (request-id, cache-control, …) | 📋 Planned       | 0.8.0    |
-| End-to-end Typed Errors                                 | 📋 Planned       | 0.9.0    |
-| S3-compatible Storage                                   | 💡 Demand-driven | post-1.0 |
-| Background Tasks                                        | 💡 Demand-driven | post-1.0 |
-| MCP Server (`ultimo mcp`)                               | ✅ Available     | 0.9.1    |
-| Python Client Generation                                | 💡 Demand-driven | post-1.0 |
+For **✅ Available** rows, the right column is the real crate version it
+shipped in. For **📋 Planned** rows, it's the [roadmap phase](#roadmap-phases)
+it's targeted for — not a crate version, since planned work doesn't have a
+version number yet.
 
-## Version Timeline
+| Feature                                                 | Status           | Shipped in / Planned for            |
+| -------------------------------------------------------- | ---------------- | ------------------------------------ |
+| **Core Routing**                                        | ✅ Available     | 0.1.0                                |
+| **Middleware**                                          | ✅ Available     | 0.1.0                                |
+| **RPC System**                                          | ✅ Available     | 0.1.0                                |
+| **TypeScript Generation**                               | ✅ Available     | 0.1.0                                |
+| **OpenAPI Support**                                     | ✅ Available     | 0.1.0                                |
+| **CLI Tools**                                           | ✅ Available     | 0.1.0                                |
+| **CORS**                                                | ✅ Available     | 0.1.0                                |
+| **Database Integration**                                | ✅ Available     | 0.1.0                                |
+| **WebSocket Support**                                   | ✅ Available     | 0.2.1                                |
+| **Sessions & Cookies**                                  | ✅ Available     | 0.3.0                                |
+| **Testing Utilities**                                   | ✅ Available     | 0.3.0                                |
+| **100% Safe Rust** (`forbid(unsafe)`)                   | ✅ Available     | 0.3.0                                |
+| Security Headers (HSTS/CSP/…)                           | ✅ Available     | 0.4.0                                |
+| CSRF Protection                                         | ✅ Available     | 0.4.0                                |
+| Request Body-Size Limit                                 | ✅ Available     | 0.4.0                                |
+| Real Client IP (proxy-aware)                            | ✅ Available     | 0.4.0                                |
+| Auth: JWT middleware                                    | ✅ Available     | 0.4.0                                |
+| Auth: API keys                                          | ✅ Available     | 0.4.0                                |
+| Auth: authorization guards                              | ✅ Available     | 0.4.0                                |
+| Benchmark Suite (criterion)                             | ✅ Available     | 0.4.0                                |
+| Perf CI Regression Guard                                | ✅ Available     | 0.4.0                                |
+| Static Files + SPA Fallback                             | ✅ Available     | 0.4.1                                |
+| Compression (gzip/brotli)                               | ✅ Available     | 0.4.1                                |
+| TypeScript Type Derivation (`client-gen`)               | ✅ Available     | 0.5.0                                |
+| `ultimo generate` (runs generate-client)                | ✅ Available     | 0.5.0                                |
+| IP Allow/Deny (CIDR)                                    | ✅ Available     | 0.5.1                                |
+| Codegen: `ultimo new` scaffold + `--watch`              | ✅ Available     | 0.5.1                                |
+| Frontend Client Adapters (TanStack Query hooks)         | ✅ Available     | 0.6.1                                |
+| Rust Client Generation (`--target rust`)                | 📋 Planned       | Codegen Story + Ship-Readiness       |
+| Interactive API Docs (`serve_docs`)                     | ✅ Available     | 0.5.1                                |
+| Deployment Guides                                       | ✅ Available     | 0.5.1                                |
+| Advanced Rate Limiting                                  | ✅ Available     | 0.5.1                                |
+| Typed Handler Extractors + Validation                   | ✅ Available     | 0.7.0                                |
+| Server-Sent Events (transport)                          | ✅ Available     | 0.9.1                                |
+| Typed RPC Subscriptions (derived TS types)              | 📋 Planned       | post-1.0                             |
+| OAuth2                                                  | 📋 Planned       | Real-Time, Auth & Production Gaps    |
+| Auth Providers (OIDC/JWKS)                              | ✅ Available     | 0.7.0                                |
+| Observability (OpenTelemetry + Prometheus)              | 📋 Planned       | Real-Time, Auth & Production Gaps    |
+| Streaming Responses                                     | ✅ Available     | 0.9.0                                |
+| Request Timeouts + HTTP Graceful Shutdown               | 📋 Planned       | Real-Time, Auth & Production Gaps    |
+| Redis (sessions · cache · rate-limit)                   | 📋 Planned       | Distribution & Dev Experience        |
+| WebSocket Compression                                   | 📋 Planned       | Distribution & Dev Experience        |
+| Hot Reload (`ultimo dev`)                               | ✅ Available     | 0.5.1                                |
+| `#[derive(UltimoType)]`                                 | 📋 Planned       | Distribution & Dev Experience        |
+| Built-in Middleware Pack (request-id, cache-control, …) | 📋 Planned       | Distribution & Dev Experience        |
+| End-to-end Typed Errors                                 | 📋 Planned       | Stabilization                        |
+| S3-compatible Storage                                   | 💡 Demand-driven | post-1.0                             |
+| Background Tasks                                        | 💡 Demand-driven | post-1.0                             |
+| MCP Server (`ultimo mcp`)                               | ✅ Available     | 0.9.1                                |
+| Python Client Generation                                | 💡 Demand-driven | post-1.0                             |
 
-### v0.1.0
+## Roadmap Phases
+
+These are thematic groupings of related work, in roughly the order we're
+tackling them — **not** release version numbers. The published crate's
+version (currently 0.9.2) bumps automatically per PR (any breaking change →
+minor, any additive/fix → patch) and moves independently of which phase a
+feature belongs to, so a phase name never goes stale the way a "v0.7.0" label
+would once the crate passes 0.7 numerically without that phase being done.
+
+### Phase 1: Foundations
 
 - Core framework features
 - RPC system with TypeScript generation
@@ -156,7 +168,7 @@ dependencies and rot as each vendor's API changes).
 - CLI tools
 - Database integration (SQLx & Diesel)
 
-### v0.2.1
+### Phase 2: WebSocket Support
 
 - ✅ **WebSocket Support (Complete)** - Production-ready RFC 6455 implementation
 - ✅ **Configuration System** - WebSocketConfig with size limits, timeouts, and buffer sizes
@@ -170,7 +182,7 @@ dependencies and rot as each vendor's API changes).
 - ✅ **279 Comprehensive Tests** - Production-ready with extensive test coverage
 - ✅ **Two Working Examples** - Simple chat + React chat
 
-### v0.3.0
+### Phase 3: Sessions, Cookies & Testing
 
 - ✅ **Session management** — cookie-based sessions, `SessionStore` + in-memory store, secure middleware
 - ✅ **Cookie helper** — parsing + `Set-Cookie` with security guards
@@ -178,7 +190,7 @@ dependencies and rot as each vendor's API changes).
 - ✅ **Router precedence fix**, `Ultimo::oneshot`, `Request::raw_body()`
 - ✅ MSRV 1.86, hardened dependency floors, automated releases + CI guardrails
 
-### v0.4.0 — Security & Performance
+### Phase 4: Security & Performance
 
 Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
@@ -196,12 +208,12 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - ✅ Framework-overhead benchmark suite (criterion) + methodology (BENCHMARKS.md) + advisory CI regression check
 - ✅ `/performance` page with reproducible methodology + self-serve recipe
 
-### v0.4.1
+### Phase 5: Static Files & Compression
 
 - ✅ **Static file serving + SPA fallback** — `serve_static`, `serve_spa`, ETag caching, path-traversal protection (`static-files` feature)
 - ✅ **Response compression** — automatic brotli/gzip middleware, pure Rust, builder API (`compression` feature)
 
-### v0.5.0 — Type-safe clients, for real
+### Phase 6: Type-Safe Clients, For Real
 
 - ✅ **TypeScript type derivation** (`client-gen` feature) — RPC client types are
   derived from your Rust types via `ts-rs`; the generated client emits real
@@ -213,12 +225,12 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - ✅ **`ultimo generate` runs for real** — executes the project's
   `generate-client` binary (no more artifact-hunting); `assert_cmd` CLI tests.
 
-### v0.5.1
+### Phase 7: Hot Reload & IP Filtering
 
 - ✅ **Hot reload** — `ultimo dev` with file-watching auto-restart
 - ✅ **IP allow/deny middleware** — CIDR-aware `IpFilter` (allow-list / deny-list)
 
-### v0.6.0 — Finish the codegen story + ship-readiness
+### Phase 8: Finish the Codegen Story + Ship-Readiness
 
 - ~~Codegen: scaffold `generate-client` into `ultimo new` templates; TypeScript
   docs rewrite; `ultimo generate --watch`~~ ✅ Shipped
@@ -228,7 +240,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - ~~Deployment guides (Docker, Fly.io/Railway, AWS, DigitalOcean, Azure, GCR, K8s)~~ ✅ Shipped
 - ~~Advanced rate limiting (per-user, per-endpoint)~~ ✅ Shipped
 
-### v0.7.0 — Real-time, auth, & production gaps
+### Phase 9: Real-Time, Auth & Production Gaps
 
 - ✅ **Typed handler extractors + validation-from-types** (type-safe input; `Path`/`Query`/`Json`/`Valid`, 400/422)
 - Typed RPC subscriptions / SSE (derived event types)
@@ -237,17 +249,17 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
   rotation), OIDC discovery, cookbook for Clerk / Cognito / Auth0 / Supabase
   (`oidc` feature)
 - **Observability** — OpenTelemetry traces + metrics, Prometheus endpoint
-- Streaming responses
+- ✅ Streaming responses
 - Request timeouts + HTTP graceful shutdown
 
-### v0.8.0 — Distribution & dev experience
+### Phase 10: Distribution & Dev Experience
 
 - **Redis integration** — sessions, cache, and rate-limit store (one dependency)
 - WebSocket compression (per-message deflate)
 - `#[derive(UltimoType)]` (drop the `ts-rs` dependency papercut)
 - Built-in middleware pack (request-id, cache-control/ETag, server-timing, basic-auth)
 
-### v0.9.0 → v1.0.0 — Stabilize
+### Phase 11: Stabilization (toward 1.0)
 
 - End-to-end typed errors
 - Public-API audit + SemVer freeze
