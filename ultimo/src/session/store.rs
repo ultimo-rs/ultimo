@@ -8,6 +8,8 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
 /// Backing store for session data. Implement this for Redis/SQL/etc. backends.
+// async_trait's boxed futures are already #[must_use]; newer clippy flags the expansion.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait SessionStore: Send + Sync {
     /// Load session data by id, or `None` if absent/expired.

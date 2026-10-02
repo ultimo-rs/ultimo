@@ -45,6 +45,8 @@ pub mod test_helpers {
 }
 
 /// WebSocket handler trait for implementing custom WebSocket logic
+// async_trait's boxed futures are already #[must_use]; newer clippy flags the expansion.
+#[allow(clippy::double_must_use)]
 #[async_trait::async_trait]
 pub trait WebSocketHandler: Send + Sync {
     /// Type of context data attached to each WebSocket connection

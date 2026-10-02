@@ -12,6 +12,8 @@ use validator::Validate;
 ///
 /// Every extractor borrows `&Context`; the request body is buffered and cached,
 /// so multiple body-reading extractors on the same handler are fine.
+// async_trait's boxed futures are already #[must_use]; newer clippy flags the expansion.
+#[allow(clippy::double_must_use)]
 #[async_trait::async_trait]
 pub trait FromRequest: Sized {
     async fn from_request(ctx: &Context) -> Result<Self>;
