@@ -35,12 +35,18 @@ use crate::websocket::{ChannelManager, WebSocketConfig, WebSocketHandler, WebSoc
 type BoxedWebSocketHandler =
     Arc<dyn Fn(WebSocketUpgrade<()>) -> crate::response::Response + Send + Sync>;
 
+/// How long [`Ultimo::serve_with_shutdown`] waits for in-flight requests to
+/// finish after a shutdown signal, unless overridden.
+const DEFAULT_SHUTDOWN_GRACE_PERIOD: std::time::Duration = std::time::Duration::from_secs(30);
+
 /// Main Ultimo application
 pub struct Ultimo {
     router: Router,
     handlers: Vec<BoxedHandler>,
     middleware: Vec<BoxedMiddleware>,
     max_body_size: Option<usize>,
+    request_timeout: Option<std::time::Duration>,
+    shutdown_grace_period: std::time::Duration,
     trust_proxy: bool,
 
     #[cfg(feature = "database")]
@@ -69,6 +75,8 @@ impl Ultimo {
             handlers: Vec::new(),
             middleware: Vec::new(),
             max_body_size: None,
+            request_timeout: None,
+            shutdown_grace_period: DEFAULT_SHUTDOWN_GRACE_PERIOD,
             trust_proxy: false,
             #[cfg(feature = "database")]
             database: None,
@@ -97,6 +105,8 @@ impl Ultimo {
             handlers: Vec::new(),
             middleware: Vec::new(),
             max_body_size: None,
+            request_timeout: None,
+            shutdown_grace_period: DEFAULT_SHUTDOWN_GRACE_PERIOD,
             trust_proxy: false,
             #[cfg(feature = "database")]
             database: None,
@@ -116,6 +126,29 @@ impl Ultimo {
     /// Defaults to no limit — setting one is recommended for production.
     pub fn max_body_size(&mut self, bytes: usize) -> &mut Self {
         self.max_body_size = Some(bytes);
+        self
+    }
+
+    /// Set a per-request timeout for routing + middleware + handler execution.
+    ///
+    /// A request that hasn't produced a response within `timeout` is answered
+    /// with **408 Request Timeout** and its handler future is dropped
+    /// (cancelled at its next `.await`). The timeout bounds the time to
+    /// *produce* the response — a streamed body ([`Context::stream`],
+    /// [`Context::sse`]) keeps flowing after the handler returns, and
+    /// WebSocket upgrades are handled before dispatch, so neither is cut off.
+    /// Defaults to no timeout.
+    pub fn request_timeout(&mut self, timeout: std::time::Duration) -> &mut Self {
+        self.request_timeout = Some(timeout);
+        self
+    }
+
+    /// How long [`serve_with_shutdown`](Self::serve_with_shutdown) /
+    /// [`listen_with_shutdown`](Self::listen_with_shutdown) wait for in-flight
+    /// requests to finish after the shutdown signal before giving up and
+    /// returning anyway. Defaults to 30 seconds.
+    pub fn shutdown_grace_period(&mut self, grace: std::time::Duration) -> &mut Self {
+        self.shutdown_grace_period = grace;
         self
     }
 
@@ -534,8 +567,31 @@ impl Ultimo {
         self.dispatch_parts(parts, bytes, Some(peer_addr)).await
     }
 
-    /// Run routing + middleware + handler against an already-buffered request.
+    /// Run routing + middleware + handler against an already-buffered request,
+    /// bounded by [`request_timeout`](Self::request_timeout) if one is set.
     async fn dispatch_parts(
+        &self,
+        parts: hyper::http::request::Parts,
+        body: Bytes,
+        client_addr: Option<SocketAddr>,
+    ) -> Response {
+        match self.request_timeout {
+            Some(limit) => {
+                match tokio::time::timeout(limit, self.dispatch_inner(parts, body, client_addr))
+                    .await
+                {
+                    Ok(response) => response,
+                    Err(_) => {
+                        error!("Request timed out after {:?}", limit);
+                        request_timeout_response()
+                    }
+                }
+            }
+            None => self.dispatch_inner(parts, body, client_addr).await,
+        }
+    }
+
+    async fn dispatch_inner(
         &self,
         parts: hyper::http::request::Parts,
         body: Bytes,
@@ -702,6 +758,166 @@ impl Ultimo {
             });
         }
     }
+
+    /// Start the HTTP server on `addr`, shutting down gracefully when
+    /// `shutdown` completes. See [`serve_with_shutdown`](Self::serve_with_shutdown).
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use ultimo::prelude::*;
+    ///
+    /// # async fn run() -> ultimo::Result<()> {
+    /// let mut app = Ultimo::new();
+    /// app.get("/", |ctx: Context| async move { ctx.text("hi").await });
+    /// app.listen_with_shutdown("127.0.0.1:3000", ultimo::shutdown_signal()).await
+    /// # }
+    /// ```
+    pub async fn listen_with_shutdown<F>(self, addr: &str, shutdown: F) -> Result<()>
+    where
+        F: std::future::Future<Output = ()>,
+    {
+        let addr: SocketAddr = addr
+            .parse()
+            .map_err(|_| UltimoError::Internal(format!("Invalid address: {}", addr)))?;
+        let listener = TcpListener::bind(addr).await?;
+        self.serve_with_shutdown(listener, shutdown).await
+    }
+
+    /// Serve on an already-bound `listener` until `shutdown` completes, then
+    /// shut down gracefully:
+    ///
+    /// 1. stop accepting new connections;
+    /// 2. send a `1001 Going Away` close frame to connected WebSocket clients
+    ///    (with the `websocket` feature);
+    /// 3. let in-flight HTTP requests finish, up to
+    ///    [`shutdown_grace_period`](Self::shutdown_grace_period) (default 30s),
+    ///    then return regardless.
+    ///
+    /// Taking a bound listener (rather than an address) lets callers bind port
+    /// `0` and read the chosen port from `listener.local_addr()`.
+    pub async fn serve_with_shutdown<F>(self, listener: TcpListener, shutdown: F) -> Result<()>
+    where
+        F: std::future::Future<Output = ()>,
+    {
+        if let Ok(addr) = listener.local_addr() {
+            info!("🚀 Ultimo server listening on http://{}", addr);
+        }
+
+        let grace = self.shutdown_grace_period;
+        let app = Arc::new(self);
+        let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
+        let mut connections = tokio::task::JoinSet::new();
+        tokio::pin!(shutdown);
+
+        loop {
+            tokio::select! {
+                accepted = listener.accept() => {
+                    let (stream, peer_addr) = accepted?;
+                    let io = TokioIo::new(stream);
+                    let app = app.clone();
+                    let mut stop_rx = stop_rx.clone();
+
+                    connections.spawn(async move {
+                        let service = service_fn(move |req| {
+                            let app = app.clone();
+                            async move {
+                                Ok::<_, hyper::Error>(app.handle_request(req, peer_addr).await)
+                            }
+                        });
+                        let conn = http1::Builder::new()
+                            .serve_connection(io, service)
+                            .with_upgrades(); // Enable HTTP upgrades for WebSockets
+                        tokio::pin!(conn);
+
+                        let mut stopping = false;
+                        loop {
+                            tokio::select! {
+                                res = conn.as_mut() => {
+                                    if let Err(err) = res {
+                                        error!("Connection error: {}", err);
+                                    }
+                                    break;
+                                }
+                                _ = stop_rx.changed(), if !stopping => {
+                                    // Finish the in-flight request, then close.
+                                    stopping = true;
+                                    conn.as_mut().graceful_shutdown();
+                                }
+                            }
+                        }
+                    });
+                }
+                // Reap finished connection tasks so the set doesn't grow forever.
+                Some(_) = connections.join_next(), if !connections.is_empty() => {}
+                _ = &mut shutdown => break,
+            }
+        }
+
+        info!("Shutting down: no longer accepting connections");
+        drop(listener);
+
+        #[cfg(feature = "websocket")]
+        {
+            let going_away = crate::websocket::Message::Close(Some(crate::websocket::CloseFrame {
+                code: 1001,
+                reason: "Server shutting down".to_string(),
+            }));
+            let notified = app.channel_manager.broadcast_all(going_away).await;
+            if notified > 0 {
+                info!("Sent close frames to {} WebSocket connection(s)", notified);
+            }
+        }
+
+        let _ = stop_tx.send(true);
+        let drained = tokio::time::timeout(grace, async {
+            while connections.join_next().await.is_some() {}
+        })
+        .await;
+        match drained {
+            Ok(()) => info!("All in-flight requests drained"),
+            Err(_) => error!(
+                "Shutdown grace period ({:?}) elapsed with requests still in flight",
+                grace
+            ),
+        }
+        Ok(())
+    }
+}
+
+/// A future that completes when the process receives Ctrl+C (all platforms)
+/// or `SIGTERM` (Unix) — the signal container orchestrators send to stop a
+/// service. Pass it to [`Ultimo::listen_with_shutdown`].
+pub async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        if let Ok(mut sig) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
+            sig.recv().await;
+        } else {
+            std::future::pending::<()>().await;
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+}
+
+/// 408 response for a request that exceeded `request_timeout`.
+fn request_timeout_response() -> Response {
+    response::ResponseBuilder::new()
+        .status(408)
+        .text("Request Timeout")
+        .build()
+        .unwrap_or_else(|_| response::helpers::text("Request Timeout").unwrap())
 }
 
 /// 413 Payload Too Large response (body exceeded `max_body_size`).
@@ -987,5 +1203,133 @@ mod oneshot_tests {
         let resp = app.oneshot(req).await;
         assert_eq!(resp.status(), 204);
         assert_eq!(body_string(resp).await, "");
+    }
+}
+
+#[cfg(test)]
+mod timeout_and_shutdown_tests {
+    use super::*;
+    use http_body_util::Full;
+    use hyper::Request as HyperRequest;
+    use std::time::{Duration, Instant};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    fn get(uri: &str) -> HyperRequest<Full<Bytes>> {
+        HyperRequest::builder()
+            .uri(uri)
+            .body(Full::new(Bytes::new()))
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn request_timeout_returns_408_when_handler_is_too_slow() {
+        let mut app = Ultimo::new_without_defaults();
+        app.request_timeout(Duration::from_millis(20));
+        app.get("/slow", |ctx: Context| async move {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            ctx.text("late").await
+        });
+
+        let started = Instant::now();
+        let resp = app.oneshot(get("/slow")).await;
+        assert_eq!(resp.status(), 408);
+        assert!(started.elapsed() < Duration::from_millis(400));
+    }
+
+    #[tokio::test]
+    async fn request_within_timeout_is_unaffected() {
+        let mut app = Ultimo::new_without_defaults();
+        app.request_timeout(Duration::from_millis(500));
+        app.get("/fast", |ctx: Context| async move { ctx.text("ok").await });
+
+        assert_eq!(app.oneshot(get("/fast")).await.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn no_timeout_configured_never_times_out() {
+        let mut app = Ultimo::new_without_defaults();
+        app.get("/slowish", |ctx: Context| async move {
+            tokio::time::sleep(Duration::from_millis(60)).await;
+            ctx.text("ok").await
+        });
+
+        assert_eq!(app.oneshot(get("/slowish")).await.status(), 200);
+    }
+
+    async fn raw_get(addr: std::net::SocketAddr, path: &str) -> String {
+        let mut s = tokio::net::TcpStream::connect(addr).await.unwrap();
+        s.write_all(
+            format!("GET {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n").as_bytes(),
+        )
+        .await
+        .unwrap();
+        let mut out = String::new();
+        s.read_to_string(&mut out).await.unwrap();
+        out
+    }
+
+    #[tokio::test]
+    async fn graceful_shutdown_drains_in_flight_requests_then_stops_accepting() {
+        let mut app = Ultimo::new_without_defaults();
+        app.shutdown_grace_period(Duration::from_secs(5));
+        app.get("/slow", |ctx: Context| async move {
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            ctx.text("drained").await
+        });
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let server = tokio::spawn(app.serve_with_shutdown(listener, async {
+            rx.await.ok();
+        }));
+
+        let in_flight = tokio::spawn(raw_get(addr, "/slow"));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        tx.send(()).unwrap();
+
+        // In-flight request still completes successfully...
+        let body = in_flight.await.unwrap();
+        assert!(
+            body.contains("200 OK") && body.contains("drained"),
+            "{body}"
+        );
+        // ...and the server then exits cleanly.
+        tokio::time::timeout(Duration::from_secs(2), server)
+            .await
+            .expect("server should exit after draining")
+            .unwrap()
+            .unwrap();
+        // New connections are refused once shut down.
+        assert!(tokio::net::TcpStream::connect(addr).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn graceful_shutdown_gives_up_after_grace_period() {
+        let mut app = Ultimo::new_without_defaults();
+        app.shutdown_grace_period(Duration::from_millis(100));
+        app.get("/stuck", |ctx: Context| async move {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            ctx.text("never").await
+        });
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let server = tokio::spawn(app.serve_with_shutdown(listener, async {
+            rx.await.ok();
+        }));
+
+        let _stuck = tokio::spawn(raw_get(addr, "/stuck"));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let started = Instant::now();
+        tx.send(()).unwrap();
+
+        tokio::time::timeout(Duration::from_secs(3), server)
+            .await
+            .expect("server must not wait past the grace period")
+            .unwrap()
+            .unwrap();
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 }

@@ -65,7 +65,7 @@ pub mod auth;
 pub(crate) mod static_files;
 
 // Re-exports for convenience
-pub use app::Ultimo;
+pub use app::{shutdown_signal, Ultimo};
 pub use context::Context;
 pub use error::{Result, UltimoError};
 pub use extract::{FromRequest, Json, Path, Query, Valid};

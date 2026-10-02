@@ -154,7 +154,10 @@ where
                 Ok(upgraded) => {
                     let (handler, sender, mut incoming_rx, mut _drain_rx) =
                         ConnectionHandler::new(upgraded, channel_manager.clone(), config.clone());
-                    let connection_id = uuid::Uuid::new_v4();
+                    let connection_id = handler.connection_id();
+                    channel_manager
+                        .register_connection(connection_id, sender.clone())
+                        .await;
                     let remote_addr = None; // TODO: Get from request
 
                     let ws = WebSocket::new(
@@ -267,7 +270,10 @@ where
                 Ok(upgraded) => {
                     let (handler, sender, incoming_rx, drain_rx) =
                         ConnectionHandler::new(upgraded, channel_manager.clone(), config.clone());
-                    let connection_id = uuid::Uuid::new_v4();
+                    let connection_id = handler.connection_id();
+                    channel_manager
+                        .register_connection(connection_id, sender.clone())
+                        .await;
                     let remote_addr = None; // TODO: Get from request
 
                     let ws = WebSocket::new(

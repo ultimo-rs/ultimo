@@ -44,6 +44,7 @@ the framework is 100% safe Rust (`#![forbid(unsafe_code)]`).
 - 🔐 **Auth, built in** — JWT and API-key middleware plus scope-based [authorization guards](https://docs.ultimo.dev/authorization).
 - 🛡️ **Secure by default** — 100% safe Rust, secure sessions/cookies, CSRF, security-headers middleware, request body-size limits, and supply-chain CI.
 - ⚡ **Fast** — native Rust on the Hyper + Tokio core, O(1) constant-time routing, benchmarks regression-guarded in CI ([details](https://docs.ultimo.dev/performance)).
+- 🛑 **Production-ready shutdown** — `request_timeout` plus `listen_with_shutdown` drains in-flight requests (and closes WebSockets with `1001`) on `SIGTERM`/Ctrl+C.
 - 🗄️ **Databases** — first-class SQLx and Diesel integration (PostgreSQL / MySQL / SQLite).
 - 🧪 **Testing utilities** — in-process `TestClient`, response assertions, and fixtures.
 - 🤖 **Built for coding agents** — typed Rust→TS codegen, scaffolds that build, [`llms.txt`](https://docs.ultimo.dev/llms.txt) docs, and [Context7](https://context7.com/ultimo-rs/ultimo). See [Using Ultimo with AI coding agents](https://docs.ultimo.dev/ai-agents).
