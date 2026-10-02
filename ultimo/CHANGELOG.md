@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.2...ultimo-v0.9.3) - 2026-10-02
+
+### Added
+
+- *(app)* request timeouts + HTTP graceful shutdown ([#195](https://github.com/ultimo-rs/ultimo/pull/195))
+
 ## [0.9.2](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.1...ultimo-v0.9.2) - 2026-09-21
 
 ### Added
