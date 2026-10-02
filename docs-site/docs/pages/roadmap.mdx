@@ -40,8 +40,7 @@ a stable **1.0**.
 - ~~📦 **Deployment guides** — Docker, Fly.io/Railway, AWS, DigitalOcean, Azure,
   Google Cloud Run, Kubernetes — each with ready-to-use config.~~ ✅ Shipped in 0.5.1
 - ~~🛡️ **Advanced rate limiting** — per-user, per-endpoint limits.~~ ✅ Shipped in 0.5.1
-- ⏱️ **Request timeouts** + **HTTP graceful shutdown** (WebSocket graceful
-  shutdown already ships).
+- ~~⏱️ **Request timeouts** + **HTTP graceful shutdown**.~~ ✅ Shipped in 0.9.3
 - ~~🔄 **Hot reload** — `ultimo dev` with file-watching auto-restart.~~ ✅ Shipped in 0.5.1
 
 ### Developer experience
@@ -139,7 +138,7 @@ version number yet.
 | Auth Providers (OIDC/JWKS)                              | ✅ Available     | 0.7.0                                |
 | Observability (OpenTelemetry + Prometheus)              | 📋 Planned       | Real-Time, Auth & Production Gaps    |
 | Streaming Responses                                     | ✅ Available     | 0.9.0                                |
-| Request Timeouts + HTTP Graceful Shutdown               | 📋 Planned       | Real-Time, Auth & Production Gaps    |
+| Request Timeouts + HTTP Graceful Shutdown               | ✅ Available     | 0.9.3                                |
 | Redis (sessions · cache · rate-limit)                   | 📋 Planned       | Distribution & Dev Experience        |
 | WebSocket Compression                                   | 📋 Planned       | Distribution & Dev Experience        |
 | Hot Reload (`ultimo dev`)                               | ✅ Available     | 0.5.1                                |
@@ -250,7 +249,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
   (`oidc` feature)
 - **Observability** — OpenTelemetry traces + metrics, Prometheus endpoint
 - ✅ Streaming responses
-- Request timeouts + HTTP graceful shutdown
+- ✅ **Request timeouts + HTTP graceful shutdown** — `request_timeout`, `listen_with_shutdown`, `shutdown_signal`; WebSocket clients get a `1001` close frame
 
 ### Phase 10: Distribution & Dev Experience
 

@@ -71,11 +71,49 @@ use ultimo::middleware::builtin::IpFilter;
 app.use_middleware(IpFilter::allow(&["10.0.0.0/8"]).build());
 ```
 
-- [ ] **Graceful shutdown** — Ultimo handles `SIGTERM` automatically; HTTP
-      connections drain, WebSocket clients get close frames via `broadcast_all()`
+- [ ] **Graceful shutdown + request timeout** — use `listen_with_shutdown` so
+      `SIGTERM` (what Docker, Kubernetes, Fly.io, etc. send) drains in-flight
+      requests instead of dropping them, and set a `request_timeout` — see
+      [Graceful shutdown & timeouts](#graceful-shutdown--timeouts) below
 
 - [ ] **Resource limits** — Ultimo binaries are lean; 64–128 MB RAM handles
       most workloads; set container limits accordingly
+
+## Graceful shutdown & timeouts
+
+`app.listen(...)` runs until the process is killed. For deployments, use
+`listen_with_shutdown` so a stop signal drains work instead of cutting it off:
+
+```rust
+use std::time::Duration;
+
+let mut app = Ultimo::new();
+app.request_timeout(Duration::from_secs(30));       // 408 if a handler takes longer
+app.shutdown_grace_period(Duration::from_secs(25)); // keep below your platform's kill timeout
+
+app.listen_with_shutdown("0.0.0.0:3000", ultimo::shutdown_signal()).await?;
+```
+
+On `SIGTERM` or Ctrl+C the server:
+
+1. stops accepting new connections;
+2. sends a `1001 Going Away` close frame to connected WebSocket clients
+   (`websocket` feature);
+3. lets in-flight HTTP requests finish, up to the grace period, then returns.
+
+Set the grace period below your platform's own kill timeout (Kubernetes
+`terminationGracePeriodSeconds` defaults to 30s; Docker's `stop` to 10s) so
+Ultimo exits on its own terms rather than being `SIGKILL`ed.
+
+**Notes**
+
+- `request_timeout` bounds the time to *produce* a response. Streamed bodies
+  (`ctx.stream`, `ctx.sse`) keep flowing after the handler returns, and
+  WebSocket upgrades aren't covered — so long-lived connections aren't cut off.
+  It applies to the whole app; a handler that legitimately needs longer (e.g.
+  long-polling) should return a stream or SSE channel instead of blocking.
+- Upgraded WebSocket connections are told to close but aren't awaited by the
+  grace period — clients are expected to honor the close frame.
 
 ## Environment variables
 

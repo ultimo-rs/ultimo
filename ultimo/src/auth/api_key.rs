@@ -40,6 +40,8 @@ pub struct ApiKeyIdentity {
 
 /// Validates presented API keys. Implement this for a database/Redis-backed key
 /// store; the built-in [`StaticKeys`] covers in-memory configuration.
+// async_trait's boxed futures are already #[must_use]; newer clippy flags the expansion.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait ApiKeyStore: Send + Sync {
     /// Resolve a presented key to an identity, or `None` to reject it.

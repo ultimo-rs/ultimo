@@ -84,6 +84,47 @@ Start the HTTP server on the specified address.
 app.listen("127.0.0.1:3000").await?;
 ```
 
+##### `listen_with_shutdown(self, addr: &str, shutdown: impl Future<Output = ()>) -> Result<()>`
+
+Like `listen`, but returns after a **graceful shutdown** once `shutdown`
+completes: stop accepting connections, send a `1001 Going Away` close frame to
+connected WebSocket clients (with the `websocket` feature), and let in-flight
+HTTP requests finish for up to [`shutdown_grace_period`](#shutdown-grace-period-mut-self-grace-duration---mut-self).
+Pair it with `ultimo::shutdown_signal()` (Ctrl+C everywhere, `SIGTERM` on Unix).
+
+```rust
+app.listen_with_shutdown("0.0.0.0:3000", ultimo::shutdown_signal()).await?;
+```
+
+See [Deployment → Graceful shutdown & timeouts](/deployment#graceful-shutdown--timeouts).
+
+##### `serve_with_shutdown(self, listener: TcpListener, shutdown: impl Future<Output = ()>) -> Result<()>`
+
+The same, on an already-bound `tokio::net::TcpListener` — bind port `0` and read
+the port from `listener.local_addr()` (handy in tests).
+
+##### `shutdown_signal() -> impl Future<Output = ()>`
+
+Free function (`ultimo::shutdown_signal`). Completes on Ctrl+C or, on Unix,
+`SIGTERM` — the signal container orchestrators send to stop a service.
+
+##### `request_timeout(&mut self, timeout: Duration) -> &mut Self`
+
+Answer any request that hasn't produced a response within `timeout` with
+**408 Request Timeout** (the handler future is cancelled at its next `.await`).
+It bounds time-to-response only: streamed bodies (`ctx.stream`, `ctx.sse`) keep
+flowing after the handler returns, and WebSocket upgrades are not affected. No
+timeout by default.
+
+```rust
+app.request_timeout(Duration::from_secs(30));
+```
+
+##### `shutdown_grace_period(&mut self, grace: Duration) -> &mut Self`
+
+How long `listen_with_shutdown` / `serve_with_shutdown` wait for in-flight
+requests after the shutdown signal before returning anyway. Defaults to 30s.
+
 ##### `max_body_size(&mut self, bytes: usize) -> &mut Self`
 
 Reject requests whose body exceeds `bytes` with **413 Payload Too Large** (the

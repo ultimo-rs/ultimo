@@ -233,6 +233,13 @@ impl ConnectionHandler {
         (handler, tx, incoming_rx, drain_rx)
     }
 
+    /// The id this handler cleans up on disconnect. The `WebSocket` handed to
+    /// user code must use the same id, or `subscribe` registrations would
+    /// never be removed by `disconnect`.
+    pub(crate) fn connection_id(&self) -> uuid::Uuid {
+        self.connection_id
+    }
+
     pub async fn handle(self) -> Result<(), std::io::Error> {
         tracing::info!("ConnectionHandler::handle() started");
         let mut read_buf = BytesMut::with_capacity(8192);

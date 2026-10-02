@@ -23,6 +23,20 @@ impl ChannelManager {
         }
     }
 
+    /// Track a connection (before it subscribes to anything) so server-wide
+    /// notifications like [`broadcast_all`](Self::broadcast_all) reach it.
+    pub(crate) async fn register_connection(
+        &self,
+        connection_id: Uuid,
+        sender: mpsc::Sender<Message>,
+    ) {
+        self.connections
+            .write()
+            .await
+            .entry(connection_id)
+            .or_insert(sender);
+    }
+
     /// Subscribe a connection to a topic
     pub async fn subscribe(
         &self,

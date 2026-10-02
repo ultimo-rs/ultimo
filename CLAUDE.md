@@ -161,9 +161,9 @@ crate's SemVer — small additive/fix PRs bump the real version (currently
   TypeScript type derivation, `ultimo generate` for real.
 - **v0.7.0: partially shipped.** Typed handler extractors + validation-from-types
   and OIDC/JWKS auth providers are done. Still open: typed RPC
-  subscriptions/SSE event types, OAuth2 provider integration, observability
-  (OpenTelemetry + Prometheus), streaming responses, request timeouts +
-  graceful shutdown.
+  subscriptions/SSE event types, OAuth2 provider integration, and
+  observability (OpenTelemetry + Prometheus). Streaming responses and request
+  timeouts + HTTP graceful shutdown have also shipped.
 - **v0.8.0: not started.** Redis integration (sessions/cache/rate-limit),
   WebSocket compression, `#[derive(UltimoType)]` (drop the `ts-rs` dependency),
   more built-in middleware (request-id, cache-control/ETag, server-timing,

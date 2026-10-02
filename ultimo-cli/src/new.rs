@@ -1068,6 +1068,11 @@ async fn main() -> ultimo::Result<()> {
     // Add logger middleware
     app.use_middleware(ultimo::middleware::builtin::logger());
 
+    // Bound how long any single request can take (408 on timeout) and how long
+    // shutdown waits for in-flight requests to drain.
+    app.request_timeout(std::time::Duration::from_secs(30));
+    app.shutdown_grace_period(std::time::Duration::from_secs(30));
+
     // GET /api/users/:id - Get user by ID
     let users_get = users.clone();
     app.get("/api/users/:id", move |ctx: Context| {
@@ -1176,7 +1181,10 @@ async fn main() -> ultimo::Result<()> {
     println!();
     println!("💡 See examples/openapi-demo for full OpenAPI spec generation");
     
-    app.listen("127.0.0.1:3000").await?;
+    // Stops accepting connections on Ctrl+C / SIGTERM, then lets in-flight
+    // requests finish (up to the grace period) before exiting.
+    app.listen_with_shutdown("127.0.0.1:3000", ultimo::shutdown_signal())
+        .await?;
     Ok(())
 }
 "#;
