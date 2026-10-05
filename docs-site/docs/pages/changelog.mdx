@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-10-05
+
+### Added
+
+- *(middleware)* add request_id() for correlated request logs ([#197](https://github.com/ultimo-rs/ultimo/pull/197))
+
 ## [0.9.3] - 2026-10-02
 
 ### Added
