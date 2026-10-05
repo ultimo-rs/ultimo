@@ -1062,6 +1062,10 @@ async fn main() -> ultimo::Result<()> {
 
     let mut app = Ultimo::new();
 
+    // Tag every request with an id (X-Request-Id, echoed on the response) and
+    // put it on every log line. Register it first.
+    app.use_middleware(ultimo::middleware::builtin::request_id());
+
     // Add CORS middleware
     app.use_middleware(ultimo::middleware::builtin::cors());
 

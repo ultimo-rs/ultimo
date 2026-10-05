@@ -212,6 +212,26 @@ fn every_scaffold_using_logger_installs_a_tracing_subscriber() {
 }
 
 #[test]
+fn production_scaffold_registers_request_id_before_logger() {
+    let tmp = tempfile::tempdir().unwrap();
+    ultimo()
+        .current_dir(tmp.path())
+        .args(["new", "demo", "--template", "production"])
+        .assert()
+        .success();
+
+    let main = fs::read_to_string(tmp.path().join("demo/src/main.rs")).unwrap();
+    let rid = main
+        .find("builtin::request_id()")
+        .expect("production scaffold should register request_id()");
+    let log = main.find("builtin::logger()").expect("logger()");
+    assert!(
+        rid < log,
+        "request_id() must be registered before logger() so its span wraps it"
+    );
+}
+
+#[test]
 fn generate_runs_the_convention_bin_and_writes_output() {
     // A minimal cargo project whose generate-client bin writes its first arg.
     let tmp = tempfile::tempdir().unwrap();

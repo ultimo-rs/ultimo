@@ -722,6 +722,18 @@ Log all incoming requests with method, path, and response time.
 app.use_middleware(ultimo::middleware::builtin::logger());
 ```
 
+#### `request_id()` / `RequestId`
+
+Assign each request an id: reuse a valid inbound `X-Request-Id` (1–128 bytes of
+visible ASCII) or generate a UUID v4, echo it on the response (errors included),
+expose it as `ctx.request_id().await`, and run the chain inside a `tracing` span
+carrying `request_id`. Register it first. `RequestId::new().header("X-Correlation-Id").build()`
+customizes the header name. See [Middleware → Request ID](/middleware#request-id).
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::request_id());
+```
+
 #### `cors()`
 
 Enable CORS with permissive defaults (allows all origins, methods, and headers).
