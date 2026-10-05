@@ -341,6 +341,14 @@ impl Context {
         state.get(key).cloned()
     }
 
+    /// The request id assigned by the [`request_id`](crate::middleware::builtin::request_id)
+    /// middleware (the inbound `X-Request-Id` if it was valid, otherwise a
+    /// generated UUID). `None` if that middleware isn't registered.
+    pub async fn request_id(&self) -> Option<String> {
+        self.get(crate::middleware::builtin::REQUEST_ID_STATE_KEY)
+            .await
+    }
+
     /// Read a request cookie by name.
     pub fn cookie(&self, name: &str) -> Option<String> {
         self.req

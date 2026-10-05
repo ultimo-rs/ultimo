@@ -38,6 +38,49 @@ tracing_subscriber::fmt().init();
 
 (`ultimo new` scaffolds that use `logger()` already do this for you.)
 
+### Request ID
+
+```rust
+use ultimo::middleware::builtin::{logger, request_id};
+
+app.use_middleware(request_id()); // register first (outermost)
+app.use_middleware(logger());
+```
+
+Tags every request with an id so you can follow it across logs:
+
+- Reuses the inbound `X-Request-Id` if it is 1–128 bytes of visible ASCII;
+  otherwise generates a UUID v4. Anything else (empty, spaces, control or
+  non-ASCII bytes, oversized) is replaced, so a client can't smuggle junk into
+  your logs.
+- Echoes the id on the response — including error responses.
+- Available in handlers as `ctx.request_id().await` (`None` if the middleware
+  isn't registered).
+- Runs the rest of the chain inside a `tracing` span with a `request_id` field,
+  so **every log line for the request carries it** — `logger()`'s lines and your
+  own `tracing::info!` calls alike — and OpenTelemetry/JSON layers pick it up
+  as a span attribute:
+
+```text
+INFO request{request_id=4f1c…}: ultimo::middleware::builtin: --> GET /users
+INFO request{request_id=4f1c…}: my_app: loaded 3 users
+INFO request{request_id=4f1c…}: ultimo::middleware::builtin: <-- GET /users 200 (212µs)
+```
+
+Use another header name with the builder (it panics at startup if the name
+isn't a valid header name):
+
+```rust
+use ultimo::middleware::builtin::RequestId;
+
+app.use_middleware(RequestId::new().header("X-Correlation-Id").build());
+```
+
+Register it **before** other middleware: the span only covers what runs inside
+it, and errors from inner middleware are turned into responses by `request_id`
+(so they get the header) — a middleware registered outside it sees a normal
+response instead of an `Err`.
+
 ### CORS
 
 Defaults (allow `*`, `GET`/`POST`, `Content-Type`):

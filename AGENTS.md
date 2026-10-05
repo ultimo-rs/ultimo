@@ -166,8 +166,8 @@ crate's SemVer — small additive/fix PRs bump the real version (currently
   timeouts + HTTP graceful shutdown have also shipped.
 - **v0.8.0: not started.** Redis integration (sessions/cache/rate-limit),
   WebSocket compression, `#[derive(UltimoType)]` (drop the `ts-rs` dependency),
-  more built-in middleware (request-id, cache-control/ETag, server-timing,
-  basic-auth).
+  more built-in middleware (cache-control/ETag, server-timing, basic-auth;
+  `request-id` has shipped).
 - **v0.9.0 → v1.0.0 (stabilization):** end-to-end typed errors, public-API
   audit + SemVer freeze, documentation completeness, production
   battle-testing.

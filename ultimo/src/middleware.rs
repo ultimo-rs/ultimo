@@ -163,6 +163,126 @@ pub mod builtin {
         })
     }
 
+    /// Context state key under which [`request_id`] stores the request id.
+    pub const REQUEST_ID_STATE_KEY: &str = "request_id";
+
+    const REQUEST_ID_DEFAULT_HEADER: &str = "x-request-id";
+    const REQUEST_ID_MAX_LEN: usize = 128;
+
+    /// An inbound id is reused only if it is 1..=128 bytes of visible ASCII
+    /// (`0x21..=0x7E`). Anything else (empty, spaces, control or non-ASCII
+    /// bytes, oversized) is replaced, so a client can't smuggle junk into logs.
+    fn is_valid_request_id(id: &str) -> bool {
+        !id.is_empty()
+            && id.len() <= REQUEST_ID_MAX_LEN
+            && id.bytes().all(|b| (0x21..=0x7E).contains(&b))
+    }
+
+    /// Request-id middleware builder; see [`request_id`] for the defaults.
+    ///
+    /// ```rust
+    /// use ultimo::middleware::builtin::RequestId;
+    ///
+    /// let mw = RequestId::new().header("X-Correlation-Id").build();
+    /// ```
+    pub struct RequestId {
+        header: String,
+    }
+
+    impl Default for RequestId {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl RequestId {
+        /// Use the standard `X-Request-Id` header.
+        pub fn new() -> Self {
+            Self {
+                header: REQUEST_ID_DEFAULT_HEADER.to_string(),
+            }
+        }
+
+        /// Read and write the id on a different header (e.g. `X-Correlation-Id`).
+        pub fn header(mut self, name: impl Into<String>) -> Self {
+            self.header = name.into();
+            self
+        }
+
+        /// Build the middleware.
+        ///
+        /// # Panics
+        /// If the configured header name isn't a valid HTTP header name.
+        pub fn build(self) -> BoxedMiddleware {
+            let name = hyper::header::HeaderName::from_bytes(self.header.as_bytes())
+                .unwrap_or_else(|_| panic!("invalid request-id header name: {:?}", self.header));
+            Arc::new(move |ctx, next| {
+                let name = name.clone();
+                Box::pin(async move {
+                    use tracing::Instrument;
+
+                    let id = ctx
+                        .req
+                        .header(name.as_str())
+                        .filter(|v| is_valid_request_id(v))
+                        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+                    ctx.set(REQUEST_ID_STATE_KEY, id.clone()).await;
+
+                    let span = tracing::info_span!("request", request_id = %id);
+                    let result = async {
+                        match next(ctx).await {
+                            Ok(response) => response,
+                            // Turn errors into their standard response here (and
+                            // log them as the dispatcher would) so the header is
+                            // also present on error responses.
+                            Err(err) => {
+                                error!("Handler error: {}", err);
+                                crate::response::helpers::error_response(&err).unwrap_or_else(
+                                    |_| crate::response::helpers::text("Internal Error").unwrap(),
+                                )
+                            }
+                        }
+                    }
+                    .instrument(span)
+                    .await;
+
+                    let mut response = result;
+                    if let Ok(value) = hyper::header::HeaderValue::from_str(&id) {
+                        response.headers_mut().insert(name, value);
+                    }
+                    Ok(response)
+                })
+            })
+        }
+    }
+
+    /// Request-id middleware with the standard `X-Request-Id` header.
+    ///
+    /// For each request it:
+    /// - reuses the inbound `X-Request-Id` if it is 1–128 bytes of visible ASCII,
+    ///   otherwise generates a UUID v4 (so clients can't inject junk into logs);
+    /// - exposes the id as [`Context::request_id`];
+    /// - echoes it on the response (including error responses);
+    /// - runs the rest of the chain inside a `tracing` span carrying
+    ///   `request_id`, so every log line emitted for the request — including
+    ///   [`logger`]'s — is correlated.
+    ///
+    /// Register it **first** (outermost) so the span also covers the other
+    /// middleware, and so errors from inner middleware get the header.
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use ultimo::prelude::*;
+    /// use ultimo::middleware::builtin::{logger, request_id};
+    ///
+    /// let mut app = Ultimo::new();
+    /// app.use_middleware(request_id());
+    /// app.use_middleware(logger());
+    /// ```
+    pub fn request_id() -> BoxedMiddleware {
+        RequestId::new().build()
+    }
+
     /// CORS middleware with configurable options
     pub struct Cors {
         allow_origin: String,
@@ -1310,5 +1430,130 @@ mod tests {
 
         assert!(!map.contains_key("stale"), "idle bucket must be evicted");
         assert!(map.contains_key("fresh"), "active bucket must be kept");
+    }
+}
+
+#[cfg(test)]
+mod request_id_tests {
+    use super::builtin::{request_id, RequestId};
+    use crate::{Context, Ultimo, UltimoError};
+    use bytes::Bytes;
+    use http_body_util::Full;
+    use hyper::Request as HyperRequest;
+
+    fn req(inbound: Option<&[u8]>) -> HyperRequest<Full<Bytes>> {
+        let mut b = HyperRequest::builder().uri("/");
+        if let Some(v) = inbound {
+            b = b.header(
+                "x-request-id",
+                hyper::header::HeaderValue::from_bytes(v).unwrap(),
+            );
+        }
+        b.body(Full::new(Bytes::new())).unwrap()
+    }
+
+    fn app_with(mw: crate::middleware::BoxedMiddleware) -> Ultimo {
+        let mut app = Ultimo::new_without_defaults();
+        app.use_middleware(mw);
+        app.get("/", |ctx: Context| async move {
+            let id = ctx.request_id().await.unwrap_or_default();
+            ctx.text(id).await
+        });
+        app
+    }
+
+    async fn id_of(resp: &crate::response::Response) -> String {
+        resp.headers()
+            .get("x-request-id")
+            .expect("X-Request-Id header")
+            .to_str()
+            .unwrap()
+            .to_string()
+    }
+
+    #[tokio::test]
+    async fn generates_a_uuid_when_absent() {
+        let resp = app_with(request_id()).oneshot(req(None)).await;
+        let id = id_of(&resp).await;
+        assert!(uuid::Uuid::parse_str(&id).is_ok(), "not a uuid: {id}");
+    }
+
+    #[tokio::test]
+    async fn reuses_a_valid_inbound_id() {
+        let resp = app_with(request_id())
+            .oneshot(req(Some(b"trace-abc.123_XYZ")))
+            .await;
+        assert_eq!(id_of(&resp).await, "trace-abc.123_XYZ");
+    }
+
+    #[tokio::test]
+    async fn replaces_invalid_inbound_ids() {
+        let too_long = vec![b'a'; 129];
+        let cases: Vec<&[u8]> = vec![
+            b"",                 // empty
+            b"has space",        // 0x20 is not "visible"
+            "café".as_bytes(),   // non-ASCII
+            b"tab\there",        // control char
+            too_long.as_slice(), // > 128
+        ];
+        for bad in cases {
+            let resp = app_with(request_id()).oneshot(req(Some(bad))).await;
+            let id = id_of(&resp).await;
+            assert!(
+                uuid::Uuid::parse_str(&id).is_ok(),
+                "inbound {bad:?} should have been replaced, got {id}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn accepts_exactly_128_visible_chars() {
+        let max = "a".repeat(128);
+        let resp = app_with(request_id())
+            .oneshot(req(Some(max.as_bytes())))
+            .await;
+        assert_eq!(id_of(&resp).await, max);
+    }
+
+    #[tokio::test]
+    async fn handler_sees_the_same_id_via_ctx() {
+        use http_body_util::BodyExt;
+        let resp = app_with(request_id()).oneshot(req(Some(b"from-ctx"))).await;
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], b"from-ctx");
+    }
+
+    #[tokio::test]
+    async fn header_is_present_on_error_responses_too() {
+        let mut app = Ultimo::new_without_defaults();
+        app.use_middleware(request_id());
+        app.get("/", |_ctx: Context| async move {
+            Err::<crate::response::Response, _>(UltimoError::BadRequest("nope".into()))
+        });
+        let resp = app.oneshot(req(Some(b"err-id"))).await;
+        assert_eq!(resp.status(), 400);
+        assert_eq!(id_of(&resp).await, "err-id");
+    }
+
+    #[tokio::test]
+    async fn header_name_is_configurable() {
+        let mw = RequestId::new().header("X-Correlation-Id").build();
+        let mut app = Ultimo::new_without_defaults();
+        app.use_middleware(mw);
+        app.get("/", |ctx: Context| async move { ctx.text("ok").await });
+        let req = HyperRequest::builder()
+            .uri("/")
+            .header("x-correlation-id", "corr-1")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+        let resp = app.oneshot(req).await;
+        assert_eq!(resp.headers().get("x-correlation-id").unwrap(), "corr-1");
+        assert!(resp.headers().get("x-request-id").is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid request-id header name")]
+    fn invalid_header_name_panics_at_build() {
+        let _ = RequestId::new().header("not a header\n").build();
     }
 }
