@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.3...ultimo-v0.9.4) - 2026-10-18
+
+### Added
+
+- *(middleware)* trim_trailing_slash and append_trailing_slash ([#202](https://github.com/ultimo-rs/ultimo/pull/202))
+- *(middleware)* etag, cache_control, server_timing and BasicAuth ([#201](https://github.com/ultimo-rs/ultimo/pull/201))
+- *(middleware)* add request_id() for correlated request logs ([#197](https://github.com/ultimo-rs/ultimo/pull/197))
+
 ## [0.9.3](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.2...ultimo-v0.9.3) - 2026-10-02
 
 ### Added
