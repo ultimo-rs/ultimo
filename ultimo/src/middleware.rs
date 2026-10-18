@@ -719,6 +719,78 @@ pub mod builtin {
     }
 
     // -------------------------------------------------------------------------
+    // Trailing-slash normalization
+    // -------------------------------------------------------------------------
+
+    /// Canonical form of `path`: duplicate slashes collapsed and the trailing
+    /// slash removed (or added, when `append`, except on file-like last segments).
+    fn canonical_path(path: &str, append: bool) -> String {
+        let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        let Some(last) = segments.last() else {
+            return "/".to_string();
+        };
+        let mut canonical = format!("/{}", segments.join("/"));
+        if append && !last.contains('.') {
+            canonical.push('/');
+        }
+        canonical
+    }
+
+    fn trailing_slash_redirect(append: bool) -> BoxedMiddleware {
+        Arc::new(move |ctx, next| {
+            Box::pin(async move {
+                if ctx.req.method() != "GET" && ctx.req.method() != "HEAD" {
+                    return next(ctx).await;
+                }
+                let canonical = canonical_path(ctx.req.path(), append);
+                if canonical == ctx.req.path() {
+                    return next(ctx).await;
+                }
+                let location = match ctx.req.query_string() {
+                    Some(query) => format!("{canonical}?{query}"),
+                    None => canonical,
+                };
+                Ok(HyperResponse::builder()
+                    .status(308)
+                    .header(hyper::header::LOCATION, location)
+                    .body(UltimoBody::empty())
+                    .unwrap())
+            })
+        })
+    }
+
+    /// Redirect `GET`/`HEAD` requests to the path without a trailing slash
+    /// (`/users/` → `/users`) with **308 Permanent Redirect**, keeping the query
+    /// string and collapsing duplicate slashes.
+    ///
+    /// The router already matches both forms; this gives each resource one
+    /// canonical URL for caches and search engines. Only matched routes are
+    /// redirected — unknown paths still 404.
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// let mut app = Ultimo::new_without_defaults();
+    /// app.use_middleware(ultimo::middleware::builtin::trim_trailing_slash());
+    /// ```
+    pub fn trim_trailing_slash() -> BoxedMiddleware {
+        trailing_slash_redirect(false)
+    }
+
+    /// Redirect `GET`/`HEAD` requests to the path *with* a trailing slash
+    /// (`/users` → `/users/`) with **308 Permanent Redirect**. Paths whose last
+    /// segment looks like a file (contains `.`, e.g. `/app.js`) are left as-is.
+    /// See [`trim_trailing_slash`] for the opposite convention.
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// let mut app = Ultimo::new_without_defaults();
+    /// app.use_middleware(ultimo::middleware::builtin::append_trailing_slash());
+    /// ```
+    pub fn append_trailing_slash() -> BoxedMiddleware {
+        trailing_slash_redirect(true)
+    }
+
+    // -------------------------------------------------------------------------
     // HTTP Basic authentication
     // -------------------------------------------------------------------------
 

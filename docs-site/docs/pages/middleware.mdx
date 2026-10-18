@@ -119,6 +119,23 @@ Adds `Server-Timing: app;dur=1.3` so browser dev tools show server time in the
 network panel. Timing data can aid attackers, so prefer enabling it only in
 development.
 
+### Trailing slashes
+
+The router matches `/users`, `/users/` and `//users` to the same route. To give
+each page a single canonical URL (better for caches and SEO), redirect the
+alternatives with **308 Permanent Redirect**:
+
+```rust
+use ultimo::middleware::builtin::{append_trailing_slash, trim_trailing_slash};
+
+app.use_middleware(trim_trailing_slash());      // /users/?page=2 → /users?page=2
+// or
+app.use_middleware(append_trailing_slash());    // /users → /users/  (/app.js untouched)
+```
+
+Only `GET`/`HEAD` requests to existing routes are redirected; unknown paths
+still 404 and API calls with other methods are never bounced.
+
 ### Basic auth
 
 Gate internal tools, admin panels or staging with HTTP Basic auth (RFC 7617).
