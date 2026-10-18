@@ -556,6 +556,313 @@ pub mod builtin {
     }
 
     // -------------------------------------------------------------------------
+    // HTTP caching: ETag + Cache-Control
+    // -------------------------------------------------------------------------
+
+    fn strip_weak(tag: &str) -> &str {
+        let tag = tag.trim();
+        tag.strip_prefix("W/").unwrap_or(tag)
+    }
+
+    /// `If-None-Match` uses weak comparison (RFC 9110 §13.1.2).
+    fn etag_matches(if_none_match: &str, etag: &str) -> bool {
+        let etag = strip_weak(etag);
+        if_none_match
+            .split(',')
+            .any(|candidate| candidate.trim() == "*" || strip_weak(candidate) == etag)
+    }
+
+    fn body_etag(body: &[u8]) -> String {
+        use base64::Engine;
+        use sha1::{Digest, Sha1};
+        let digest = Sha1::digest(body);
+        format!(
+            "\"{}\"",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(digest)
+        )
+    }
+
+    /// ETag + conditional-GET middleware.
+    ///
+    /// For `GET`/`HEAD` requests that produce a buffered `200` response, sets a
+    /// strong `ETag` derived from a hash of the body (unless the handler already
+    /// set one) and answers a matching `If-None-Match` with **304 Not Modified**
+    /// and no body. Streaming/SSE responses, other methods and other statuses
+    /// pass through untouched.
+    ///
+    /// The body is hashed on every request, so this saves bandwidth, not server
+    /// work. When combined with [`compression`], a compressed response's ETag is
+    /// downgraded to a weak one.
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// let mut app = Ultimo::new_without_defaults();
+    /// app.use_middleware(ultimo::middleware::builtin::etag());
+    /// ```
+    pub fn etag() -> BoxedMiddleware {
+        use http_body_util::BodyExt;
+        use hyper::header::{HeaderValue, CONTENT_LENGTH, CONTENT_TYPE, ETAG};
+
+        Arc::new(|ctx, next| {
+            Box::pin(async move {
+                let conditional = ctx.req.method() == "GET" || ctx.req.method() == "HEAD";
+                let if_none_match = ctx.req.header("if-none-match");
+
+                let res = next(ctx).await?;
+                if !conditional || res.status() != hyper::StatusCode::OK {
+                    return Ok(res);
+                }
+
+                let (mut parts, body) = res.into_parts();
+                let existing = parts
+                    .headers
+                    .get(ETAG)
+                    .and_then(|v| v.to_str().ok())
+                    .map(str::to_owned);
+                let (tag, body) = match (existing, body) {
+                    (Some(tag), body) => (tag, body),
+                    (None, UltimoBody::Stream(stream)) => {
+                        return Ok(HyperResponse::from_parts(parts, UltimoBody::Stream(stream)));
+                    }
+                    (None, UltimoBody::Full(full)) => {
+                        let Ok(collected) = full.collect().await;
+                        let bytes = collected.to_bytes();
+                        let tag = body_etag(&bytes);
+                        if let Ok(value) = HeaderValue::from_str(&tag) {
+                            parts.headers.insert(ETAG, value);
+                        }
+                        (tag, UltimoBody::full(bytes))
+                    }
+                };
+
+                if if_none_match.is_some_and(|inm| etag_matches(&inm, &tag)) {
+                    parts.status = hyper::StatusCode::NOT_MODIFIED;
+                    parts.headers.remove(CONTENT_LENGTH);
+                    parts.headers.remove(CONTENT_TYPE);
+                    return Ok(HyperResponse::from_parts(parts, UltimoBody::empty()));
+                }
+                Ok(HyperResponse::from_parts(parts, body))
+            })
+        })
+    }
+
+    /// Default `Cache-Control` middleware.
+    ///
+    /// Sets `Cache-Control: {value}` on successful (`2xx`) and `304` responses
+    /// that don't already carry one, so a handler can still override it (e.g.
+    /// `no-store` on a private route). Error responses are never marked
+    /// cacheable.
+    ///
+    /// # Panics
+    /// If `value` isn't a valid header value.
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// let mut app = Ultimo::new_without_defaults();
+    /// app.use_middleware(ultimo::middleware::builtin::cache_control("public, max-age=60"));
+    /// ```
+    pub fn cache_control(value: impl Into<String>) -> BoxedMiddleware {
+        use hyper::header::{HeaderValue, CACHE_CONTROL};
+
+        let value = value.into();
+        let value = HeaderValue::from_str(&value)
+            .unwrap_or_else(|_| panic!("invalid Cache-Control value: {:?}", value));
+        Arc::new(move |ctx, next| {
+            let value = value.clone();
+            Box::pin(async move {
+                let mut res = next(ctx).await?;
+                let status = res.status();
+                if (status.is_success() || status == hyper::StatusCode::NOT_MODIFIED)
+                    && !res.headers().contains_key(CACHE_CONTROL)
+                {
+                    res.headers_mut().insert(CACHE_CONTROL, value);
+                }
+                Ok(res)
+            })
+        })
+    }
+
+    // -------------------------------------------------------------------------
+    // Server-Timing
+    // -------------------------------------------------------------------------
+
+    /// `Server-Timing` middleware.
+    ///
+    /// Adds `Server-Timing: app;dur=<ms>` with the time the rest of the chain
+    /// took to produce the response head, which browser dev tools show in the
+    /// network timing panel. Register it first (outermost) to time everything.
+    ///
+    /// Timing data can help attackers (e.g. timing side channels), so consider
+    /// enabling it only in development or for trusted clients.
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// let mut app = Ultimo::new_without_defaults();
+    /// app.use_middleware(ultimo::middleware::builtin::server_timing());
+    /// ```
+    pub fn server_timing() -> BoxedMiddleware {
+        Arc::new(|ctx, next| {
+            Box::pin(async move {
+                let start = Instant::now();
+                let mut res = next(ctx).await?;
+                let ms = start.elapsed().as_secs_f64() * 1000.0;
+                if let Ok(value) = hyper::header::HeaderValue::from_str(&format!("app;dur={ms:.1}"))
+                {
+                    res.headers_mut().append(
+                        hyper::header::HeaderName::from_static("server-timing"),
+                        value,
+                    );
+                }
+                Ok(res)
+            })
+        })
+    }
+
+    // -------------------------------------------------------------------------
+    // HTTP Basic authentication
+    // -------------------------------------------------------------------------
+
+    /// Context state key under which [`BasicAuth`] stores the authenticated username.
+    pub const BASIC_AUTH_USER_STATE_KEY: &str = "basic_auth_user";
+
+    type BasicAuthValidator = Arc<dyn Fn(&str, &str) -> bool + Send + Sync>;
+
+    fn sha1_bytes(input: &str) -> [u8; 20] {
+        use sha1::{Digest, Sha1};
+        Sha1::digest(input.as_bytes()).into()
+    }
+
+    /// Compares fixed-size digests without short-circuiting, so timing doesn't
+    /// reveal how much of a credential matched.
+    fn digest_eq(a: &[u8; 20], b: &[u8; 20]) -> bool {
+        a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+    }
+
+    fn parse_basic_credentials(header: &str) -> Option<(String, String)> {
+        use base64::Engine;
+        let (scheme, token) = header.trim().split_once(' ')?;
+        if !scheme.eq_ignore_ascii_case("basic") {
+            return None;
+        }
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(token.trim())
+            .ok()?;
+        let decoded = String::from_utf8(decoded).ok()?;
+        let (user, pass) = decoded.split_once(':')?;
+        Some((user.to_string(), pass.to_string()))
+    }
+
+    /// HTTP Basic authentication middleware (RFC 7617).
+    ///
+    /// Requests without valid credentials get **401 Unauthorized** with a
+    /// `WWW-Authenticate: Basic realm="..."` challenge. On success the username
+    /// is available via [`Context::basic_auth_user`](crate::context::Context::basic_auth_user).
+    ///
+    /// Static users are compared in constant time. Basic auth sends credentials
+    /// on every request, so only use it over HTTPS — it suits internal tools,
+    /// admin panels and staging gates; prefer JWT/sessions for end users.
+    ///
+    /// ```
+    /// # use ultimo::Ultimo;
+    /// use ultimo::middleware::builtin::BasicAuth;
+    ///
+    /// let mut app = Ultimo::new_without_defaults();
+    /// app.use_middleware(BasicAuth::new("Admin").user("admin", "change-me").build());
+    ///
+    /// // Or check credentials yourself (e.g. against a password hash):
+    /// app.use_middleware(
+    ///     BasicAuth::with_validator("Admin", |user, pass| user == "admin" && pass == "change-me")
+    ///         .build(),
+    /// );
+    /// ```
+    pub struct BasicAuth {
+        realm: String,
+        users: Vec<(String, String)>,
+        validator: Option<BasicAuthValidator>,
+    }
+
+    impl BasicAuth {
+        /// Create a Basic auth gate for `realm` with no users yet.
+        pub fn new(realm: impl Into<String>) -> Self {
+            Self {
+                realm: realm.into(),
+                users: Vec::new(),
+                validator: None,
+            }
+        }
+
+        /// Create a Basic auth gate whose credentials are checked by `validator`.
+        /// The validator is responsible for its own constant-time comparison.
+        pub fn with_validator<F>(realm: impl Into<String>, validator: F) -> Self
+        where
+            F: Fn(&str, &str) -> bool + Send + Sync + 'static,
+        {
+            Self {
+                validator: Some(Arc::new(validator)),
+                ..Self::new(realm)
+            }
+        }
+
+        /// Allow a username/password pair.
+        pub fn user(mut self, username: impl Into<String>, password: impl Into<String>) -> Self {
+            self.users.push((username.into(), password.into()));
+            self
+        }
+
+        /// Build the middleware.
+        pub fn build(self) -> BoxedMiddleware {
+            // Quotes/backslashes/non-printables would break the quoted-string.
+            let realm: String = self
+                .realm
+                .chars()
+                .filter(|c| (' '..='~').contains(c) && *c != '"' && *c != '\\')
+                .collect();
+            let challenge = hyper::header::HeaderValue::from_str(&format!(
+                "Basic realm=\"{}\", charset=\"UTF-8\"",
+                realm
+            ))
+            .expect("sanitized realm is a valid header value");
+            let users: Arc<Vec<([u8; 20], [u8; 20])>> = Arc::new(
+                self.users
+                    .iter()
+                    .map(|(u, p)| (sha1_bytes(u), sha1_bytes(p)))
+                    .collect(),
+            );
+            let validator = self.validator;
+
+            Arc::new(move |ctx, next| {
+                let challenge = challenge.clone();
+                let users = users.clone();
+                let validator = validator.clone();
+                Box::pin(async move {
+                    let credentials = ctx
+                        .req
+                        .header("authorization")
+                        .and_then(|h| parse_basic_credentials(&h));
+
+                    if let Some((user, pass)) = credentials {
+                        let (user_digest, pass_digest) = (sha1_bytes(&user), sha1_bytes(&pass));
+                        let static_ok = users.iter().fold(false, |found, (u, p)| {
+                            found | (digest_eq(u, &user_digest) & digest_eq(p, &pass_digest))
+                        });
+                        if static_ok || validator.as_ref().is_some_and(|v| v(&user, &pass)) {
+                            ctx.set(BASIC_AUTH_USER_STATE_KEY, user).await;
+                            return next(ctx).await;
+                        }
+                    }
+
+                    Ok(HyperResponse::builder()
+                        .status(401)
+                        .header(hyper::header::WWW_AUTHENTICATE, challenge)
+                        .header("Content-Type", "text/plain")
+                        .body(UltimoBody::full("Unauthorized"))
+                        .unwrap())
+                })
+            })
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // IP allow/deny (CIDR filtering)
     // -------------------------------------------------------------------------
 
@@ -1056,6 +1363,7 @@ pub mod builtin {
                             CONTENT_ENCODING,
                             hyper::header::HeaderValue::from_static("br"),
                         );
+                        weaken_etag(res.headers_mut());
                         res.headers_mut().insert(
                             CONTENT_LENGTH,
                             hyper::header::HeaderValue::from_str(&len.to_string()).unwrap(),
@@ -1075,6 +1383,7 @@ pub mod builtin {
                             CONTENT_ENCODING,
                             hyper::header::HeaderValue::from_static("gzip"),
                         );
+                        weaken_etag(res.headers_mut());
                         res.headers_mut().insert(
                             CONTENT_LENGTH,
                             hyper::header::HeaderValue::from_str(&len.to_string()).unwrap(),
@@ -1089,6 +1398,20 @@ pub mod builtin {
                     }
                 })
             })
+        }
+    }
+
+    /// A compressed body is a different byte sequence, so a strong ETag computed
+    /// on the identity body must become weak (RFC 9110 §8.8.1).
+    #[cfg(feature = "compression")]
+    fn weaken_etag(headers: &mut hyper::HeaderMap) {
+        let weak = headers
+            .get(hyper::header::ETAG)
+            .and_then(|v| v.to_str().ok())
+            .filter(|tag| tag.starts_with('"'))
+            .and_then(|tag| hyper::header::HeaderValue::from_str(&format!("W/{tag}")).ok());
+        if let Some(weak) = weak {
+            headers.insert(hyper::header::ETAG, weak);
         }
     }
 

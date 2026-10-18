@@ -212,3 +212,30 @@ async fn compression_builder_respects_min_size_override() {
     // min_size=99999 means nothing is compressed
     assert!(res.headers().get("content-encoding").is_none());
 }
+
+#[tokio::test]
+async fn compressed_response_gets_weak_etag() {
+    let mut app = Ultimo::new_without_defaults();
+    app.use_middleware(compression());
+    app.use_middleware(ultimo::middleware::builtin::etag());
+    app.get("/text", |ctx: Context| async move {
+        ctx.text(large_text()).await
+    });
+
+    let req = |enc: &str| {
+        HyperRequest::builder()
+            .uri("/text")
+            .header("accept-encoding", enc)
+            .body(empty())
+            .unwrap()
+    };
+    let plain = app.oneshot(req("identity")).await;
+    let strong = plain.headers()["etag"].to_str().unwrap().to_string();
+    assert!(strong.starts_with('"'), "{strong}");
+
+    let gz = app.oneshot(req("gzip")).await;
+    assert_eq!(
+        gz.headers()["etag"].to_str().unwrap(),
+        format!("W/{strong}")
+    );
+}

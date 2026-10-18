@@ -50,9 +50,9 @@ a stable **1.0**.
   serve Swagger UI / Scalar / ReDoc wired to the generated OpenAPI spec
   (FastAPI's signature `/docs`). The Swagger UI helper exists today; this makes
   it one line.~~ ✅ Shipped in 0.5.1
-- 🧩 **Built-in middleware pack** — small, expected pieces: ~~`request-id`~~ ✅ shipped,
-  `cache-control` / ETag helpers, `server-timing`, basic-auth, trailing-slash
-  normalization (Hono-style breadth).
+- 🧩 **Built-in middleware pack** — small, expected pieces: ~~`request-id`,
+  `cache-control` / ETag helpers, `server-timing`, basic-auth~~ ✅ shipped;
+  trailing-slash normalization remains (Hono-style breadth).
 
 ### Integrations
 
@@ -144,7 +144,7 @@ version number yet.
 | WebSocket Compression                                   | 📋 Planned       | Distribution & Dev Experience        |
 | Hot Reload (`ultimo dev`)                               | ✅ Available     | 0.5.1                                |
 | `#[derive(UltimoType)]`                                 | 📋 Planned       | Distribution & Dev Experience        |
-| Built-in Middleware Pack (request-id, cache-control, …) | 📋 Planned       | Distribution & Dev Experience        |
+| Built-in Middleware Pack (request-id, ETag, cache-control, server-timing, basic-auth) | ✅ Available | 0.9.4 |
 | End-to-end Typed Errors                                 | 📋 Planned       | Stabilization                        |
 | S3-compatible Storage                                   | 💡 Demand-driven | post-1.0                             |
 | Background Tasks                                        | 💡 Demand-driven | post-1.0                             |
@@ -258,7 +258,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - **Redis integration** — sessions, cache, and rate-limit store (one dependency)
 - WebSocket compression (per-message deflate)
 - `#[derive(UltimoType)]` (drop the `ts-rs` dependency papercut)
-- Built-in middleware pack (✅ request-id; cache-control/ETag, server-timing, basic-auth remaining)
+- ✅ Built-in middleware pack (request-id, cache-control/ETag, server-timing, basic-auth; trailing-slash normalization remaining)
 
 ### Phase 11: Stabilization (toward 1.0)
 

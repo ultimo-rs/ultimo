@@ -167,10 +167,10 @@ their feature belongs to.
   extractors + validation, OIDC/JWKS, streaming responses, SSE transport,
   request timeouts + HTTP graceful shutdown are done. Still open: OAuth2 and
   observability (`request_id()` shipped; OpenTelemetry + Prometheus remain).
-- **Phase 10 (Distribution & DX): started.** Redis integration
-  (sessions/cache/rate-limit), WebSocket compression, `#[derive(UltimoType)]`,
-  rest of the middleware pack (cache-control/ETag, server-timing, basic-auth;
-  `request-id` has shipped).
+- **Phase 10 (Distribution & DX): started.** Middleware pack shipped
+  (request-id, cache-control/ETag, server-timing, basic-auth). Still open:
+  trailing-slash normalization, Redis integration (sessions/cache/rate-limit),
+  WebSocket compression, `#[derive(UltimoType)]`.
 - **Phase 11 (Stabilization → 1.0):** end-to-end typed errors, public-API
   audit + SemVer freeze, documentation completeness, production battle-testing.
 - **Post-1.0 / demand-driven:** typed RPC subscriptions (derived SSE event

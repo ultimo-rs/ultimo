@@ -81,6 +81,74 @@ it, and errors from inner middleware are turned into responses by `request_id`
 (so they get the header) — a middleware registered outside it sees a normal
 response instead of an `Err`.
 
+### HTTP caching: ETag + Cache-Control
+
+```rust
+use ultimo::middleware::builtin::{cache_control, etag};
+
+app.use_middleware(cache_control("public, max-age=60"));
+app.use_middleware(etag());
+```
+
+- `etag()` hashes buffered `200` responses to `GET`/`HEAD` into a strong `ETag`
+  (a handler-set `ETag` is kept) and answers a matching `If-None-Match` with
+  **304 Not Modified** and no body. It saves bandwidth, not server work — the
+  handler still runs. Streaming/SSE responses pass through.
+- `cache_control(value)` sets a default `Cache-Control` on `2xx`/`304`
+  responses only, never on errors. A handler can override it per route:
+
+```rust
+app.get("/me", |ctx: Context| async move {
+    ctx.header("Cache-Control", "no-store").await;
+    ctx.json(json!({ "private": true })).await
+});
+```
+
+With `compression()` as well, compressed responses carry a weak (`W/"..."`)
+ETag, since their bytes differ from the uncompressed body.
+
+### Server-Timing
+
+```rust
+use ultimo::middleware::builtin::server_timing;
+
+app.use_middleware(server_timing()); // register first to time everything
+```
+
+Adds `Server-Timing: app;dur=1.3` so browser dev tools show server time in the
+network panel. Timing data can aid attackers, so prefer enabling it only in
+development.
+
+### Basic auth
+
+Gate internal tools, admin panels or staging with HTTP Basic auth (RFC 7617).
+The browser shows its native login prompt.
+
+```rust
+use ultimo::middleware::builtin::BasicAuth;
+
+app.use_middleware(
+    BasicAuth::new("Admin")
+        .user("alice", std::env::var("ADMIN_PASSWORD").expect("ADMIN_PASSWORD"))
+        .build(),
+);
+
+app.get("/admin", |ctx: Context| async move {
+    let user = ctx.basic_auth_user().await.unwrap_or_default();
+    ctx.text(format!("Hello, {user}")).await
+});
+```
+
+To check against your own store (e.g. password hashes), use a validator — it is
+responsible for its own constant-time comparison:
+
+```rust
+BasicAuth::with_validator("Admin", |user, pass| verify_password(user, pass)).build()
+```
+
+Credentials travel on every request, so **only use Basic auth over HTTPS**. For
+end users, prefer [JWT](/jwt) or [sessions](/sessions).
+
 ### CORS
 
 Defaults (allow `*`, `GET`/`POST`, `Content-Type`):
