@@ -16,8 +16,9 @@ a stable **1.0**.
   registry (CodeArtifact, Artifactory, Cloudsmith) for internal microservice
   contracts — if Service A changes an RPC signature, Service B won't compile
   until updated.
-- 📡 **Typed RPC subscriptions / SSE** — server-push with event types derived
-  from your Rust types (tRPC-style subscriptions, in Rust).
+- 📡 **Typed RPC subscriptions** — server-push with event types derived from
+  your Rust types (tRPC-style subscriptions, in Rust). The SSE transport
+  already ships (0.9.1); this is the typed layer on top. _(Post-1.0.)_
 - ❗ **End-to-end typed errors** — RPC errors surfaced as typed results in the
   generated client.
 - ✅ **Validation from types** — derive request validation from the type
@@ -242,7 +243,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 ### Phase 9: Real-Time, Auth & Production Gaps
 
 - ✅ **Typed handler extractors + validation-from-types** (type-safe input; `Path`/`Query`/`Json`/`Valid`, 400/422)
-- Typed RPC subscriptions / SSE (derived event types)
+- ✅ Server-Sent Events transport (typed event types derived for the client are post-1.0)
 - OAuth2 provider integration
 - ✅ **Auth providers (OIDC/JWKS)** — RS256/ES256 + remote JWKS (fetch/cache/
   rotation), OIDC discovery, cookbook for Clerk / Cognito / Auth0 / Supabase
@@ -265,8 +266,9 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 - Public-API audit + SemVer freeze
 - Documentation completeness
 - Production battle-testing
-- _(Demand-driven: S3-compatible storage, background tasks, MCP server, Python
-  client generation)_
+- _(Demand-driven: S3-compatible storage, background tasks, Python client
+  generation, typed RPC subscriptions)_
+- ✅ MCP server (`ultimo mcp`) — shipped early in 0.9.1
 
 ## Contributing
 

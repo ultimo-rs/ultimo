@@ -16,7 +16,7 @@ change is a potential breaking change. **The public API contract** — changing
 any of it requires a deliberate version bump:
 
 - Any `pub` item (types, fns, traits, enum variants, fields) and the `prelude`
-- **Cargo feature names** (`websocket`, `testing`, `session`, `csrf`, `database`, `sqlx-*`, `diesel-*`, `test-helpers`) — renaming/removing breaks `features = [...]` downstream
+- **Cargo feature names** (`websocket`, `testing`, `session`, `csrf`, `jwt`, `oidc`, `api-key`, `static-files`, `compression`, `client-gen`, `database`, `sqlx-*`, `diesel-*`, `test-helpers`) — renaming/removing breaks `features = [...]` downstream
 - **MSRV** (`rust-version`) — raising it is breaking (we're at 1.86.0)
 - **Direct dependency floors** — raising one (e.g. `bytes`, `diesel`) constrains downstream resolution; a dep type re-exported in our API (e.g. `bytes::Bytes` in WebSocket messages) makes that dep's version part of _our_ API
 - CLI subcommands / flags of `ultimo-cli`
@@ -75,9 +75,11 @@ The crate is `#![forbid(unsafe_code)]` — 100% safe Rust, no `unsafe`.
 
 `default = []` — **everything is opt-in.** When adding code under a feature, gate
 it with `#[cfg(feature = "...")]`. Features: `websocket`, `testing`
-(TestClient/assertions/fixtures), `session`, `csrf`, `test-helpers` (exposes
-`websocket::test_helpers` for integration tests), `database` (enabled
-transitively by `sqlx-postgres|mysql|sqlite`, `diesel-postgres|mysql|sqlite`).
+(TestClient/assertions/fixtures), `session`, `csrf`, `jwt`, `oidc` (implies
+`jwt`), `api-key`, `static-files`, `compression`, `client-gen` (ts-rs type
+derivation), `test-helpers` (exposes `websocket::test_helpers` for integration
+tests), `database` (enabled transitively by `sqlx-postgres|mysql|sqlite`,
+`diesel-postgres|mysql|sqlite`).
 
 ## ⚠️ Test invocation gotchas (READ BEFORE TOUCHING TESTS)
 
@@ -150,27 +152,29 @@ throughout. Invoke it for any change to this repo.
 ## Roadmap
 
 Full detail: `docs-site/docs/pages/roadmap.mdx` (canonical — keep this summary
-in sync with it, not the other way around). Its milestone labels (v0.4.0,
-v0.7.0, …) group features thematically and don't track 1:1 with the published
-crate's SemVer — small additive/fix PRs bump the real version (currently
-0.9.2) independently of which roadmap milestone their feature belongs to.
+in sync with it, not the other way around). Its phases (`### Phase N: ...`)
+group features thematically and don't track the published crate's SemVer —
+small additive/fix PRs bump the real version independently of which phase
+their feature belongs to.
 
-- **v0.4.0–v0.6.1: shipped.** Security & Performance (JWT/API-key/OIDC auth,
-  authz guards, security headers, CSRF, rate-limit, IP allow/deny, benchmark
-  suite), static files + SPA + compression, hot reload, `client-gen`
-  TypeScript type derivation, `ultimo generate` for real.
-- **v0.7.0: partially shipped.** Typed handler extractors + validation-from-types
-  and OIDC/JWKS auth providers are done. Still open: typed RPC
-  subscriptions/SSE event types, OAuth2 provider integration, and
-  observability (OpenTelemetry + Prometheus). Streaming responses and request
-  timeouts + HTTP graceful shutdown have also shipped.
-- **v0.8.0: not started.** Redis integration (sessions/cache/rate-limit),
-  WebSocket compression, `#[derive(UltimoType)]` (drop the `ts-rs` dependency),
-  more built-in middleware (cache-control/ETag, server-timing, basic-auth;
+- **Phases 1–7: shipped.** Core, WebSocket, sessions/testing, security &
+  performance (JWT/API-key/OIDC auth, authz guards, security headers, CSRF,
+  rate-limit, IP allow/deny, benchmark suite), static files + SPA +
+  compression, `client-gen` TypeScript type derivation, hot reload.
+- **Phase 8 (Codegen + Ship-Readiness): mostly shipped.** Still open: Rust
+  client generation (`ultimo generate --target rust`).
+- **Phase 9 (Real-Time, Auth & Production Gaps): mostly shipped.** Typed
+  extractors + validation, OIDC/JWKS, streaming responses, SSE transport,
+  request timeouts + HTTP graceful shutdown are done. Still open: OAuth2 and
+  observability (`request_id()` shipped; OpenTelemetry + Prometheus remain).
+- **Phase 10 (Distribution & DX): started.** Redis integration
+  (sessions/cache/rate-limit), WebSocket compression, `#[derive(UltimoType)]`,
+  rest of the middleware pack (cache-control/ETag, server-timing, basic-auth;
   `request-id` has shipped).
-- **v0.9.0 → v1.0.0 (stabilization):** end-to-end typed errors, public-API
-  audit + SemVer freeze, documentation completeness, production
-  battle-testing.
+- **Phase 11 (Stabilization → 1.0):** end-to-end typed errors, public-API
+  audit + SemVer freeze, documentation completeness, production battle-testing.
+- **Post-1.0 / demand-driven:** typed RPC subscriptions (derived SSE event
+  types), S3-compatible storage, background tasks, Python client generation.
 
 ## Documentation surfaces (MUST keep current, in the same PR as the change)
 
