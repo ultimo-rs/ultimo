@@ -349,6 +349,13 @@ impl Context {
             .await
     }
 
+    /// The username authenticated by the [`BasicAuth`](crate::middleware::builtin::BasicAuth)
+    /// middleware. `None` if that middleware isn't registered.
+    pub async fn basic_auth_user(&self) -> Option<String> {
+        self.get(crate::middleware::builtin::BASIC_AUTH_USER_STATE_KEY)
+            .await
+    }
+
     /// Read a request cookie by name.
     pub fn cookie(&self, name: &str) -> Option<String> {
         self.req

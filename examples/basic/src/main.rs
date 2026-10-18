@@ -25,6 +25,7 @@ async fn main() -> Result<()> {
     let mut app = Ultimo::new();
 
     // Global middleware
+    app.use_middleware(middleware::builtin::server_timing());
     app.use_middleware(middleware::builtin::logger());
     app.use_middleware(
         middleware::builtin::Cors::new()
@@ -32,6 +33,9 @@ async fn main() -> Result<()> {
             .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
             .build(),
     );
+    // Revalidate on every load, but answer unchanged pages with 304.
+    app.use_middleware(middleware::builtin::cache_control("no-cache"));
+    app.use_middleware(middleware::builtin::etag());
 
     // Landing page with demo links
     app.get("/", |ctx: Context| async move {

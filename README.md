@@ -41,7 +41,7 @@ the framework is 100% safe Rust (`#![forbid(unsafe_code)]`).
 - 🔌 **WebSockets** — RFC 6455 with a built-in pub/sub system (zero extra deps).
 - 🌊 **Streaming responses** — chunked/streaming bodies via `ctx.stream(...)`.
 - 📡 **Server-Sent Events** — typed server→client push via `ctx.sse(...)` + `EventSource`.
-- 🔐 **Auth, built in** — JWT and API-key middleware plus scope-based [authorization guards](https://docs.ultimo.dev/authorization).
+- 🔐 **Auth, built in** — JWT, API-key and HTTP Basic auth middleware plus scope-based [authorization guards](https://docs.ultimo.dev/authorization).
 - 🛡️ **Secure by default** — 100% safe Rust, secure sessions/cookies, CSRF, security-headers middleware, request body-size limits, and supply-chain CI.
 - ⚡ **Fast** — native Rust on the Hyper + Tokio core, O(1) constant-time routing, benchmarks regression-guarded in CI ([details](https://docs.ultimo.dev/performance)).
 - 🛑 **Production-ready shutdown** — `request_timeout` plus `listen_with_shutdown` drains in-flight requests (and closes WebSockets with `1001`) on `SIGTERM`/Ctrl+C.

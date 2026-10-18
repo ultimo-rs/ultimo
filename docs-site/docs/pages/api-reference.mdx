@@ -366,6 +366,13 @@ else the connection peer. `peer_addr()` is the raw connection peer. See
 let ip = ctx.client_ip();
 ```
 
+#### Basic auth user
+
+##### `basic_auth_user(&self) -> Option<String>`
+
+The username authenticated by the [`BasicAuth`](#basicauth--http-basic-authentication)
+middleware; `None` if it isn't registered.
+
 #### Session (requires `session` feature)
 
 ##### `session(&self) -> Session`
@@ -732,6 +739,48 @@ customizes the header name. See [Middleware → Request ID](/middleware#request-
 
 ```rust
 app.use_middleware(ultimo::middleware::builtin::request_id());
+```
+
+#### `etag()` — ETag + conditional GET
+
+For `GET`/`HEAD` requests with a buffered `200` response, sets a strong `ETag`
+(hash of the body) unless the handler set one, and answers a matching
+`If-None-Match` with **304 Not Modified** and no body. Streams pass through.
+With `compression()`, compressed responses get a weak (`W/`) ETag.
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::etag());
+```
+
+#### `cache_control(value)`
+
+Sets `Cache-Control: value` on `2xx`/`304` responses that don't already have
+one (handlers can override). Panics on an invalid header value.
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::cache_control("public, max-age=60"));
+```
+
+#### `server_timing()`
+
+Adds `Server-Timing: app;dur=<ms>` (time to produce the response head). Register
+it first. Exposes timing data — consider enabling only in development.
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::server_timing());
+```
+
+#### `BasicAuth` — HTTP Basic authentication
+
+401 with `WWW-Authenticate: Basic realm="..."` unless the request carries valid
+credentials; the username is then available via `ctx.basic_auth_user().await`.
+Static users are compared in constant time. HTTPS only.
+
+```rust
+use ultimo::middleware::builtin::BasicAuth;
+
+app.use_middleware(BasicAuth::new("Admin").user("admin", "change-me").build());
+// or: BasicAuth::with_validator("Admin", |user, pass| check(user, pass)).build()
 ```
 
 #### `cors()`
