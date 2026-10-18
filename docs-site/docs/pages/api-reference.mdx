@@ -770,6 +770,17 @@ it first. Exposes timing data — consider enabling only in development.
 app.use_middleware(ultimo::middleware::builtin::server_timing());
 ```
 
+#### `trim_trailing_slash()` / `append_trailing_slash()`
+
+308-redirect matched `GET`/`HEAD` requests to one canonical path — without
+(`/users/` → `/users`) or with (`/users` → `/users/`; file-like paths such as
+`/app.js` are skipped) a trailing slash. Duplicate slashes are collapsed and the
+query string is kept. The router itself already matches both forms.
+
+```rust
+app.use_middleware(ultimo::middleware::builtin::trim_trailing_slash());
+```
+
 #### `BasicAuth` — HTTP Basic authentication
 
 401 with `WWW-Authenticate: Basic realm="..."` unless the request carries valid

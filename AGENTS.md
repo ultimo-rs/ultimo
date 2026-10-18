@@ -168,9 +168,9 @@ their feature belongs to.
   request timeouts + HTTP graceful shutdown are done. Still open: OAuth2 and
   observability (`request_id()` shipped; OpenTelemetry + Prometheus remain).
 - **Phase 10 (Distribution & DX): started.** Middleware pack shipped
-  (request-id, cache-control/ETag, server-timing, basic-auth). Still open:
-  trailing-slash normalization, Redis integration (sessions/cache/rate-limit),
-  WebSocket compression, `#[derive(UltimoType)]`.
+  (request-id, cache-control/ETag, server-timing, basic-auth, trailing-slash).
+  Still open: Redis integration (sessions/cache/rate-limit), WebSocket
+  compression, `#[derive(UltimoType)]`.
 - **Phase 11 (Stabilization → 1.0):** end-to-end typed errors, public-API
   audit + SemVer freeze, documentation completeness, production battle-testing.
 - **Post-1.0 / demand-driven:** typed RPC subscriptions (derived SSE event

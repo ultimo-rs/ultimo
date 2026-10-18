@@ -33,6 +33,7 @@ async fn main() -> Result<()> {
             .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
             .build(),
     );
+    app.use_middleware(middleware::builtin::trim_trailing_slash());
     // Revalidate on every load, but answer unchanged pages with 304.
     app.use_middleware(middleware::builtin::cache_control("no-cache"));
     app.use_middleware(middleware::builtin::etag());
