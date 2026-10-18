@@ -91,7 +91,7 @@ pub struct WebSocketConfig {
     /// Ping timeout in seconds (default: 10 seconds)
     pub ping_timeout: u64,
 
-    /// Enable per-message deflate compression (default: false)
+    /// Reserved for per-message deflate (RFC 7692); not yet implemented and currently ignored.
     pub compression: bool,
 
     /// Write buffer size in bytes (default: 128 KB)
