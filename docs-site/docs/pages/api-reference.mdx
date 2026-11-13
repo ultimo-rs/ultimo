@@ -552,6 +552,17 @@ let uri = ctx.req.uri();
 let path = uri.path();
 ```
 
+##### `route_pattern(&self) -> Option<&str>`
+
+The pattern of the route that matched, exactly as registered (`"/users/:id"` for
+a request to `/users/42`). `None` when no route matched (e.g. an `OPTIONS`
+preflight answered by middleware). Prefer it over `path()` for metric and log
+labels — its cardinality is bounded by your route table.
+
+```rust
+let route = ctx.req.route_pattern(); // Some("/users/:id")
+```
+
 ---
 
 ## RPC System
@@ -934,6 +945,23 @@ let store = StaticKeys::new().insert("key-abc", "service-a");
 app.use_middleware(ApiKey::new(store).build()); // header "x-api-key"
 ```
 
+#### `Metrics` (requires `metrics` feature)
+
+Prometheus HTTP metrics with no extra dependencies: `http_requests_total`
+(counter: `method`, `route`, `status`), `http_request_duration_seconds`
+(histogram: `method`, `route`) and `http_requests_in_flight` (gauge). `route` is
+the registered pattern, never the raw path. `Metrics` is cheap to clone.
+Methods: `new()`, `with_buckets(&[f64])`, `middleware()`, `handler()`,
+`render() -> String`. Constants: `CONTENT_TYPE`, `DEFAULT_BUCKETS`. See
+[Metrics](/metrics).
+
+```rust
+use ultimo::metrics::Metrics;
+let metrics = Metrics::new();
+app.use_middleware(metrics.middleware());
+app.get("/metrics", metrics.handler());
+```
+
 ### Custom Middleware
 
 Create custom middleware by implementing the middleware function signature:
@@ -1204,6 +1232,7 @@ All features are off by default (`default = []`).
 - `jwt` - HS256 JWT authentication middleware ([JWT Authentication](/jwt))
 - `api-key` - API-key authentication with a pluggable store ([API-Key Authentication](/api-keys))
 - `static-files` - Static file serving + SPA fallback (`serve_static`, `serve_spa`) ([Static Files](/static-files))
+- `metrics` - Prometheus HTTP metrics: request counter, latency histogram, in-flight gauge and a `/metrics` handler (`ultimo::metrics::Metrics`) ([Metrics](/metrics))
 - `compression` - Automatic gzip/brotli response compression (`compression()`, `Compression`) ([Compression](/middleware#compression))
 - `client-gen` - Derive RPC client TypeScript types from Rust types via `ts-rs`; `query`/`mutation` infer types from `#[derive(TS)]` structs (string-typed `query_with_types`/`mutation_with_types` remain as escape hatches) ([RPC](/rpc), [TypeScript Client Generation](/typescript))
 - `oidc` - Verify RS256/ES256 tokens against a provider's JWKS endpoint (`Jwt::jwks`, `Jwt::oidc`, `Jwt::jwks_from_set`) with fetch/cache/rotation ([JWT](/jwt))

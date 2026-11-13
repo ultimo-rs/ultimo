@@ -123,6 +123,10 @@ export default defineConfig({
           text: "Testing",
           link: "/testing",
         },
+        {
+          text: "Metrics (Prometheus)",
+          link: "/metrics",
+        },
       ],
     },
     {

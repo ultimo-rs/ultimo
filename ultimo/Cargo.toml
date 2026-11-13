@@ -107,6 +107,9 @@ api-key = ["dep:sha2"]
 # Static file serving + SPA fallback
 static-files = ["dep:mime_guess"]
 
+# Prometheus HTTP metrics (request counter, latency histogram, in-flight gauge)
+metrics = []
+
 # Response compression (gzip + brotli)
 compression = ["dep:flate2", "dep:brotli"]
 
