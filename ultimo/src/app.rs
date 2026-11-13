@@ -43,6 +43,8 @@ const DEFAULT_SHUTDOWN_GRACE_PERIOD: std::time::Duration = std::time::Duration::
 pub struct Ultimo {
     router: Router,
     handlers: Vec<BoxedHandler>,
+    /// Registered path pattern per handler id (parallel to `handlers`).
+    route_patterns: Vec<Arc<str>>,
     middleware: Vec<BoxedMiddleware>,
     max_body_size: Option<usize>,
     request_timeout: Option<std::time::Duration>,
@@ -73,6 +75,7 @@ impl Ultimo {
         let mut app = Self {
             router: Router::new(),
             handlers: Vec::new(),
+            route_patterns: Vec::new(),
             middleware: Vec::new(),
             max_body_size: None,
             request_timeout: None,
@@ -103,6 +106,7 @@ impl Ultimo {
         Self {
             router: Router::new(),
             handlers: Vec::new(),
+            route_patterns: Vec::new(),
             middleware: Vec::new(),
             max_body_size: None,
             request_timeout: None,
@@ -370,6 +374,7 @@ impl Ultimo {
     ) -> &mut Self {
         let handler_id = self.handlers.len();
         self.handlers.push(handler.into_handler());
+        self.route_patterns.push(Arc::from(path));
         self.router.add_route(method, path, handler_id);
         self
     }
@@ -679,6 +684,8 @@ impl Ultimo {
 
         // Create context
         let mut ctx = Context::from_parts(parts, body, params);
+        ctx.req
+            .set_route_pattern(self.route_patterns[handler_id].clone());
         ctx.set_client(client_addr, self.trust_proxy);
         let cookie_sink = ctx.set_cookies_handle();
 
