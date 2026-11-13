@@ -63,10 +63,10 @@ impl HttpBody for UltimoBody {
         cx: &mut TaskContext<'_>,
     ) -> Poll<Option<std::result::Result<Frame<Self::Data>, Self::Error>>> {
         match self.get_mut() {
-            // `Full`'s error is `Infallible`; box it to unify the error type.
+            // `Full`'s error is `Infallible`, so its error arm can't happen.
             UltimoBody::Full(f) => match Pin::new(f).poll_frame(cx) {
                 Poll::Ready(Some(Ok(frame))) => Poll::Ready(Some(Ok(frame))),
-                Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Box::new(e) as BoxError))),
+                Poll::Ready(Some(Err(never))) => match never {},
                 Poll::Ready(None) => Poll::Ready(None),
                 Poll::Pending => Poll::Pending,
             },
