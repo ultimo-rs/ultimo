@@ -27,6 +27,7 @@ pub struct Request {
     headers: hyper::HeaderMap,
     params: Params,
     body: Arc<RwLock<Option<Bytes>>>,
+    route_pattern: Option<Arc<str>>,
 }
 
 impl Request {
@@ -42,6 +43,7 @@ impl Request {
             headers: parts.headers,
             params,
             body: Arc::new(RwLock::new(Some(body))),
+            route_pattern: None,
         }
     }
 
@@ -127,6 +129,20 @@ impl Request {
     /// Get the request method
     pub fn method(&self) -> &hyper::Method {
         &self.method
+    }
+
+    /// The pattern of the route that matched this request, exactly as it was
+    /// registered (e.g. `"/users/:id"` for a request to `/users/42`).
+    ///
+    /// `None` when no route matched (e.g. an `OPTIONS` preflight handled by
+    /// middleware). Use this rather than [`path`](Self::path) for metrics or
+    /// log labels: it has bounded cardinality.
+    pub fn route_pattern(&self) -> Option<&str> {
+        self.route_pattern.as_deref()
+    }
+
+    pub(crate) fn set_route_pattern(&mut self, pattern: Arc<str>) {
+        self.route_pattern = Some(pattern);
     }
 
     /// Parse request body as JSON

@@ -65,6 +65,10 @@ jobs:
       - name: clippy (oidc, lib)
         run: cargo clippy -p ultimo --lib --features "oidc" -- -D warnings
 
+      # metrics (Prometheus) — no deps; lint lib + its integration test.
+      - name: clippy (metrics)
+        run: cargo clippy -p ultimo --lib --test metrics --features "metrics,testing" -- -D warnings
+
   # ── Unit + integration tests (no DB system deps) ──────────────────────
   test:
     name: test (${{ matrix.os }})
@@ -142,6 +146,14 @@ jobs:
       # Vary header, double-compress guard, and builder min_size override.
       - name: Compression tests (compression feature)
         run: cargo test -p ultimo --features "compression" --test compression --test streaming
+
+      # Prometheus metrics. Unit tests cover bucketing/escaping; integration
+      # tests cover route-pattern labels, error statuses, timeouts, /metrics.
+      - name: Metrics tests (metrics feature)
+        run: |
+          cargo test -p ultimo --features "metrics" --lib metrics
+          cargo test -p ultimo --features "metrics,testing" --test metrics
+          cargo test -p ultimo --features "metrics" --doc
 
       # TypeScript client generation (ts-rs type derivation). Covers the decl
       # collector, derived query/mutation, and the golden-file client test.
