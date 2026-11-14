@@ -68,6 +68,9 @@ jobs:
       # metrics (Prometheus) — no deps; lint lib + its integration test.
       - name: clippy (metrics)
         run: cargo clippy -p ultimo --lib --test metrics --features "metrics,testing" -- -D warnings
+      # OpenTelemetry tracing — lint lib + its integration test.
+      - name: clippy (otel)
+        run: cargo clippy -p ultimo --lib --test otel --features "otel,testing" -- -D warnings
 
   # ── Unit + integration tests (no DB system deps) ──────────────────────
   test:
@@ -154,6 +157,13 @@ jobs:
           cargo test -p ultimo --features "metrics" --lib metrics
           cargo test -p ultimo --features "metrics,testing" --test metrics
           cargo test -p ultimo --features "metrics" --doc
+      # OpenTelemetry server spans. Integration tests use the SDK's in-memory
+      # exporter: span shape, W3C propagation, current context, errors, timeouts.
+      - name: OpenTelemetry tests (otel feature)
+        run: |
+          cargo test -p ultimo --features "otel" --lib otel
+          cargo test -p ultimo --features "otel,testing" --test otel
+          cargo test -p ultimo --features "otel" --doc
 
       # TypeScript client generation (ts-rs type derivation). Covers the decl
       # collector, derived query/mutation, and the golden-file client test.

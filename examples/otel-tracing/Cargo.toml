@@ -1,0 +1,15 @@
+[package]
+name = "otel-tracing-example"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+publish = false
+
+[dependencies]
+ultimo = { path = "../../ultimo", features = ["otel"] }
+opentelemetry = { version = "0.33", default-features = false, features = ["trace"] }
+# `testing` provides the in-memory exporter this demo reads spans back from.
+# A real app would use `opentelemetry-otlp` with the batch exporter instead.
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace", "testing"] }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"

@@ -962,6 +962,22 @@ app.use_middleware(metrics.middleware());
 app.get("/metrics", metrics.handler());
 ```
 
+#### `Tracing` (requires `otel` feature)
+
+OpenTelemetry server spans per request, named `{method} {route}`, with HTTP
+semantic-convention attributes (`http.request.method`, `http.route`,
+`url.path`, `user_agent.original`, `http.response.status_code`, `error.type`)
+plus `ultimo.request_id`. Incoming trace context (W3C `traceparent`) is
+extracted with the global propagator, and the server span is the current
+OpenTelemetry context while handlers run. Uses the globally installed tracer
+provider (`opentelemetry` 0.33). Methods: `new()`, `with_scope_name(name)`,
+`middleware()`. See [Tracing (OpenTelemetry)](/otel).
+
+```rust
+use ultimo::otel::Tracing;
+app.use_middleware(Tracing::new().middleware());
+```
+
 ### Custom Middleware
 
 Create custom middleware by implementing the middleware function signature:
@@ -1233,6 +1249,7 @@ All features are off by default (`default = []`).
 - `api-key` - API-key authentication with a pluggable store ([API-Key Authentication](/api-keys))
 - `static-files` - Static file serving + SPA fallback (`serve_static`, `serve_spa`) ([Static Files](/static-files))
 - `metrics` - Prometheus HTTP metrics: request counter, latency histogram, in-flight gauge and a `/metrics` handler (`ultimo::metrics::Metrics`) ([Metrics](/metrics))
+- `otel` - OpenTelemetry server spans with W3C trace-context propagation (`ultimo::otel::Tracing`); adds the `opentelemetry` 0.33 API crate ([Tracing (OpenTelemetry)](/otel))
 - `compression` - Automatic gzip/brotli response compression (`compression()`, `Compression`) ([Compression](/middleware#compression))
 - `client-gen` - Derive RPC client TypeScript types from Rust types via `ts-rs`; `query`/`mutation` infer types from `#[derive(TS)]` structs (string-typed `query_with_types`/`mutation_with_types` remain as escape hatches) ([RPC](/rpc), [TypeScript Client Generation](/typescript))
 - `oidc` - Verify RS256/ES256 tokens against a provider's JWKS endpoint (`Jwt::jwks`, `Jwt::oidc`, `Jwt::jwks_from_set`) with fetch/cache/rotation ([JWT](/jwt))

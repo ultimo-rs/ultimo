@@ -56,6 +56,9 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 flate2  = { version = "1", optional = true }
 brotli  = { version = "8", optional = true }
 
+# OpenTelemetry tracing (optional) — API crate only; the app picks the SDK/exporter
+opentelemetry = { version = "0.33", default-features = false, features = ["trace"], optional = true }
+
 # Database support (optional)
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls"], optional = true }
 diesel = { version = "2.3.10", optional = true }  # >=2.3.8: RUSTSEC fix for COPY command injection + unaligned access
@@ -76,6 +79,8 @@ reqwest = { version = "0.12", features = ["json"] }
 # Offline test keys for OIDC/JWKS verification (generate an RSA keypair + JWKS).
 rsa = { version = "0.9", features = ["std"] }
 rand = "0.8"
+# In-memory span exporter + W3C propagator for the `otel` integration tests.
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace", "testing"] }
 
 [features]
 default = []
@@ -109,6 +114,9 @@ static-files = ["dep:mime_guess"]
 
 # Prometheus HTTP metrics (request counter, latency histogram, in-flight gauge)
 metrics = []
+
+# OpenTelemetry server spans + W3C trace-context propagation
+otel = ["dep:opentelemetry"]
 
 # Response compression (gzip + brotli)
 compression = ["dep:flate2", "dep:brotli"]

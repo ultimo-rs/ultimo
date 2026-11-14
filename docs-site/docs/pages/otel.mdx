@@ -1,0 +1,174 @@
+# OpenTelemetry Tracing
+
+Trace every request with [OpenTelemetry](https://opentelemetry.io/): one
+`SERVER` span per request, named by route pattern, continuing the caller's
+trace from a W3C `traceparent` header. Send the spans to Jaeger, Grafana Tempo,
+Honeycomb, Datadog or any OTLP collector. Requires the `otel` Cargo feature.
+
+```toml
+ultimo = { version = "0.9", features = ["otel"] }
+```
+
+Ultimo depends only on the [`opentelemetry`](https://docs.rs/opentelemetry)
+**API** crate. Your app picks the SDK, sampler and exporter and installs them
+globally; until it does, every span is a no-op and costs next to nothing.
+
+## Quick start (OTLP)
+
+```toml
+[dependencies]
+ultimo = { version = "0.9", features = ["otel"] }
+opentelemetry = "0.33"
+opentelemetry_sdk = "0.33"
+opentelemetry-otlp = "0.33"   # HTTP/protobuf exporter, port 4318
+tokio = { version = "1", features = ["full"] }
+```
+
+```rust
+use opentelemetry::global;
+use opentelemetry_sdk::propagation::TraceContextPropagator;
+use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry_sdk::Resource;
+use ultimo::otel::Tracing;
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    // 1. Install an SDK and the W3C propagator once, at startup.
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_http()
+        .build()
+        .expect("OTLP exporter");
+    let provider = SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(Resource::builder().with_service_name("my-api").build())
+        .build();
+    global::set_tracer_provider(provider.clone());
+    global::set_text_map_propagator(TraceContextPropagator::new());
+
+    // 2. Register the middleware first so the span covers the whole chain.
+    let mut app = Ultimo::new();
+    app.use_middleware(Tracing::new().middleware());
+
+    app.get("/users/:id", |ctx: Context| async move {
+        ctx.json(json!({ "id": ctx.req.param("id")? })).await
+    });
+
+    let result = app.listen_with_shutdown("0.0.0.0:3000", ultimo::shutdown_signal()).await;
+    // 3. Flush buffered spans before exiting.
+    let _ = provider.shutdown();
+    result
+}
+```
+
+The exporter reads the standard `OTEL_EXPORTER_OTLP_ENDPOINT` /
+`OTEL_EXPORTER_OTLP_HEADERS` environment variables, so the same binary can
+point at a local collector or a hosted backend.
+
+:::warning
+Use the same `opentelemetry` version as Ultimo (**0.33**). OpenTelemetry's
+globals are per crate version: a provider installed through a different
+version isn't seen by Ultimo, and its spans silently stay no-ops.
+:::
+
+## What's recorded
+
+Spans follow the
+[HTTP semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-spans/):
+
+| Field                         | Value                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| Span name                     | `{method} {route}`, e.g. `GET /users/:id` (just `{method}` when no route matched)              |
+| Span kind                     | `SERVER`                                                                                       |
+| `http.request.method`         | `GET`, `POST`, … (`_OTHER` for non-standard methods, plus `http.request.method_original`)      |
+| `http.route`                  | the registered pattern (`/users/:id`), never the raw path                                      |
+| `url.path`                    | the raw request path (`/users/42`)                                                             |
+| `user_agent.original`         | the `User-Agent` header, if sent                                                               |
+| `http.response.status_code`   | the response status                                                                            |
+| `error.type`                  | the status code for 5xx, or `cancelled` if the request was dropped                             |
+| `ultimo.request_id`           | the id from the [`request_id`](/middleware) middleware, if registered                          |
+
+- **5xx responses** set the span status to `Error`. **4xx** don't: on a server
+  span they're the client's mistake, not a server failure.
+- **Timed-out or abandoned requests** (see `request_timeout`) still end their
+  span, marked `error.type = "cancelled"`.
+- **The query string isn't recorded** — it often carries tokens or personal data.
+- **Requests that match no route** never reach middleware, so 404s for unknown
+  paths produce no span.
+
+## Distributed traces
+
+With `TraceContextPropagator` installed, an incoming `traceparent` (and
+`tracestate`) header makes the server span a child of the caller's span, so a
+browser, gateway or upstream service and your Ultimo API show up in one trace.
+Without a propagator installed, every request starts a new trace.
+
+## Child spans in handlers
+
+While the rest of the middleware chain and your handler run, the server span is
+the **current** OpenTelemetry context. Spans you start there become its children:
+
+```rust
+use opentelemetry::global;
+use opentelemetry::trace::{Span, Tracer};
+
+app.get("/users/:id", |ctx: Context| async move {
+    let mut span = global::tracer("my-api").start("db.load_user");
+    let user = load_user(ctx.req.param("id")?).await?;
+    span.end();
+    ctx.json(user).await
+});
+```
+
+Need the trace id, say for an error page or a log line?
+
+```rust
+use opentelemetry::trace::TraceContextExt;
+
+let trace_id = opentelemetry::Context::current()
+    .span()
+    .span_context()
+    .trace_id()
+    .to_string();
+```
+
+Work you `tokio::spawn` doesn't inherit the context automatically. Capture
+`opentelemetry::Context::current()` and wrap the task with
+`opentelemetry::context::FutureExt::with_context`.
+
+## Correlating with logs and request ids
+
+Register [`request_id()`](/middleware) after the tracing middleware and each
+span carries `ultimo.request_id`, the same value returned in the
+`X-Request-Id` response header and by `ctx.request_id()`. To put trace ids on
+your `tracing` log lines, add
+[`tracing-opentelemetry`](https://docs.rs/tracing-opentelemetry) to your
+subscriber.
+
+## Custom scope name
+
+Spans are reported under the instrumentation scope `ultimo`. To use your own:
+
+```rust
+app.use_middleware(Tracing::with_scope_name("my-api").middleware());
+```
+
+## Metrics
+
+Tracing pairs with the [`metrics` feature](/metrics), which serves request
+counts and latency histograms to Prometheus. Use both: metrics to see that
+something is slow, traces to see why.
+
+## Example
+
+[`examples/otel-tracing`](https://github.com/ultimo-rs/ultimo/tree/main/examples/otel-tracing)
+is a browser page that sends requests with a fresh `traceparent` and lists the
+resulting spans (server span plus a child span from the handler), using an
+in-memory exporter so it runs without a collector:
+
+```bash
+cargo run -p otel-tracing-example
+```
+
+See also: [Metrics](/metrics) · [Middleware](/middleware) ·
+[Deployment](/deployment) · [API Reference](/api-reference).
