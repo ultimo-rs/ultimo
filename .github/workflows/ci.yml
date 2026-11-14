@@ -71,6 +71,9 @@ jobs:
       # OpenTelemetry tracing — lint lib + its integration test.
       - name: clippy (otel)
         run: cargo clippy -p ultimo --lib --test otel --features "otel,testing" -- -D warnings
+      # OAuth2 / OIDC login flow — lint lib + its integration test.
+      - name: clippy (oauth2)
+        run: cargo clippy -p ultimo --lib --test oauth2 --features "oauth2,testing" -- -D warnings
       # Redis stores — lint lib + its integration test (tests run in `test-redis`).
       - name: clippy (redis)
         run: cargo clippy -p ultimo --lib --test redis --features "redis,session,testing" -- -D warnings
@@ -160,6 +163,14 @@ jobs:
           cargo test -p ultimo --features "metrics" --lib metrics
           cargo test -p ultimo --features "metrics,testing" --test metrics
           cargo test -p ultimo --features "metrics" --doc
+      # OAuth2 / OIDC login. Integration tests run a fake provider on a local
+      # port: discovery, PKCE token exchange, ID-token/nonce checks, userinfo,
+      # state + open-redirect guards, session rotation.
+      - name: OAuth2 tests (oauth2 feature)
+        run: |
+          cargo test -p ultimo --features "oauth2" --lib auth::oauth2
+          cargo test -p ultimo --features "oauth2,testing" --test oauth2
+          cargo test -p ultimo --features "oauth2" --doc oauth2
       # OpenTelemetry server spans. Integration tests use the SDK's in-memory
       # exporter: span shape, W3C propagation, current context, errors, timeouts.
       - name: OpenTelemetry tests (otel feature)

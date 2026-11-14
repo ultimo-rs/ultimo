@@ -31,10 +31,6 @@ a stable **1.0**.
 
 - 🗜️ **WebSocket compression** — per-message deflate (RFC 7692).
 
-### Auth & sessions
-
-- 🔐 **OAuth2** — provider integration on top of the existing JWT/API-key auth.
-
 ### Production-readiness
 
 - ~~📦 **Deployment guides** — Docker, Fly.io/Railway, AWS, DigitalOcean, Azure,
@@ -135,7 +131,7 @@ version number yet.
 | Typed Handler Extractors + Validation                   | ✅ Available     | 0.7.0                                |
 | Server-Sent Events (transport)                          | ✅ Available     | 0.9.1                                |
 | Typed RPC Subscriptions (derived TS types)              | 📋 Planned       | post-1.0                             |
-| OAuth2                                                  | 📋 Planned       | Real-Time, Auth & Production Gaps    |
+| OAuth2 / OIDC Login (`oauth2` feature)                  | ✅ Available     | 0.9.8                                |
 | Auth Providers (OIDC/JWKS)                              | ✅ Available     | 0.7.0                                |
 | Prometheus Metrics (`metrics` feature)                  | ✅ Available     | 0.9.5                                |
 | OpenTelemetry Tracing (`otel` feature)                  | ✅ Available     | 0.9.6                                |
@@ -247,7 +243,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
 - ✅ **Typed handler extractors + validation-from-types** (type-safe input; `Path`/`Query`/`Json`/`Valid`, 400/422)
 - ✅ Server-Sent Events transport (typed event types derived for the client are post-1.0)
-- OAuth2 provider integration
+- ✅ **OAuth2 / OIDC login** — authorization code + PKCE, OIDC ID-token verification, GitHub preset, session sign-in (`oauth2` feature)
 - ✅ **Auth providers (OIDC/JWKS)** — RS256/ES256 + remote JWKS (fetch/cache/
   rotation), OIDC discovery, cookbook for Clerk / Cognito / Auth0 / Supabase
   (`oidc` feature)

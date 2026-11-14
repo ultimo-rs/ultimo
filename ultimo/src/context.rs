@@ -461,6 +461,12 @@ impl Context {
             .expect("session middleware not installed (add `session(store, config)`)")
     }
 
+    /// The session, or `None` if the session middleware isn't installed.
+    #[cfg(feature = "oauth2")]
+    pub(crate) async fn session_opt(&self) -> Option<crate::session::Session> {
+        self.session.read().await.clone()
+    }
+
     /// Attach a session to this context (used by the session middleware).
     #[cfg(feature = "session")]
     pub(crate) async fn set_session(&self, s: crate::session::Session) {

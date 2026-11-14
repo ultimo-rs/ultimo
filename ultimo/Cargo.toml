@@ -109,6 +109,9 @@ jwt = ["dep:jsonwebtoken"]
 # OIDC/JWKS verification (RS256/ES256 against a provider's JWKS endpoint)
 oidc = ["jwt", "dep:reqwest", "jsonwebtoken/use_pem"]
 
+# OAuth2 / OIDC login (authorization code + PKCE) with session-backed sign-in
+oauth2 = ["oidc", "session", "dep:sha2"]
+
 # API-key authentication middleware (pluggable store, SHA-256 hashed keys)
 api-key = ["dep:sha2"]
 

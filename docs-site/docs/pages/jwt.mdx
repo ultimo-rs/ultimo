@@ -96,6 +96,11 @@ do when `ctx.jwt_claims()` is `None`.
 
 ## OIDC providers (JWKS)
 
+:::tip
+This section verifies **API bearer tokens** issued by a provider. To let browser
+users **sign in** with Google, GitHub, Okta, … use [OAuth2 / Social Login](/oauth2).
+:::
+
 Verify tokens issued by an OIDC provider (Clerk, Auth0, Cognito, Supabase, …)
 against its published **JWKS** — RS256/ES256 public keys, fetched and cached.
 Requires the `oidc` feature:

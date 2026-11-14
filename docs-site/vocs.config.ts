@@ -82,6 +82,10 @@ export default defineConfig({
               link: "/jwt",
             },
             {
+              text: "OAuth2 / Social Login",
+              link: "/oauth2",
+            },
+            {
               text: "API Keys",
               link: "/api-keys",
             },

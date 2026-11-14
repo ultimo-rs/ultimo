@@ -189,43 +189,53 @@ impl Jwt {
                     .map_err(|e| UltimoError::Unauthorized(format!("invalid JWT: {e}")))
             }
             #[cfg(feature = "oidc")]
-            KeySource::Jwks(client) => {
-                let header = decode_header(token)
-                    .map_err(|e| UltimoError::Unauthorized(format!("invalid JWT header: {e}")))?;
-                // Only asymmetric algorithms are valid against JWKS public keys.
-                // Rejecting HS*/none prevents the classic algorithm-confusion
-                // attack (an attacker signing HS256 with the RSA public key).
-                if !matches!(
-                    header.alg,
-                    Algorithm::RS256
-                        | Algorithm::RS384
-                        | Algorithm::RS512
-                        | Algorithm::PS256
-                        | Algorithm::PS384
-                        | Algorithm::PS512
-                        | Algorithm::ES256
-                        | Algorithm::ES384
-                        | Algorithm::EdDSA
-                ) {
-                    return Err(UltimoError::Unauthorized(format!(
-                        "unsupported JWT algorithm for JWKS: {:?}",
-                        header.alg
-                    )));
-                }
-                let kid = header
-                    .kid
-                    .ok_or_else(|| UltimoError::Unauthorized("JWT missing 'kid'".into()))?;
-                let key = client.decoding_key(&kid).await?;
-                // Pin the validation to exactly this token's algorithm (one
-                // family), preserving iss/aud/exp/leeway from the builder.
-                let mut validation = self.validation.clone();
-                validation.algorithms = vec![header.alg];
-                jwt_decode::<serde_json::Value>(token, &key, &validation)
-                    .map(|d| d.claims)
-                    .map_err(|e| UltimoError::Unauthorized(format!("invalid JWT: {e}")))
-            }
+            KeySource::Jwks(client) => verify_with_jwks(client, token, &self.validation).await,
         }
     }
+}
+
+/// Verify `token` against `client`'s keys. Only asymmetric algorithms are
+/// accepted, and validation is pinned to exactly the token header's algorithm
+/// (keeping iss/aud/exp/leeway/required claims from `validation`).
+#[cfg(feature = "oidc")]
+pub(crate) async fn verify_with_jwks(
+    client: &JwksClient,
+    token: &str,
+    validation: &Validation,
+) -> Result<serde_json::Value> {
+    let header = decode_header(token)
+        .map_err(|e| UltimoError::Unauthorized(format!("invalid JWT header: {e}")))?;
+    // Only asymmetric algorithms are valid against JWKS public keys.
+    // Rejecting HS*/none prevents the classic algorithm-confusion
+    // attack (an attacker signing HS256 with the RSA public key).
+    if !matches!(
+        header.alg,
+        Algorithm::RS256
+            | Algorithm::RS384
+            | Algorithm::RS512
+            | Algorithm::PS256
+            | Algorithm::PS384
+            | Algorithm::PS512
+            | Algorithm::ES256
+            | Algorithm::ES384
+            | Algorithm::EdDSA
+    ) {
+        return Err(UltimoError::Unauthorized(format!(
+            "unsupported JWT algorithm for JWKS: {:?}",
+            header.alg
+        )));
+    }
+    let kid = header
+        .kid
+        .ok_or_else(|| UltimoError::Unauthorized("JWT missing 'kid'".into()))?;
+    let key = client.decoding_key(&kid).await?;
+    // Pin the validation to exactly this token's algorithm (one
+    // family), preserving iss/aud/exp/leeway from the builder.
+    let mut validation = validation.clone();
+    validation.algorithms = vec![header.alg];
+    jwt_decode::<serde_json::Value>(token, &key, &validation)
+        .map(|d| d.claims)
+        .map_err(|e| UltimoError::Unauthorized(format!("invalid JWT: {e}")))
 }
 
 use crate::Context;
