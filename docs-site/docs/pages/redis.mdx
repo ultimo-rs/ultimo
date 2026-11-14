@@ -1,0 +1,155 @@
+# Redis
+
+Run several instances of your app behind a load balancer and they need to agree
+on two things: who is logged in, and how many requests a client has made. The
+`redis` feature adds Redis-backed stores for both:
+
+- **`RedisSessionStore`** — a [`SessionStore`](/sessions#custom-stores) for the
+  `session` middleware.
+- **`RedisRateLimitStore`** — a shared bucket store for
+  [`RateLimiter`](/api-reference).
+
+```toml
+ultimo = { version = "0.9", features = ["redis", "session"] }
+```
+
+:::warning
+The `redis` feature uses the [`redis`](https://docs.rs/redis) crate's 1.x line,
+which needs **Rust 1.88**. The rest of Ultimo keeps its 1.86 MSRV. The rate-limit
+script needs **Redis 5+** (or a compatible server such as Valkey or DragonflyDB).
+:::
+
+## Quick start
+
+```rust
+use ultimo::prelude::*;
+use ultimo::middleware::builtin::RateLimiter;
+use ultimo::redis::{connect, RedisRateLimitStore, RedisSessionStore};
+use ultimo::session::{session, SessionConfig};
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    // One connection for the whole app: multiplexed, cheap to clone, and it
+    // reconnects on its own after a Redis restart.
+    let conn = connect(&std::env::var("REDIS_URL").unwrap()).await?;
+
+    let mut app = Ultimo::new();
+    app.use_middleware(session(
+        RedisSessionStore::new(conn.clone()),
+        SessionConfig::default(),
+    ));
+    app.use_middleware(
+        RateLimiter::new(100, 60)
+            .store(RedisRateLimitStore::new(conn))
+            .build(),
+    );
+
+    app.get("/me", |ctx: Context| async move {
+        let uid: Option<u64> = ctx.session().await.get("uid").await?;
+        ctx.json(json!({ "uid": uid })).await
+    });
+
+    app.listen("0.0.0.0:3000").await
+}
+```
+
+`connect` fails if Redis can't be reached at startup, so a misconfigured
+`REDIS_URL` stops the app instead of serving without shared state.
+
+## Sessions
+
+Each session is stored as a JSON string under `ultimo:session:{id}` and expires
+with the session's TTL (`SessionConfig::ttl`), so Redis cleans up abandoned
+sessions on its own — no sweeper task, no unbounded growth.
+
+```rust
+let store = RedisSessionStore::new(conn).prefix("myapp:session:");
+```
+
+If Redis errors while **loading** a session, the request carries on as if the
+user had no session (they appear logged out) and the error is logged with
+`tracing`. A failed **save** is logged too; the response is still sent.
+
+## Rate limiting
+
+`RedisRateLimitStore` runs the same token-bucket algorithm as the in-memory
+limiter, in one atomic Lua script timed by the Redis server's clock, so
+instances with slightly different clocks still agree. Buckets live under
+`ultimo:ratelimit:{scope}:{key}` and expire once they would have refilled.
+
+```rust
+// Shared across every instance: 5 login attempts per minute per IP.
+app.use_middleware(
+    RateLimiter::new(5, 60)
+        .scope("login")
+        .store(RedisRateLimitStore::new(conn.clone()))
+        .build(),
+);
+```
+
+**Scopes.** Bucket keys start with a scope so limiters sharing one store don't
+mix their counts. The default scope is the limit itself (`5/60s`), so limiters
+with different limits never collide; give limiters with the *same* limit (say,
+on two different routes) their own `.scope("…")`.
+
+**When Redis is down** the store **fails open**: requests are allowed and the
+error is logged, so a Redis outage costs you rate limiting, not your API. For
+endpoints where that's the wrong trade (login, password reset), reject instead:
+
+```rust
+let store = RedisRateLimitStore::new(conn).fail_closed(); // 429 if Redis is unreachable
+```
+
+## Your own store
+
+The rate limiter accepts any `RateLimitStore`, so you can back it with
+something other than Redis:
+
+```rust
+use std::time::Duration;
+use ultimo::middleware::builtin::RateLimitStore;
+
+#[async_trait::async_trait]
+impl RateLimitStore for MyStore {
+    async fn try_acquire(&self, key: &str, max_requests: u64, window: Duration) -> bool {
+        /* take one token from `key`'s bucket */
+    }
+}
+```
+
+`MemoryRateLimitStore` (the default) is public too, if you want several
+limiters to share one in-process store.
+
+## TLS, clusters and pools
+
+`ultimo::redis::client` re-exports the `redis` crate, so you can build the
+`ConnectionManager` yourself — for example with `rediss://` URLs after enabling
+one of its TLS features in your own `Cargo.toml`:
+
+```toml
+redis = { version = "1", features = ["tokio-rustls-comp"] }
+```
+
+```rust
+let client = ultimo::redis::client::Client::open("rediss://my-redis:6380")
+    .expect("valid Redis URL");
+let conn = client
+    .get_connection_manager()
+    .await
+    .expect("connect to Redis");
+```
+
+## Example
+
+[`examples/redis`](https://github.com/ultimo-rs/ultimo/tree/main/examples/redis)
+runs two instances of one app (ports 3000 and 3001) against the same Redis: log
+in on one and you're logged in on the other, and a burst of requests split
+across both hits one shared rate limit.
+
+```bash
+docker run --rm -p 6379:6379 redis:7-alpine
+REDIS_URL=redis://127.0.0.1:6379 cargo run -p redis-example
+```
+
+See also: [Sessions](/sessions) · [Security](/security) ·
+[Deployment](/deployment) · [API Reference](/api-reference).

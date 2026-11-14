@@ -131,6 +131,10 @@ export default defineConfig({
           text: "Tracing (OpenTelemetry)",
           link: "/otel",
         },
+        {
+          text: "Redis",
+          link: "/redis",
+        },
       ],
     },
     {

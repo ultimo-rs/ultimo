@@ -131,7 +131,9 @@ impl SessionStore for MyStore {
 }
 ```
 
-Redis and SQL stores are planned follow-ups.
+For several instances behind a load balancer, use the built-in
+[`RedisSessionStore`](/redis) (`redis` feature) so every instance sees the same
+sessions. A SQL store is a planned follow-up.
 
 ## Full example
 
