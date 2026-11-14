@@ -10,7 +10,7 @@ mod examples;
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{ServerCapabilities, ServerInfo};
+use rmcp::model::{ServerCapabilities, ServerConfig};
 use rmcp::transport::stdio;
 use rmcp::{schemars, tool, tool_handler, tool_router, ServerHandler, ServiceExt};
 use serde::Deserialize;
@@ -271,9 +271,9 @@ fn collect_files(root: &Path, dir: &Path, out: &mut Vec<String>) {
 
 #[tool_handler]
 impl ServerHandler for UltimoMcp {
-    fn get_info(&self) -> ServerInfo {
-        // `ServerInfo` is `#[non_exhaustive]`, so build via Default + field set.
-        let mut info = ServerInfo::default();
+    fn get_info(&self) -> ServerConfig {
+        // `ServerConfig` is `#[non_exhaustive]`, so build via Default + field set.
+        let mut info = ServerConfig::default();
         info.instructions = Some(
             "Tools for building apps with the Ultimo Rust web framework: search the docs, \
              read examples, scaffold projects, and introspect a project's typed RPC surface."

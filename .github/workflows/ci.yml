@@ -247,12 +247,14 @@ jobs:
         with:
           tool: cargo-audit
       - name: cargo audit (committed Cargo.lock)
-        # Keep in sync with deny.toml's [advisories].ignore — same two
-        # advisories (idna, rsa), no compatible fixed version available yet.
+        # Keep in sync with deny.toml's [advisories].ignore (reasons there):
+        # idna, rsa, crypto-bigint, libsqlite3-sys — no compatible fix yet.
         run: |
           cargo audit \
             --ignore RUSTSEC-2024-0421 \
-            --ignore RUSTSEC-2023-0071
+            --ignore RUSTSEC-2023-0071 \
+            --ignore RUSTSEC-2026-0387 \
+            --ignore RUSTSEC-2026-0459
 
   # ── Supply-chain checks (cargo-deny) ──────────────────────────────────
   # Advisories (RUSTSEC), banned/duplicate deps, and source pinning. License

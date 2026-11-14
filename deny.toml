@@ -11,6 +11,13 @@ version = 2
 ignore = [
   "RUSTSEC-2024-0421", # idna
   "RUSTSEC-2023-0071", # rsa
+  # No semver-compatible fix; both need major dependency bumps tracked for 0.10.
+  # crypto-bigint 0.5 (via jsonwebtoken 10 -> p256): Ultimo only *signs* HS256;
+  # ES256 is used solely to verify OIDC tokens (public inputs). Fix: jsonwebtoken 11.
+  "RUSTSEC-2026-0387", # crypto-bigint
+  # libsqlite3-sys 0.30 (via sqlx 0.8 / diesel 2.3): fix needs sqlx 0.9, which
+  # changes the public `ctx.sqlx()` pool type — a breaking (0.10) release.
+  "RUSTSEC-2026-0459", # libsqlite3-sys (C SQLite CVE)
   # Unmaintained (not vulnerabilities) transitive deps — low risk, no control.
   "RUSTSEC-2024-0370", # proc-macro-error
   "RUSTSEC-2024-0384", # instant (via notify)
