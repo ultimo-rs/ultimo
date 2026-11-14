@@ -41,7 +41,7 @@ the framework is 100% safe Rust (`#![forbid(unsafe_code)]`).
 - 🔌 **WebSockets** — RFC 6455 with a built-in pub/sub system (zero extra deps).
 - 🌊 **Streaming responses** — chunked/streaming bodies via `ctx.stream(...)`.
 - 📡 **Server-Sent Events** — typed server→client push via `ctx.sse(...)` + `EventSource`.
-- 🔐 **Auth, built in** — JWT, API-key and HTTP Basic auth middleware plus scope-based [authorization guards](https://docs.ultimo.dev/authorization).
+- 🔐 **Auth, built in** — "Sign in with Google/GitHub/…" ([OAuth2 + OIDC login](https://docs.ultimo.dev/oauth2) with PKCE), JWT, API-key and HTTP Basic auth middleware, plus scope-based [authorization guards](https://docs.ultimo.dev/authorization).
 - 🛡️ **Secure by default** — 100% safe Rust, secure sessions/cookies, CSRF, security-headers middleware, request body-size limits, and supply-chain CI.
 - ⚡ **Fast** — native Rust on the Hyper + Tokio core, O(1) constant-time routing, benchmarks regression-guarded in CI ([details](https://docs.ultimo.dev/performance)).
 - 📈 **Prometheus metrics** — request counter, latency histogram and in-flight gauge labelled by route pattern, served from `/metrics` with zero extra dependencies ([details](https://docs.ultimo.dev/metrics)).
@@ -126,6 +126,7 @@ Everything is opt-in (`default = []`):
 | `redis`                                              | Redis session store + shared rate-limit store (Rust 1.88+)        |
 | `client-gen`                                         | Derive RPC client TypeScript types from Rust types (via `ts-rs`)  |
 | `oidc`                                               | Verify OIDC/JWKS (RS256/ES256) tokens — Clerk, Auth0, Cognito, Supabase |
+| `oauth2`                                             | "Sign in with …" login: OAuth2 + PKCE, OIDC ID tokens, sessions   |
 | `testing`                                            | In-process `TestClient`, assertions, fixtures                     |
 | `test-helpers`                                       | WebSocket test helpers (for integration tests)                    |
 | `sqlx-postgres` · `sqlx-mysql` · `sqlx-sqlite`       | SQLx integration per backend                                      |

@@ -2266,6 +2266,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "oauth2-login-example"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "serde_urlencoded",
+ "tokio",
+ "ultimo",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

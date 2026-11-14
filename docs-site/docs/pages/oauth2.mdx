@@ -1,0 +1,199 @@
+# OAuth2 / Social Login
+
+Add "Sign in with Google / GitHub / Microsoft / Okta / …" with two routes. Ultimo
+runs the [OAuth2 authorization-code flow](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1)
+with [PKCE](https://datatracker.ietf.org/doc/html/rfc7636), verifies
+[OpenID Connect](https://openid.net/specs/openid-connect-core-1_0.html) ID
+tokens, and signs the user into a [session](/sessions). Requires the `oauth2`
+feature (it enables `oidc` and `session`).
+
+```toml
+ultimo = { version = "0.9", features = ["oauth2"] }
+```
+
+:::tip
+This is **login for browser users** of your app. To protect an API with bearer
+tokens issued by a provider (Auth0, Clerk, Cognito, …), use
+[`Jwt::oidc`](/jwt#oidc-providers-jwks) instead.
+:::
+
+## Quick start (OpenID Connect)
+
+```rust
+use ultimo::prelude::*;
+use ultimo::auth::oauth2::OAuth2;
+use ultimo::session::{session, MemoryStore, SessionConfig};
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    // Fetches https://accounts.google.com/.well-known/openid-configuration once.
+    let google = OAuth2::discover(
+        "https://accounts.google.com",
+        std::env::var("GOOGLE_CLIENT_ID").unwrap(),
+        std::env::var("GOOGLE_CLIENT_SECRET").unwrap(),
+        "https://myapp.example/auth/callback", // registered with the provider
+    )
+    .await?;
+
+    let mut app = Ultimo::new();
+    app.use_middleware(session(MemoryStore::new(), SessionConfig::default()));
+
+    app.get("/auth/login", google.login_handler());
+    app.get("/auth/callback", google.callback_handler());
+
+    app.get("/me", |ctx: Context| async move {
+        match OAuth2::current_user(&ctx).await? {
+            Some(user) => ctx.json(json!({ "id": user.subject, "email": user.email })).await,
+            None => Err(UltimoError::Unauthorized("not signed in".into())),
+        }
+    });
+    app.post("/logout", |ctx: Context| async move {
+        ctx.session().await.destroy();
+        ctx.redirect("/").await
+    });
+
+    app.listen("0.0.0.0:3000").await
+}
+```
+
+Link to `/auth/login?return_to=/dashboard` and the user comes back to
+`/dashboard` once signed in.
+
+`OAuth2::discover` works with any OpenID Connect provider:
+
+| Provider              | Issuer                                                        |
+| --------------------- | ------------------------------------------------------------- |
+| Google                | `https://accounts.google.com`                                 |
+| Microsoft Entra ID    | `https://login.microsoftonline.com/{tenant-id}/v2.0`          |
+| Auth0                 | `https://{tenant}.auth0.com/`                                 |
+| Okta                  | `https://{org}.okta.com` (or `/oauth2/default`)               |
+| Keycloak              | `https://{host}/realms/{realm}`                               |
+| AWS Cognito           | `https://cognito-idp.{region}.amazonaws.com/{user-pool-id}`   |
+| GitLab                | `https://gitlab.com`                                          |
+
+## GitHub and other plain OAuth2 providers
+
+GitHub doesn't speak OpenID Connect, so there's a preset that identifies the
+user through GitHub's API instead:
+
+```rust
+let github = OAuth2::github(client_id, client_secret, "https://myapp.example/auth/callback");
+```
+
+For any other OAuth2 provider, give its endpoints. The user is identified by
+calling `userinfo_url` with the access token (`sub` or `id` becomes the user's
+`subject`):
+
+```rust
+use ultimo::auth::oauth2::{OAuth2, Provider};
+
+let discord = OAuth2::new(
+    Provider {
+        authorization_url: "https://discord.com/oauth2/authorize".into(),
+        token_url: "https://discord.com/api/oauth2/token".into(),
+        userinfo_url: Some("https://discord.com/api/users/@me".into()),
+    },
+    client_id,
+    client_secret,
+    "https://myapp.example/auth/callback",
+)
+.scopes(["identify", "email"]);
+```
+
+## What happens
+
+1. **`/auth/login`** generates a random `state`, a PKCE verifier and (for OIDC)
+   a `nonce`, stores them in the session and redirects to the provider.
+2. The user signs in and approves; the provider redirects to your callback with
+   a one-time `code`.
+3. **`/auth/callback`**:
+   - rejects the request unless `state` matches this session's login attempt
+     (CSRF protection). Each attempt can be used **once**;
+   - exchanges the code for tokens, proving with the PKCE verifier that it's
+     the same client that started the login;
+   - **OIDC:** verifies the ID token: signature (provider JWKS, cached and
+     rotated), `iss`, `aud` = your client id, `exp`, and `nonce` = this login's
+     nonce. **Plain OAuth2:** fetches the userinfo endpoint;
+   - **rotates the session id** (session-fixation defense) and signs the user
+     in;
+   - redirects to `return_to`.
+
+`return_to` only accepts same-site paths (`/dashboard?tab=2`). Anything else
+(`https://evil.example`, `//evil.example`, …) becomes `/`, so the login route
+can't be used as an open redirect.
+
+## The signed-in user
+
+```rust
+pub struct OAuthUser {
+    pub subject: String,        // stable provider user id — key your users on this
+    pub email: Option<String>,
+    pub name: Option<String>,   // name, else preferred_username / login
+    pub claims: serde_json::Value, // full ID-token claims or userinfo response
+}
+```
+
+`OAuth2::current_user(&ctx)` returns it from the session (`None` when signed
+out). Sign out by destroying the session: `ctx.session().await.destroy()`.
+
+:::warning
+Key your users on `subject` (plus which provider), not `email`. Emails change,
+and not every provider verifies them — check the `email_verified` claim in
+`user.claims` before trusting an address for account linking.
+:::
+
+## Custom login handling
+
+`on_login` replaces the default "store the user, redirect to `return_to`" step.
+Use it to create or look up your own user record, restrict who can sign in, or
+keep the provider's tokens:
+
+```rust
+let github = OAuth2::github(id, secret, redirect).on_login(|ctx, login| async move {
+    // login.user: OAuthUser · login.tokens: access/refresh/id tokens · login.return_to
+    let user = db_upsert_user("github", &login.user).await?;
+    ctx.session().await.set("user_id", &user.id).await?;
+    ctx.redirect(&login.return_to).await
+});
+```
+
+The session id has already been rotated when the hook runs. Return an error
+(e.g. `UltimoError::Forbidden`) to refuse the login, or call
+`OAuth2::sign_in(&ctx, &login.user)` to keep the default sign-in alongside your
+own logic. Tokens are never stored by Ultimo unless you store them.
+
+## Configuration
+
+| Method                             | Effect                                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `.scopes([...])`                   | Replace the requested scopes (OIDC default `openid email profile`; keep `openid`)      |
+| `.client_secret_basic()`           | Send client credentials as HTTP Basic auth (default: in the form body)                  |
+| `.on_login(hook)`                  | Custom handling of a successful login                                                   |
+
+## Requirements and gotchas
+
+- **Session cookie `SameSite=Lax`** (the default). The provider redirects back
+  with a cross-site top-level navigation; a `Strict` cookie isn't sent there and
+  every callback fails the `state` check.
+- **Several instances?** Use a shared session store such as
+  [`RedisSessionStore`](/redis), or the callback may land on an instance that
+  never saw the login start.
+- **`redirect_uri` must match exactly** what you registered with the provider,
+  scheme and trailing slash included.
+- **Serve over HTTPS in production.** `SessionConfig::default()` marks the
+  cookie `Secure`; use `.secure(false)` only for local `http://` development.
+- Starting a second login in another tab replaces the first attempt's `state`,
+  so finishing the first one then fails — start again.
+
+## Example
+
+[`examples/oauth2-login`](https://github.com/ultimo-rs/ultimo/tree/main/examples/oauth2-login)
+signs in with GitHub or any OIDC provider from environment variables, and falls
+back to a built-in mock provider so it runs with no setup:
+
+```bash
+cargo run -p oauth2-login-example
+```
+
+See also: [Sessions](/sessions) · [JWT & OIDC tokens](/jwt) ·
+[Authorization](/authorization) · [Redis](/redis) · [API Reference](/api-reference).

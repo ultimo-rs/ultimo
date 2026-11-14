@@ -939,6 +939,26 @@ app.use_middleware(jwt.clone().build());
 let token = jwt.sign(&claims)?;
 ```
 
+#### `OAuth2` (requires `oauth2` feature)
+
+"Sign in with …" for browser users: the OAuth2 authorization-code flow with
+PKCE, OIDC ID-token verification (JWKS signature, `iss`, `aud`, `exp`, `nonce`)
+or userinfo lookup, session-id rotation, and a session-backed sign-in. Module
+`ultimo::auth::oauth2`. See [OAuth2 / Social Login](/oauth2).
+
+- Constructors: `OAuth2::discover(issuer, client_id, secret, redirect_uri).await` (OIDC), `OAuth2::new(Provider { authorization_url, token_url, userinfo_url }, ..)` (plain OAuth2), `OAuth2::github(..)`
+- Builder: `scopes([..])`, `client_secret_basic()`, `on_login(|ctx, OAuthLogin| async { .. })`
+- Routes: `login_handler()` (`?return_to=/path`, same-site only), `callback_handler()`
+- Session helpers: `OAuth2::current_user(&ctx) -> Result<Option<OAuthUser>>`, `OAuth2::sign_in(&ctx, &user)`
+- Types: `OAuthUser { subject, email, name, claims }`, `OAuthTokens { access_token, refresh_token, id_token, expires_in, scope, token_type }`, `OAuthLogin { user, tokens, return_to }`, `Provider`
+
+```rust
+use ultimo::auth::oauth2::OAuth2;
+let google = OAuth2::discover("https://accounts.google.com", id, secret, redirect).await?;
+app.get("/auth/login", google.login_handler());
+app.get("/auth/callback", google.callback_handler());
+```
+
 #### `ApiKey` (requires `api-key` feature)
 
 API-key auth — validates a presented key against a pluggable **`ApiKeyStore`**,
@@ -1277,6 +1297,7 @@ All features are off by default (`default = []`).
 - `otel` - OpenTelemetry server spans with W3C trace-context propagation (`ultimo::otel::Tracing`); adds the `opentelemetry` 0.33 API crate ([Tracing (OpenTelemetry)](/otel))
 - `compression` - Automatic gzip/brotli response compression (`compression()`, `Compression`) ([Compression](/middleware#compression))
 - `client-gen` - Derive RPC client TypeScript types from Rust types via `ts-rs`; `query`/`mutation` infer types from `#[derive(TS)]` structs (string-typed `query_with_types`/`mutation_with_types` remain as escape hatches) ([RPC](/rpc), [TypeScript Client Generation](/typescript))
+- `oauth2` - OAuth2 / OIDC login flow (authorization code + PKCE, ID-token verification, session sign-in) via `ultimo::auth::oauth2::OAuth2`; enables `oidc` + `session` ([OAuth2 / Social Login](/oauth2))
 - `oidc` - Verify RS256/ES256 tokens against a provider's JWKS endpoint (`Jwt::jwks`, `Jwt::oidc`, `Jwt::jwks_from_set`) with fetch/cache/rotation ([JWT](/jwt))
 - `testing` - Testing utilities: `TestClient`, assertions, helpers ([Testing](/testing))
 - `test-helpers` - WebSocket test helpers (for integration tests)

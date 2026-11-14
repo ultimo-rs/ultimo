@@ -2,6 +2,8 @@
 //!
 //! - `jwt` — stateless JWT (JSON Web Token) verification + signing (feature `jwt`).
 //! - `api_key` — API-key validation against a pluggable store (feature `api-key`).
+//! - `oauth2` — "Sign in with …" login flow: OAuth2 authorization code + PKCE,
+//!   OIDC ID-token verification, session-backed sign-in (feature `oauth2`).
 //!
 //! Both middlewares normalize their result into a [`Principal`] on the request
 //! `Context`, which the authorization guards (`Context::require_scope`, etc.)
@@ -17,6 +19,9 @@ pub use jwks::JwksClient;
 
 #[cfg(feature = "api-key")]
 pub mod api_key;
+
+#[cfg(feature = "oauth2")]
+pub mod oauth2;
 
 /// The normalized authenticated caller, populated by an auth middleware and read
 /// by the authorization guards on [`crate::Context`].
