@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.7](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.6...ultimo-v0.9.7) - 2026-11-14
+
+### Added
+
+- *(redis)* Redis session store and shared rate-limit store ([#210](https://github.com/ultimo-rs/ultimo/pull/210))
+
 ## [0.9.6](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.5...ultimo-v0.9.6) - 2026-11-14
 
 ### Added
