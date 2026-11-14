@@ -1135,6 +1135,85 @@ pub mod builtin {
         Global,
     }
 
+    /// Backing store for [`RateLimiter`] token buckets.
+    ///
+    /// The default, [`MemoryRateLimitStore`], keeps buckets in process memory —
+    /// fine for a single instance. Behind a load balancer each instance would
+    /// count separately, so use a shared store such as
+    /// `ultimo::redis::RedisRateLimitStore` (`redis` feature) to enforce one
+    /// limit across all instances.
+    // async_trait's boxed futures are already #[must_use]; newer clippy flags the expansion.
+    #[allow(clippy::double_must_use)]
+    #[async_trait::async_trait]
+    pub trait RateLimitStore: Send + Sync {
+        /// Take one token from `key`'s bucket, which holds at most
+        /// `max_requests` tokens and refills at `max_requests` per `window`.
+        /// Returns `true` if a token was available (the request is allowed).
+        async fn try_acquire(
+            &self,
+            key: &str,
+            max_requests: u64,
+            window: std::time::Duration,
+        ) -> bool;
+    }
+
+    /// In-process [`RateLimitStore`]: the default for [`RateLimiter`].
+    ///
+    /// Idle buckets are evicted once they've fully refilled, so memory stays
+    /// bounded by the number of keys active within one window.
+    #[derive(Clone, Default)]
+    pub struct MemoryRateLimitStore {
+        buckets: Arc<Mutex<HashMap<String, RateBucket>>>,
+    }
+
+    impl MemoryRateLimitStore {
+        /// An empty store.
+        pub fn new() -> Self {
+            Self::default()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl RateLimitStore for MemoryRateLimitStore {
+        async fn try_acquire(
+            &self,
+            key: &str,
+            max_requests: u64,
+            window: std::time::Duration,
+        ) -> bool {
+            let max_tokens = max_requests as f64;
+            let rate = max_tokens / window.as_secs_f64().max(f64::MIN_POSITIVE);
+            // A bucket idle this long is guaranteed to have refilled to its
+            // cap, so it's safe to evict (see `evict_stale`).
+            let idle_cutoff = window.max(std::time::Duration::from_secs(1));
+
+            let mut map = self.buckets.lock().unwrap_or_else(|e| e.into_inner());
+            let now = std::time::Instant::now();
+            let bucket = map.entry(key.to_string()).or_insert_with(|| RateBucket {
+                tokens: max_tokens,
+                last_refill: now,
+            });
+
+            // Refill tokens based on elapsed time
+            let elapsed = now.duration_since(bucket.last_refill).as_secs_f64();
+            bucket.tokens = (bucket.tokens + elapsed * rate).min(max_tokens);
+            bucket.last_refill = now;
+
+            // Try to consume a token
+            let allowed = if bucket.tokens >= 1.0 {
+                bucket.tokens -= 1.0;
+                true
+            } else {
+                false
+            };
+
+            // Bound the map's memory (anti unbounded-growth DoS).
+            evict_stale(&mut map, now, idle_cutoff);
+
+            allowed
+        }
+    }
+
     /// Per-route or global rate limiting middleware (token bucket algorithm).
     ///
     /// Limits the number of requests per time window. Returns `429 Too Many
@@ -1154,11 +1233,16 @@ pub mod builtin {
     ///         .build()
     /// );
     /// ```
+    ///
+    /// Buckets live in process memory unless you pass a shared
+    /// [`store`](Self::store) (e.g. Redis) so several instances enforce one limit.
     #[derive(Clone)]
     pub struct RateLimiter {
         max_requests: u64,
         window_secs: u64,
         key: RateLimitKey,
+        store: Option<Arc<dyn RateLimitStore>>,
+        scope: Option<String>,
     }
 
     impl RateLimiter {
@@ -1169,6 +1253,8 @@ pub mod builtin {
                 max_requests,
                 window_secs,
                 key: RateLimitKey::Ip,
+                store: None,
+                scope: None,
             }
         }
 
@@ -1178,26 +1264,43 @@ pub mod builtin {
             self
         }
 
+        /// Keep buckets in `store` instead of a private in-memory map. Use a
+        /// shared store (e.g. `ultimo::redis::RedisRateLimitStore`) to enforce
+        /// one limit across several app instances.
+        pub fn store(mut self, store: impl RateLimitStore + 'static) -> Self {
+            self.store = Some(Arc::new(store));
+            self
+        }
+
+        /// Namespace this limiter's buckets within a shared [`store`](Self::store).
+        ///
+        /// Bucket keys are `{scope}:{key}`. The default scope is derived from
+        /// the limit (e.g. `100/60s`), so limiters with different limits never
+        /// share buckets; set a scope to keep two limiters with the *same*
+        /// limit (say, on different routes) apart.
+        pub fn scope(mut self, scope: impl Into<String>) -> Self {
+            self.scope = Some(scope.into());
+            self
+        }
+
         /// Build the middleware.
         pub fn build(self) -> BoxedMiddleware {
-            let rate = self.max_requests as f64 / self.window_secs as f64;
-            let max_tokens = self.max_requests as f64;
+            let max_requests = self.max_requests;
             let window_secs = self.window_secs;
+            let window = std::time::Duration::from_secs(window_secs);
             let key_strategy = self.key;
-
-            let buckets: Arc<Mutex<HashMap<String, RateBucket>>> =
-                Arc::new(Mutex::new(HashMap::new()));
-            // A bucket idle this long is guaranteed to have refilled to its
-            // cap, so it's safe to evict (see `evict_stale`).
-            let idle_cutoff = std::time::Duration::from_secs(window_secs.max(1));
+            let store: Arc<dyn RateLimitStore> = self
+                .store
+                .unwrap_or_else(|| Arc::new(MemoryRateLimitStore::new()));
+            let scope: Arc<str> = self
+                .scope
+                .unwrap_or_else(|| format!("{max_requests}/{window_secs}s"))
+                .into();
 
             Arc::new(move |ctx, next| {
-                let buckets = buckets.clone();
+                let store = store.clone();
                 let key_strategy = key_strategy.clone();
-                let rate = rate;
-                let max_tokens = max_tokens;
-                let window_secs = window_secs;
-                let idle_cutoff = idle_cutoff;
+                let scope = scope.clone();
 
                 Box::pin(async move {
                     // Extract key
@@ -1213,33 +1316,9 @@ pub mod builtin {
                         RateLimitKey::Global => "__global__".to_string(),
                     };
 
-                    // Check/update bucket
-                    let allowed = {
-                        let mut map = buckets.lock().unwrap_or_else(|e| e.into_inner());
-                        let now = std::time::Instant::now();
-                        let bucket = map.entry(key).or_insert_with(|| RateBucket {
-                            tokens: max_tokens,
-                            last_refill: now,
-                        });
-
-                        // Refill tokens based on elapsed time
-                        let elapsed = now.duration_since(bucket.last_refill).as_secs_f64();
-                        bucket.tokens = (bucket.tokens + elapsed * rate).min(max_tokens);
-                        bucket.last_refill = now;
-
-                        // Try to consume a token
-                        let allowed = if bucket.tokens >= 1.0 {
-                            bucket.tokens -= 1.0;
-                            true
-                        } else {
-                            false
-                        };
-
-                        // Bound the map's memory (anti unbounded-growth DoS).
-                        evict_stale(&mut map, now, idle_cutoff);
-
-                        allowed
-                    };
+                    let allowed = store
+                        .try_acquire(&format!("{scope}:{key}"), max_requests, window)
+                        .await;
 
                     if allowed {
                         next(ctx).await

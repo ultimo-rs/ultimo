@@ -71,6 +71,9 @@ jobs:
       # OpenTelemetry tracing — lint lib + its integration test.
       - name: clippy (otel)
         run: cargo clippy -p ultimo --lib --test otel --features "otel,testing" -- -D warnings
+      # Redis stores — lint lib + its integration test (tests run in `test-redis`).
+      - name: clippy (redis)
+        run: cargo clippy -p ultimo --lib --test redis --features "redis,session,testing" -- -D warnings
 
   # ── Unit + integration tests (no DB system deps) ──────────────────────
   test:
@@ -211,6 +214,33 @@ jobs:
       # Testing-utilities DB rollback helper (with_test_transaction) against sqlite.
       - name: Testing-utilities DB tests (sqlite)
         run: cargo test -p ultimo --features "testing,sqlx-sqlite" --test testing_db
+
+  # ── Redis-backed stores (real Redis via a service container) ──────────
+  # tests/redis.rs returns early without REDIS_URL, so it only exercises
+  # Redis here. Linux-only: GitHub service containers don't run on macOS.
+  test-redis:
+    name: test (redis)
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Redis session + rate-limit store tests
+        run: |
+          cargo test -p ultimo --features "redis,session,testing" --test redis --test rate_limit
+          cargo test -p ultimo --features "redis,session" --doc redis
 
   # ── Minimum Supported Rust Version ────────────────────────────────────
   # Verifies the rust-version declared in Cargo.toml (single source of truth).

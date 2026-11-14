@@ -882,6 +882,14 @@ app.use_middleware(
 );
 ```
 
+Buckets live in process memory by default. `.store(impl RateLimitStore)` swaps
+in a shared store (e.g. `RedisRateLimitStore`) so several instances enforce one
+limit, and `.scope(name)` namespaces a limiter's bucket keys (`{scope}:{key}`;
+the default scope is the limit, e.g. `100/60s`).
+
+- `trait RateLimitStore` — `async fn try_acquire(&self, key: &str, max_requests: u64, window: Duration) -> bool`
+- `MemoryRateLimitStore` — the default in-process store (`new()`; `Clone` shares the buckets)
+
 #### `compression()` / `Compression` (requires `compression` feature)
 
 Automatic response compression — brotli preferred, gzip fallback. Pure Rust
@@ -976,6 +984,22 @@ provider (`opentelemetry` 0.33). Methods: `new()`, `with_scope_name(name)`,
 ```rust
 use ultimo::otel::Tracing;
 app.use_middleware(Tracing::new().middleware());
+```
+
+#### `ultimo::redis` (requires `redis` feature)
+
+Redis-backed stores for apps running several instances. Built on the `redis`
+crate 1.x (re-exported as `ultimo::redis::client`; needs Rust 1.88). See [Redis](/redis).
+
+- `connect(url) -> Result<ConnectionManager>` — open a multiplexed, auto-reconnecting connection
+- `RedisSessionStore` (also needs `session`) — `new(conn)`, `prefix(p)` (default `ultimo:session:`); implements `SessionStore`
+- `RedisRateLimitStore` — `new(conn)`, `prefix(p)` (default `ultimo:ratelimit:`), `fail_closed()`; implements `RateLimitStore`, fails open by default
+
+```rust
+use ultimo::redis::{connect, RedisRateLimitStore, RedisSessionStore};
+let conn = connect("redis://127.0.0.1:6379").await?;
+app.use_middleware(session(RedisSessionStore::new(conn.clone()), SessionConfig::default()));
+app.use_middleware(RateLimiter::new(100, 60).store(RedisRateLimitStore::new(conn)).build());
 ```
 
 ### Custom Middleware
@@ -1249,6 +1273,7 @@ All features are off by default (`default = []`).
 - `api-key` - API-key authentication with a pluggable store ([API-Key Authentication](/api-keys))
 - `static-files` - Static file serving + SPA fallback (`serve_static`, `serve_spa`) ([Static Files](/static-files))
 - `metrics` - Prometheus HTTP metrics: request counter, latency histogram, in-flight gauge and a `/metrics` handler (`ultimo::metrics::Metrics`) ([Metrics](/metrics))
+- `redis` - Redis session store and shared rate-limit store (`ultimo::redis`); needs Rust 1.88 ([Redis](/redis))
 - `otel` - OpenTelemetry server spans with W3C trace-context propagation (`ultimo::otel::Tracing`); adds the `opentelemetry` 0.33 API crate ([Tracing (OpenTelemetry)](/otel))
 - `compression` - Automatic gzip/brotli response compression (`compression()`, `Compression`) ([Compression](/middleware#compression))
 - `client-gen` - Derive RPC client TypeScript types from Rust types via `ts-rs`; `query`/`mutation` infer types from `#[derive(TS)]` structs (string-typed `query_with_types`/`mutation_with_types` remain as escape hatches) ([RPC](/rpc), [TypeScript Client Generation](/typescript))

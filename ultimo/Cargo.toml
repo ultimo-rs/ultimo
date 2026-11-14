@@ -59,6 +59,9 @@ brotli  = { version = "8", optional = true }
 # OpenTelemetry tracing (optional) — API crate only; the app picks the SDK/exporter
 opentelemetry = { version = "0.33", default-features = false, features = ["trace"], optional = true }
 
+# Redis-backed session + rate-limit stores (optional). redis 1.x needs Rust 1.88.
+redis = { version = "1", default-features = false, features = ["tokio-comp", "connection-manager", "script"], optional = true }
+
 # Database support (optional)
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls"], optional = true }
 diesel = { version = "2.3.10", optional = true }  # >=2.3.8: RUSTSEC fix for COPY command injection + unaligned access
@@ -117,6 +120,9 @@ metrics = []
 
 # OpenTelemetry server spans + W3C trace-context propagation
 otel = ["dep:opentelemetry"]
+
+# Redis session store + shared rate-limit store (`ultimo::redis`)
+redis = ["dep:redis"]
 
 # Response compression (gzip + brotli)
 compression = ["dep:flate2", "dep:brotli"]

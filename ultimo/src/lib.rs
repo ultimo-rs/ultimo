@@ -64,6 +64,9 @@ pub mod metrics;
 #[cfg(feature = "otel")]
 pub mod otel;
 
+#[cfg(feature = "redis")]
+pub mod redis;
+
 #[cfg(any(feature = "jwt", feature = "api-key"))]
 pub mod auth;
 

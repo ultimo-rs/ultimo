@@ -16,7 +16,7 @@ change is a potential breaking change. **The public API contract** — changing
 any of it requires a deliberate version bump:
 
 - Any `pub` item (types, fns, traits, enum variants, fields) and the `prelude`
-- **Cargo feature names** (`websocket`, `testing`, `session`, `csrf`, `jwt`, `oidc`, `api-key`, `static-files`, `compression`, `metrics`, `otel`, `client-gen`, `database`, `sqlx-*`, `diesel-*`, `test-helpers`) — renaming/removing breaks `features = [...]` downstream
+- **Cargo feature names** (`websocket`, `testing`, `session`, `csrf`, `jwt`, `oidc`, `api-key`, `static-files`, `compression`, `metrics`, `otel`, `redis`, `client-gen`, `database`, `sqlx-*`, `diesel-*`, `test-helpers`) — renaming/removing breaks `features = [...]` downstream
 - **MSRV** (`rust-version`) — raising it is breaking (we're at 1.86.0)
 - **Direct dependency floors** — raising one (e.g. `bytes`, `diesel`) constrains downstream resolution; a dep type re-exported in our API (e.g. `bytes::Bytes` in WebSocket messages) makes that dep's version part of _our_ API
 - CLI subcommands / flags of `ultimo-cli`
@@ -76,7 +76,7 @@ The crate is `#![forbid(unsafe_code)]` — 100% safe Rust, no `unsafe`.
 `default = []` — **everything is opt-in.** When adding code under a feature, gate
 it with `#[cfg(feature = "...")]`. Features: `websocket`, `testing`
 (TestClient/assertions/fixtures), `session`, `csrf`, `jwt`, `oidc` (implies
-`jwt`), `api-key`, `static-files`, `compression`, `metrics` (Prometheus), `otel` (OpenTelemetry tracing),
+`jwt`), `api-key`, `static-files`, `compression`, `metrics` (Prometheus), `otel` (OpenTelemetry tracing), `redis` (session + rate-limit stores; needs Rust 1.88),
 `client-gen` (ts-rs type
 derivation), `test-helpers` (exposes `websocket::test_helpers` for integration
 tests), `database` (enabled transitively by `sqlx-postgres|mysql|sqlite`,
@@ -171,8 +171,8 @@ their feature belongs to.
   OpenTelemetry tracing via `otel` shipped).
 - **Phase 10 (Distribution & DX): started.** Middleware pack shipped
   (request-id, cache-control/ETag, server-timing, basic-auth, trailing-slash).
-  Still open: Redis integration (sessions/cache/rate-limit), WebSocket
-  compression, `#[derive(UltimoType)]`.
+  Redis session + rate-limit stores shipped (`redis`). Still open: Redis
+  caching, WebSocket compression, `#[derive(UltimoType)]`.
 - **Phase 11 (Stabilization → 1.0):** end-to-end typed errors, public-API
   audit + SemVer freeze, documentation completeness, production battle-testing.
 - **Post-1.0 / demand-driven:** typed RPC subscriptions (derived SSE event
