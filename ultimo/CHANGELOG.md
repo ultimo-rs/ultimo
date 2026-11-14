@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.5...ultimo-v0.9.6) - 2026-11-14
+
+### Added
+
+- *(otel)* OpenTelemetry server spans behind the `otel` feature ([#208](https://github.com/ultimo-rs/ultimo/pull/208))
+
 ## [0.9.5](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.4...ultimo-v0.9.5) - 2026-11-14
 
 ### Added
