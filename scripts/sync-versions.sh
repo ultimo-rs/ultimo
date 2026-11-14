@@ -100,6 +100,9 @@ pick_crate_changelog() {
       return
     }
   done
+  # No crate has a section (e.g. a chore-only release). Return success: under
+  # `set -e`, a non-zero status here would abort `src=$(pick_crate_changelog)`.
+  return 0
 }
 
 # Commit titles land verbatim in the per-crate changelog (release-plz doesn't
