@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-11-14
+
+### Added
+
+- *(oauth2)* OAuth2 / OIDC "Sign in with …" login flow ([#212](https://github.com/ultimo-rs/ultimo/pull/212))
+
 ## [0.9.7] - 2026-11-14
 
 ### Added
