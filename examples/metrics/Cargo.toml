@@ -1,0 +1,11 @@
+[package]
+name = "metrics-example"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+publish = false
+
+[dependencies]
+ultimo = { path = "../../ultimo", features = ["metrics"] }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"

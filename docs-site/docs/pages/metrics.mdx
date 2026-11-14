@@ -1,0 +1,139 @@
+# Metrics (Prometheus)
+
+Expose HTTP request metrics in the
+[Prometheus text format](https://prometheus.io/docs/instrumenting/exposition_formats/)
+so Prometheus, Grafana Agent, Datadog or any OpenMetrics scraper can collect
+them. Requires the `metrics` Cargo feature and adds **no dependencies**.
+
+```toml
+ultimo = { version = "0.9", features = ["metrics"] }
+```
+
+## Quick start
+
+```rust
+use ultimo::prelude::*;
+use ultimo::metrics::Metrics;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let metrics = Metrics::new();
+    let mut app = Ultimo::new();
+
+    // Register first so latency covers the whole chain.
+    app.use_middleware(metrics.middleware());
+    app.get("/metrics", metrics.handler());
+
+    app.get("/users/:id", |ctx: Context| async move {
+        ctx.json(json!({ "id": ctx.req.param("id")? })).await
+    });
+
+    app.listen("0.0.0.0:3000").await
+}
+```
+
+`curl localhost:3000/metrics` then returns:
+
+```text
+# HELP http_requests_total Total number of HTTP requests.
+# TYPE http_requests_total counter
+http_requests_total{method="GET",route="/users/:id",status="200"} 3
+# HELP http_request_duration_seconds HTTP request latency in seconds.
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{method="GET",route="/users/:id",le="0.005"} 3
+...
+http_request_duration_seconds_bucket{method="GET",route="/users/:id",le="+Inf"} 3
+http_request_duration_seconds_sum{method="GET",route="/users/:id"} 0.000412
+http_request_duration_seconds_count{method="GET",route="/users/:id"} 3
+# HELP http_requests_in_flight HTTP requests currently being served.
+# TYPE http_requests_in_flight gauge
+http_requests_in_flight 1
+```
+
+## What's recorded
+
+| Metric                          | Type      | Labels                      |
+| ------------------------------- | --------- | --------------------------- |
+| `http_requests_total`           | counter   | `method`, `route`, `status` |
+| `http_request_duration_seconds` | histogram | `method`, `route`           |
+| `http_requests_in_flight`       | gauge     | —                           |
+
+- **`route` is the registered pattern** (`/users/:id`), never the raw path
+  (`/users/42`). Label cardinality is bounded by your route table, so a crawler
+  hitting random IDs can't blow up your Prometheus storage. The same value is
+  available to your own code as
+  [`ctx.req.route_pattern()`](/api-reference#route_patternself---optionstr).
+- **Handler errors** are counted with the status they map to (e.g. an
+  `UltimoError::Internal` is recorded as `500`).
+- **Requests that match no route** never reach middleware, so 404s for unknown
+  paths are not recorded. `OPTIONS` preflights answered by middleware (CORS)
+  are recorded with `route="unmatched"`.
+- **Timed-out requests** (see `request_timeout`) still decrement the in-flight
+  gauge.
+
+## Custom buckets
+
+The default buckets are Prometheus' own (5 ms … 10 s). Tune them to your
+latency profile:
+
+```rust
+let metrics = Metrics::with_buckets(&[0.01, 0.05, 0.1, 0.5, 1.0]);
+```
+
+## Protecting the endpoint
+
+`/metrics` is public as written. Route names and traffic volume are usually
+harmless but worth hiding on a public API — gate it with
+[Basic auth](/middleware), an [IP allow-list](/security), or serve it only on
+your internal network:
+
+```rust
+use ultimo::middleware::builtin::BasicAuth;
+
+let mut app = Ultimo::new();
+app.use_middleware(metrics.middleware());
+
+// A separate app on an internal port, for the scraper only.
+let mut admin = Ultimo::new_without_defaults();
+admin.use_middleware(BasicAuth::new("metrics").user("prometheus", "secret").build());
+admin.get("/metrics", metrics.handler());
+
+tokio::try_join!(app.listen("0.0.0.0:3000"), admin.listen("10.0.0.5:9100"))?;
+```
+
+`Metrics` is cheap to clone — every clone shares the same counters — so the
+same registry can be recorded by one app and served by another.
+
+## Scrape config
+
+```yaml
+scrape_configs:
+  - job_name: ultimo
+    static_configs:
+      - targets: ["my-api:3000"]
+```
+
+## Custom output
+
+`metrics.render()` returns the exposition text as a `String`, so you can append
+your own metrics in a handler before returning it:
+
+```rust
+use ultimo::metrics::CONTENT_TYPE;
+use ultimo::response::ResponseBuilder;
+
+app.get("/metrics", move |_ctx: Context| {
+    let metrics = metrics.clone();
+    async move {
+        let mut body = metrics.render();
+        body.push_str("# TYPE jobs_queued gauge\njobs_queued 7\n");
+        ResponseBuilder::new()
+            .header("Content-Type", CONTENT_TYPE)
+            .body(body)
+            .build()
+    }
+});
+```
+
+See also: [Middleware](/middleware) · [Deployment](/deployment) ·
+[API Reference](/api-reference).

@@ -44,6 +44,7 @@ the framework is 100% safe Rust (`#![forbid(unsafe_code)]`).
 - 🔐 **Auth, built in** — JWT, API-key and HTTP Basic auth middleware plus scope-based [authorization guards](https://docs.ultimo.dev/authorization).
 - 🛡️ **Secure by default** — 100% safe Rust, secure sessions/cookies, CSRF, security-headers middleware, request body-size limits, and supply-chain CI.
 - ⚡ **Fast** — native Rust on the Hyper + Tokio core, O(1) constant-time routing, benchmarks regression-guarded in CI ([details](https://docs.ultimo.dev/performance)).
+- 📈 **Prometheus metrics** — request counter, latency histogram and in-flight gauge labelled by route pattern, served from `/metrics` with zero extra dependencies ([details](https://docs.ultimo.dev/metrics)).
 - 🛑 **Production-ready shutdown** — `request_timeout` plus `listen_with_shutdown` drains in-flight requests (and closes WebSockets with `1001`) on `SIGTERM`/Ctrl+C.
 - 🗄️ **Databases** — first-class SQLx and Diesel integration (PostgreSQL / MySQL / SQLite).
 - 🧪 **Testing utilities** — in-process `TestClient`, response assertions, and fixtures.
@@ -118,6 +119,7 @@ Everything is opt-in (`default = []`):
 | `csrf`                                               | CSRF protection (double-submit cookie)                            |
 | `static-files`                                       | Static file serving + SPA fallback (`serve_static`, `serve_spa`)  |
 | `compression`                                        | Automatic gzip/brotli response compression (pure Rust, no C deps) |
+| `metrics`                                            | Prometheus HTTP metrics + `/metrics` handler (no extra deps)      |
 | `client-gen`                                         | Derive RPC client TypeScript types from Rust types (via `ts-rs`)  |
 | `oidc`                                               | Verify OIDC/JWKS (RS256/ES256) tokens — Clerk, Auth0, Cognito, Supabase |
 | `testing`                                            | In-process `TestClient`, assertions, fixtures                     |

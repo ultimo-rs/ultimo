@@ -16,7 +16,7 @@ change is a potential breaking change. **The public API contract** — changing
 any of it requires a deliberate version bump:
 
 - Any `pub` item (types, fns, traits, enum variants, fields) and the `prelude`
-- **Cargo feature names** (`websocket`, `testing`, `session`, `csrf`, `jwt`, `oidc`, `api-key`, `static-files`, `compression`, `client-gen`, `database`, `sqlx-*`, `diesel-*`, `test-helpers`) — renaming/removing breaks `features = [...]` downstream
+- **Cargo feature names** (`websocket`, `testing`, `session`, `csrf`, `jwt`, `oidc`, `api-key`, `static-files`, `compression`, `metrics`, `client-gen`, `database`, `sqlx-*`, `diesel-*`, `test-helpers`) — renaming/removing breaks `features = [...]` downstream
 - **MSRV** (`rust-version`) — raising it is breaking (we're at 1.86.0)
 - **Direct dependency floors** — raising one (e.g. `bytes`, `diesel`) constrains downstream resolution; a dep type re-exported in our API (e.g. `bytes::Bytes` in WebSocket messages) makes that dep's version part of _our_ API
 - CLI subcommands / flags of `ultimo-cli`
@@ -76,7 +76,8 @@ The crate is `#![forbid(unsafe_code)]` — 100% safe Rust, no `unsafe`.
 `default = []` — **everything is opt-in.** When adding code under a feature, gate
 it with `#[cfg(feature = "...")]`. Features: `websocket`, `testing`
 (TestClient/assertions/fixtures), `session`, `csrf`, `jwt`, `oidc` (implies
-`jwt`), `api-key`, `static-files`, `compression`, `client-gen` (ts-rs type
+`jwt`), `api-key`, `static-files`, `compression`, `metrics` (Prometheus),
+`client-gen` (ts-rs type
 derivation), `test-helpers` (exposes `websocket::test_helpers` for integration
 tests), `database` (enabled transitively by `sqlx-postgres|mysql|sqlite`,
 `diesel-postgres|mysql|sqlite`).
@@ -166,7 +167,7 @@ their feature belongs to.
 - **Phase 9 (Real-Time, Auth & Production Gaps): mostly shipped.** Typed
   extractors + validation, OIDC/JWKS, streaming responses, SSE transport,
   request timeouts + HTTP graceful shutdown are done. Still open: OAuth2 and
-  observability (`request_id()` shipped; OpenTelemetry + Prometheus remain).
+  OpenTelemetry (`request_id()` and Prometheus `metrics` shipped).
 - **Phase 10 (Distribution & DX): started.** Middleware pack shipped
   (request-id, cache-control/ETag, server-timing, basic-auth, trailing-slash).
   Still open: Redis integration (sessions/cache/rate-limit), WebSocket
