@@ -127,6 +127,10 @@ export default defineConfig({
           text: "Metrics (Prometheus)",
           link: "/metrics",
         },
+        {
+          text: "Tracing (OpenTelemetry)",
+          link: "/otel",
+        },
       ],
     },
     {

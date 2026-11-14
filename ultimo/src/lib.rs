@@ -61,6 +61,9 @@ pub mod csrf;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 
+#[cfg(feature = "otel")]
+pub mod otel;
+
 #[cfg(any(feature = "jwt", feature = "api-key"))]
 pub mod auth;
 

@@ -60,9 +60,9 @@ One principle throughout: a **generic capability in core**, plus **thin presets
 / adapters** and **cookbook guides** — never bundled vendor SDKs (which bloat
 dependencies and rot as each vendor's API changes).
 
-- 📈 **Observability** — OpenTelemetry traces + metrics (built on the
-  `tracing` already used internally). The Prometheus endpoint has shipped
-  (`metrics` feature, 0.9.5).
+- 📈 **Observability** — OpenTelemetry metrics (OTLP push). Prometheus
+  metrics (`metrics` feature, 0.9.5) and OpenTelemetry tracing (`otel`
+  feature, 0.9.6) have shipped.
 - 🧰 **Redis** — one integration backing sessions, the rate-limit store, and
   response/data caching.
 - 🗄️ **S3-compatible object storage** — pairs with the existing multipart
@@ -139,7 +139,8 @@ version number yet.
 | OAuth2                                                  | 📋 Planned       | Real-Time, Auth & Production Gaps    |
 | Auth Providers (OIDC/JWKS)                              | ✅ Available     | 0.7.0                                |
 | Prometheus Metrics (`metrics` feature)                  | ✅ Available     | 0.9.5                                |
-| Observability: OpenTelemetry traces + metrics           | 📋 Planned       | Real-Time, Auth & Production Gaps    |
+| OpenTelemetry Tracing (`otel` feature)                  | ✅ Available     | 0.9.6                                |
+| OpenTelemetry Metrics (OTLP push)                       | 📋 Planned       | Real-Time, Auth & Production Gaps    |
 | Streaming Responses                                     | ✅ Available     | 0.9.0                                |
 | Request Timeouts + HTTP Graceful Shutdown               | ✅ Available     | 0.9.3                                |
 | Redis (sessions · cache · rate-limit)                   | 📋 Planned       | Distribution & Dev Experience        |
@@ -251,8 +252,8 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
   rotation), OIDC discovery, cookbook for Clerk / Cognito / Auth0 / Supabase
   (`oidc` feature)
 - **Observability** — OpenTelemetry traces + metrics, Prometheus endpoint
-  _(in progress: `request_id()` middleware + request-scoped `tracing` span and
-  Prometheus metrics (`metrics` feature) shipped; OpenTelemetry next)_
+  _(mostly shipped: `request_id()` middleware, Prometheus metrics (`metrics`
+  feature) and OpenTelemetry tracing (`otel` feature); OTLP metrics push next)_
 - ✅ Streaming responses
 - ✅ **Request timeouts + HTTP graceful shutdown** — `request_timeout`, `listen_with_shutdown`, `shutdown_signal`; WebSocket clients get a `1001` close frame
 

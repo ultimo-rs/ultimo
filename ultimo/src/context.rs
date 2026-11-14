@@ -116,6 +116,12 @@ impl Request {
             .map(|s| s.to_string())
     }
 
+    /// All request headers (crate-internal; the public API is [`header`](Self::header)).
+    #[cfg_attr(not(feature = "otel"), allow(dead_code))]
+    pub(crate) fn headers_map(&self) -> &hyper::HeaderMap {
+        &self.headers
+    }
+
     /// Get the request path
     pub fn path(&self) -> &str {
         self.uri.path()
