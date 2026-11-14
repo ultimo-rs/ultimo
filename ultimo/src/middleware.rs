@@ -1241,9 +1241,20 @@ pub mod builtin {
         max_requests: u64,
         window_secs: u64,
         key: RateLimitKey,
-        store: Option<Arc<dyn RateLimitStore>>,
+        store: Option<StoreHandle>,
         scope: Option<String>,
     }
+
+    /// A shared store handle that keeps [`RateLimiter`] `UnwindSafe` +
+    /// `RefUnwindSafe` (as it was before stores were pluggable). Sound: the
+    /// limiter only reads its config, and a panic mid-`try_acquire` can't leave
+    /// a token bucket in a state that breaks later calls — at worst one token
+    /// is miscounted (the in-memory store also recovers poisoned locks).
+    #[derive(Clone)]
+    struct StoreHandle(Arc<dyn RateLimitStore>);
+
+    impl std::panic::UnwindSafe for StoreHandle {}
+    impl std::panic::RefUnwindSafe for StoreHandle {}
 
     impl RateLimiter {
         /// Create a rate limiter: `max_requests` per `window_secs` seconds.
@@ -1268,7 +1279,7 @@ pub mod builtin {
         /// shared store (e.g. `ultimo::redis::RedisRateLimitStore`) to enforce
         /// one limit across several app instances.
         pub fn store(mut self, store: impl RateLimitStore + 'static) -> Self {
-            self.store = Some(Arc::new(store));
+            self.store = Some(StoreHandle(Arc::new(store)));
             self
         }
 
@@ -1289,9 +1300,10 @@ pub mod builtin {
             let window_secs = self.window_secs;
             let window = std::time::Duration::from_secs(window_secs);
             let key_strategy = self.key;
-            let store: Arc<dyn RateLimitStore> = self
-                .store
-                .unwrap_or_else(|| Arc::new(MemoryRateLimitStore::new()));
+            let store: Arc<dyn RateLimitStore> = match self.store {
+                Some(StoreHandle(store)) => store,
+                None => Arc::new(MemoryRateLimitStore::new()),
+            };
             let scope: Arc<str> = self
                 .scope
                 .unwrap_or_else(|| format!("{max_requests}/{window_secs}s"))
@@ -1875,6 +1887,9 @@ mod tests {
 
         assert_send::<builtin::RateLimiter>();
         assert_sync::<builtin::RateLimiter>();
+        // Public auto traits are API: keep RateLimiter unwind-safe (semver-checks).
+        fn assert_unwind_safe<T: std::panic::UnwindSafe + std::panic::RefUnwindSafe>() {}
+        assert_unwind_safe::<builtin::RateLimiter>();
     }
 
     #[test]
