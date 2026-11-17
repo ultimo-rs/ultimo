@@ -21,6 +21,9 @@ ignore = [
   # Unmaintained (not vulnerabilities) transitive deps — low risk, no control.
   "RUSTSEC-2024-0370", # proc-macro-error
   "RUSTSEC-2024-0384", # instant (via notify)
+  # chrono: only via rmcp (ultimo-cli's MCP server) and the unpublished
+  # coverage-tool — not in the `ultimo` library. Revisit when rmcp moves off it.
+  "RUSTSEC-2026-0543", # chrono
 ]
 
 [bans]
