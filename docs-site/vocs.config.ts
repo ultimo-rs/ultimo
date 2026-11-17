@@ -136,6 +136,10 @@ export default defineConfig({
           link: "/otel",
         },
         {
+          text: "Response Caching",
+          link: "/caching",
+        },
+        {
           text: "Redis",
           link: "/redis",
         },

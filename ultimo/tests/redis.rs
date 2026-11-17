@@ -5,8 +5,9 @@
 //! Each test namespaces its keys with a fresh UUID so tests can run in parallel.
 
 use std::time::Duration;
+use ultimo::cache::{Cache, CacheStore, CachedResponse};
 use ultimo::middleware::builtin::{RateLimitKey, RateLimitStore, RateLimiter};
-use ultimo::redis::{connect, RedisRateLimitStore, RedisSessionStore};
+use ultimo::redis::{connect, RedisCacheStore, RedisRateLimitStore, RedisSessionStore};
 use ultimo::session::{session, SessionConfig, SessionData, SessionStore};
 use ultimo::testing::TestClient;
 use ultimo::{Context, Ultimo};
@@ -166,4 +167,72 @@ async fn rate_limit_store_fails_open_unless_fail_closed() {
         !closed.try_acquire("k", 1, window).await,
         "fail_closed rejects"
     );
+}
+
+// ---------------------------------------------------------------- cache
+
+#[tokio::test]
+async fn cache_store_roundtrip_expiry_and_prefix_removal() {
+    let Some(conn) = conn().await else { return };
+    let store = RedisCacheStore::new(conn).prefix(prefix());
+    let entry = CachedResponse::new(
+        200,
+        vec![("content-type".into(), b"text/plain".to_vec())],
+        bytes::Bytes::from_static(b"hello"),
+    );
+
+    store
+        .set("s:/a?x=1", entry.clone(), Duration::from_secs(60))
+        .await;
+    store
+        .set("s:/a?x=2", entry.clone(), Duration::from_secs(60))
+        .await;
+    // `?` and `*` in keys must match literally, not as globs.
+    store
+        .set("s:/ab?", entry.clone(), Duration::from_secs(60))
+        .await;
+    store
+        .set("s:/b?", entry.clone(), Duration::from_millis(150))
+        .await;
+    assert_eq!(store.get("s:/a?x=1").await, Some(entry.clone()));
+
+    store.remove_prefix("s:/a?").await.unwrap();
+    assert_eq!(store.get("s:/a?x=1").await, None);
+    assert_eq!(store.get("s:/a?x=2").await, None);
+    assert!(store.get("s:/ab?").await.is_some());
+
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(store.get("s:/b?").await, None);
+}
+
+#[tokio::test]
+async fn cache_is_shared_and_invalidated_across_instances() {
+    let Some(conn) = conn().await else { return };
+    let prefix = prefix();
+    let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let make = |conn| {
+        let cache = Cache::new(Duration::from_secs(60))
+            .store(RedisCacheStore::new(conn).prefix(prefix.clone()));
+        let mut app = Ultimo::new_without_defaults();
+        app.use_middleware(cache.middleware());
+        let calls = calls.clone();
+        app.get("/n", move |ctx: Context| {
+            let calls = calls.clone();
+            async move {
+                let n = calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                ctx.text(n.to_string()).await
+            }
+        });
+        (cache, TestClient::new(app))
+    };
+    let (cache_a, a) = make(conn.clone());
+    let (_cache_b, b) = make(conn);
+
+    assert_eq!(a.get("/n").send().await.text(), "1");
+    let hit = b.get("/n").send().await;
+    assert_eq!(hit.header("x-cache"), Some("HIT"));
+    assert_eq!(hit.text(), "1");
+
+    cache_a.invalidate("/n").await.unwrap();
+    assert_eq!(b.get("/n").send().await.text(), "2");
 }

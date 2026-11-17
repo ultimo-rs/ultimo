@@ -1006,6 +1006,26 @@ use ultimo::otel::Tracing;
 app.use_middleware(Tracing::new().middleware());
 ```
 
+#### `Cache` — server-side response caching
+
+Stores successful `GET` responses and serves repeats without running the
+handler. Core (no feature). See [Response Caching](/caching).
+
+- `ultimo::cache::Cache` — `new(ttl)`, `store(s)`, `scope(name)` (default `default`), `vary([headers])`, `public()`, `max_body_size(bytes)` (default 1 MiB), `middleware() -> BoxedMiddleware`, `invalidate(path).await -> Result<()>`, `clear().await -> Result<()>`. Responses get `X-Cache: HIT|MISS`; hits get `Age`
+- `CacheStore` trait — `get(key)`, `set(key, value, ttl)`, `remove_prefix(prefix) -> Result<()>`
+- `MemoryCacheStore` — the default; `new()`, `max_entries(n)` (default 10 000), `len()`, `is_empty()`
+- `CachedResponse` — `new(status, headers, body)`, `status()`, `headers()`, `body()`, `age()`, `encode() -> Vec<u8>`, `decode(&[u8]) -> Option<Self>`
+
+Requests with `Cookie`/`Authorization` bypass the cache unless that header is in `vary` or the cache is `public()`.
+
+```rust
+use ultimo::cache::Cache;
+let cache = Cache::new(Duration::from_secs(60)).vary(["accept-language"]);
+app.use_middleware(cache.middleware());
+// later, when data changes:
+cache.invalidate("/products").await?;
+```
+
 #### `ultimo::redis` (requires `redis` feature)
 
 Redis-backed stores for apps running several instances. Built on the `redis`
@@ -1014,6 +1034,7 @@ crate 1.x (re-exported as `ultimo::redis::client`; needs Rust 1.88). See [Redis]
 - `connect(url) -> Result<ConnectionManager>` — open a multiplexed, auto-reconnecting connection
 - `RedisSessionStore` (also needs `session`) — `new(conn)`, `prefix(p)` (default `ultimo:session:`); implements `SessionStore`
 - `RedisRateLimitStore` — `new(conn)`, `prefix(p)` (default `ultimo:ratelimit:`), `fail_closed()`; implements `RateLimitStore`, fails open by default
+- `RedisCacheStore` — `new(conn)`, `prefix(p)` (default `ultimo:cache:`); implements `CacheStore` for `Cache::store`
 
 ```rust
 use ultimo::redis::{connect, RedisRateLimitStore, RedisSessionStore};

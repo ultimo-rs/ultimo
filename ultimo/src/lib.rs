@@ -30,6 +30,7 @@
 #![forbid(unsafe_code)]
 
 pub mod app;
+pub mod cache;
 pub mod context;
 pub mod cookie;
 pub mod error;

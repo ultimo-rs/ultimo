@@ -63,6 +63,7 @@ Cargo workspace (`resolver = "2"`). Members:
 
 - `app.rs` (`Ultimo` builder), `context.rs` (`Context`), `router.rs`, `handler.rs`, `middleware.rs`
 - `rpc.rs` — JSON-RPC registry + **TypeScript client codegen** (`RpcRegistry`)
+- `cache.rs` (`Cache` response-cache middleware + `CacheStore`)
 - `response.rs`, `error.rs` (`UltimoError`/`Result`), `validation.rs` (`validate`), `openapi.rs` (+ `openapi/docs.rs`)
 - `cookie.rs` (core), `session/` (`session`), `csrf.rs` (`csrf`), `testing/` (`testing`)
 - `database/` = `sqlx.rs` + `diesel.rs` (behind `database`); `websocket/` (behind `websocket`)
@@ -76,7 +77,7 @@ The crate is `#![forbid(unsafe_code)]` — 100% safe Rust, no `unsafe`.
 `default = []` — **everything is opt-in.** When adding code under a feature, gate
 it with `#[cfg(feature = "...")]`. Features: `websocket`, `testing`
 (TestClient/assertions/fixtures), `session`, `csrf`, `jwt`, `oidc` (implies
-`jwt`), `oauth2` (OAuth2/OIDC login; implies `oidc` + `session`), `api-key`, `static-files`, `compression`, `metrics` (Prometheus), `otel` (OpenTelemetry tracing), `redis` (session + rate-limit stores; needs Rust 1.88),
+`jwt`), `oauth2` (OAuth2/OIDC login; implies `oidc` + `session`), `api-key`, `static-files`, `compression`, `metrics` (Prometheus), `otel` (OpenTelemetry tracing), `redis` (session, rate-limit + response-cache stores; needs Rust 1.88),
 `client-gen` (ts-rs type
 derivation), `test-helpers` (exposes `websocket::test_helpers` for integration
 tests), `database` (enabled transitively by `sqlx-postgres|mysql|sqlite`,
@@ -171,8 +172,9 @@ their feature belongs to.
   `metrics` and OpenTelemetry tracing via `otel` shipped).
 - **Phase 10 (Distribution & DX): started.** Middleware pack shipped
   (request-id, cache-control/ETag, server-timing, basic-auth, trailing-slash).
-  Redis session + rate-limit stores shipped (`redis`). Still open: Redis
-  caching, WebSocket compression, `#[derive(UltimoType)]`.
+  Redis session + rate-limit stores shipped (`redis`), and response caching
+  (`ultimo::cache`, Redis-backed via `RedisCacheStore`). Still open: WebSocket
+  compression, `#[derive(UltimoType)]`.
 - **Phase 11 (Stabilization → 1.0):** end-to-end typed errors, public-API
   audit + SemVer freeze, documentation completeness, production battle-testing.
 - **Post-1.0 / demand-driven:** typed RPC subscriptions (derived SSE event
