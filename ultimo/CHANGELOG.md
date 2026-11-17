@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.9](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.8...ultimo-v0.9.9) - 2026-11-17
+
+### Added
+
+- *(cache)* server-side response caching with memory and Redis stores ([#214](https://github.com/ultimo-rs/ultimo/pull/214))
+
 ## [0.9.8](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.7...ultimo-v0.9.8) - 2026-11-14
 
 ### Added
