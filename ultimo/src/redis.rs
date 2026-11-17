@@ -1,5 +1,5 @@
 //! Redis-backed stores, so several app instances behind a load balancer share
-//! sessions and rate limits.
+//! sessions, rate limits and cached responses.
 //!
 //! Requires the `redis` Cargo feature. Built on the [`redis`](https://docs.rs/redis)
 //! crate (re-exported as [`client`]), whose 1.x line needs **Rust 1.88** — the
@@ -9,8 +9,10 @@
 //!   for the `session` middleware (also needs the `session` feature).
 //! - [`RedisRateLimitStore`] — a [`RateLimitStore`] for
 //!   [`RateLimiter::store`](crate::middleware::builtin::RateLimiter::store).
+//! - [`RedisCacheStore`] — a [`CacheStore`] for
+//!   [`Cache::store`](crate::cache::Cache::store).
 //!
-//! Both take a [`ConnectionManager`]: one multiplexed connection that
+//! All take a [`ConnectionManager`]: one multiplexed connection that
 //! reconnects on its own and is cheap to clone, so a single
 //! [`connect`] at startup serves the whole app.
 //!
@@ -37,6 +39,7 @@
 //! # }
 //! ```
 
+use crate::cache::{CacheStore, CachedResponse};
 use crate::error::{Result, UltimoError};
 use crate::middleware::builtin::RateLimitStore;
 use ::redis::aio::ConnectionManager;
@@ -247,5 +250,128 @@ impl RateLimitStore for RedisRateLimitStore {
                 !self.fail_closed
             }
         }
+    }
+}
+
+/// Response-cache store keeping each entry as bytes under `{prefix}{key}`
+/// (default prefix `ultimo:cache:`) with a TTL, so every app instance serves
+/// from — and [invalidates](crate::cache::Cache::invalidate) — one cache.
+///
+/// Lookup and write errors are logged with `tracing` and treated as a miss.
+/// Invalidation `SCAN`s for matching keys and `UNLINK`s them, returning any
+/// Redis error, so a failed invalidation isn't silent.
+#[derive(Clone)]
+pub struct RedisCacheStore {
+    conn: ConnectionManager,
+    prefix: Arc<str>,
+}
+
+impl RedisCacheStore {
+    /// A store using `conn`, with the key prefix `ultimo:cache:`.
+    pub fn new(conn: ConnectionManager) -> Self {
+        Self {
+            conn,
+            prefix: Arc::from("ultimo:cache:"),
+        }
+    }
+
+    /// Use a custom key prefix, e.g. to share one Redis between apps.
+    pub fn prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.prefix = Arc::from(prefix.into());
+        self
+    }
+}
+
+/// Escape Redis glob metacharacters so `pattern*` matches a literal prefix.
+fn glob_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if matches!(c, '*' | '?' | '[' | ']' | '\\') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+#[async_trait::async_trait]
+impl CacheStore for RedisCacheStore {
+    async fn get(&self, key: &str) -> Option<CachedResponse> {
+        let mut conn = self.conn.clone();
+        let raw: Option<Vec<u8>> = match ::redis::cmd("GET")
+            .arg(format!("{}{}", self.prefix, key))
+            .query_async(&mut conn)
+            .await
+        {
+            Ok(raw) => raw,
+            Err(e) => {
+                tracing::warn!(error = %e, "redis cache get failed");
+                return None;
+            }
+        };
+        let entry = CachedResponse::decode(&raw?);
+        if entry.is_none() {
+            tracing::warn!("redis cache entry is not a valid cached response");
+        }
+        entry
+    }
+
+    async fn set(&self, key: &str, value: CachedResponse, ttl: Duration) {
+        let mut conn = self.conn.clone();
+        let millis = u64::try_from(ttl.as_millis()).unwrap_or(u64::MAX).max(1);
+        let result: ::redis::RedisResult<()> = ::redis::cmd("SET")
+            .arg(format!("{}{}", self.prefix, key))
+            .arg(value.encode())
+            .arg("PX")
+            .arg(millis)
+            .query_async(&mut conn)
+            .await;
+        if let Err(e) = result {
+            tracing::warn!(error = %e, "redis cache set failed");
+        }
+    }
+
+    async fn remove_prefix(&self, prefix: &str) -> Result<()> {
+        let pattern = format!("{}*", glob_escape(&format!("{}{}", self.prefix, prefix)));
+        let mut conn = self.conn.clone();
+        let mut cursor: u64 = 0;
+        loop {
+            let (next, keys): (u64, Vec<Vec<u8>>) = ::redis::cmd("SCAN")
+                .arg(cursor)
+                .arg("MATCH")
+                .arg(&pattern)
+                .arg("COUNT")
+                .arg(1000)
+                .query_async(&mut conn)
+                .await
+                .map_err(|e| {
+                    UltimoError::Internal(format!("redis cache invalidation failed: {e}"))
+                })?;
+            if !keys.is_empty() {
+                ::redis::cmd("UNLINK")
+                    .arg(keys)
+                    .query_async::<()>(&mut conn)
+                    .await
+                    .map_err(|e| {
+                        UltimoError::Internal(format!("redis cache invalidation failed: {e}"))
+                    })?;
+            }
+            if next == 0 {
+                return Ok(());
+            }
+            cursor = next;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::glob_escape;
+
+    #[test]
+    fn glob_escape_makes_metacharacters_literal() {
+        assert_eq!(glob_escape("c:/items?"), "c:/items\\?");
+        assert_eq!(glob_escape("a*b[c]d\\e"), "a\\*b\\[c\\]d\\\\e");
+        assert_eq!(glob_escape("plain:/x"), "plain:/x");
     }
 }

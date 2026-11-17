@@ -58,8 +58,9 @@ dependencies and rot as each vendor's API changes).
 - 📈 **Observability** — OpenTelemetry metrics (OTLP push). Prometheus
   metrics (`metrics` feature, 0.9.5) and OpenTelemetry tracing (`otel`
   feature, 0.9.6) have shipped.
-- 🧰 **Redis caching** — response/data caching on the Redis connection that
-  already backs sessions and rate limits (`redis` feature, 0.9.7).
+- ~~🧰 **Redis caching** — response/data caching on the Redis connection that
+  already backs sessions and rate limits (`redis` feature, 0.9.7).~~ ✅ Shipped
+  in 0.9.9 (`Cache` middleware + `RedisCacheStore`)
 - 🗄️ **S3-compatible object storage** — pairs with the existing multipart
   upload support (demand-driven).
 - ⚙️ **Background tasks** — in-process Tokio job spawning (demand-driven).
@@ -139,7 +140,7 @@ version number yet.
 | Streaming Responses                                     | ✅ Available     | 0.9.0                                |
 | Request Timeouts + HTTP Graceful Shutdown               | ✅ Available     | 0.9.3                                |
 | Redis sessions + rate-limit store (`redis` feature)     | ✅ Available     | 0.9.7                                |
-| Redis response/data caching                             | 📋 Planned       | Distribution & Dev Experience        |
+| Response caching (`Cache` + `RedisCacheStore`)          | ✅ Available     | 0.9.9                                |
 | WebSocket Compression                                   | 📋 Planned       | Distribution & Dev Experience        |
 | Hot Reload (`ultimo dev`)                               | ✅ Available     | 0.5.1                                |
 | `#[derive(UltimoType)]`                                 | 📋 Planned       | Distribution & Dev Experience        |
@@ -255,8 +256,8 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
 ### Phase 10: Distribution & Dev Experience
 
-- **Redis integration** — sessions, cache, and rate-limit store (one dependency)
-  _(sessions + rate-limit store shipped in the `redis` feature; caching next)_
+- ✅ **Redis integration** — sessions, cache, and rate-limit store (one dependency)
+  _(`redis` feature: sessions + rate-limit store in 0.9.7, response cache in 0.9.9)_
 - WebSocket compression (per-message deflate)
 - `#[derive(UltimoType)]` (drop the `ts-rs` dependency papercut)
 - ✅ Built-in middleware pack (request-id, cache-control/ETag, server-timing, basic-auth, trailing-slash normalization)

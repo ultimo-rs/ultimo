@@ -1,13 +1,15 @@
 # Redis
 
 Run several instances of your app behind a load balancer and they need to agree
-on two things: who is logged in, and how many requests a client has made. The
-`redis` feature adds Redis-backed stores for both:
+on who is logged in, how many requests a client has made, and what's cached.
+The `redis` feature adds Redis-backed stores for all three:
 
 - **`RedisSessionStore`** — a [`SessionStore`](/sessions#custom-stores) for the
   `session` middleware.
 - **`RedisRateLimitStore`** — a shared bucket store for
   [`RateLimiter`](/api-reference).
+- **`RedisCacheStore`** — a shared store for the
+  [response cache](/caching).
 
 ```toml
 ultimo = { version = "0.9", features = ["redis", "session"] }
@@ -99,6 +101,26 @@ endpoints where that's the wrong trade (login, password reset), reject instead:
 ```rust
 let store = RedisRateLimitStore::new(conn).fail_closed(); // 429 if Redis is unreachable
 ```
+
+## Response cache
+
+`RedisCacheStore` backs the [response cache](/caching): every instance serves
+from one cache, and `invalidate` on any instance clears the entry for all.
+
+```rust
+use std::time::Duration;
+use ultimo::cache::Cache;
+use ultimo::redis::RedisCacheStore;
+
+let cache = Cache::new(Duration::from_secs(60)).store(RedisCacheStore::new(conn));
+app.use_middleware(cache.middleware());
+```
+
+Entries are stored under `ultimo:cache:{scope}:{path}?{query}…` with a TTL
+(`PX`); change the prefix with `.prefix(...)`. Read and write errors are logged
+and treated as a miss, so a Redis outage means "no cache", not "no service".
+Invalidation `SCAN`s for the matching keys and `UNLINK`s them, and returns the
+error if Redis can't be reached.
 
 ## Your own store
 

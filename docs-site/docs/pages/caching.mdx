@@ -1,0 +1,224 @@
+# Response Caching
+
+`Cache` stores successful `GET` responses and answers repeat requests from the
+store, so the handler (and the database query behind it) runs at most once per
+TTL. It's in core — no feature flag — and keeps entries in memory by default.
+With the `redis` feature, [`RedisCacheStore`](/redis#response-cache) shares one
+cache between every instance of your app.
+
+:::tip
+This is a **server-side** cache. To let browsers and CDNs cache responses, set
+headers with [`cache_control(...)` and `etag()`](/api-reference)
+— the two work well together.
+:::
+
+## Quick start
+
+```rust
+use std::time::Duration;
+use ultimo::cache::Cache;
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let cache = Cache::new(Duration::from_secs(60));
+
+    let mut app = Ultimo::new();
+    app.use_middleware(cache.middleware());
+
+    app.get("/products", |ctx: Context| async move {
+        let products = load_products().await?; // runs at most once a minute
+        ctx.json(products).await
+    });
+
+    // Clones share the store: keep one to invalidate when data changes.
+    let c = cache.clone();
+    app.post("/products", move |ctx: Context| {
+        let cache = c.clone();
+        async move {
+            create_product(ctx.req.json().await?).await?;
+            cache.invalidate("/products").await?;
+            ctx.json(json!({ "ok": true })).await
+        }
+    });
+
+    app.listen("0.0.0.0:3000").await
+}
+```
+
+Every `GET` the cache handles gets an `X-Cache: HIT` or `X-Cache: MISS`
+header; hits also carry `Age` (seconds since the entry was stored).
+
+## What gets cached
+
+The cache key is the **path + raw query string** (`/products?page=2` and
+`/products?page=3` are separate entries), plus any [`vary`](#vary) headers.
+A response is stored only when all of these hold:
+
+| Condition                                              | Why                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------- |
+| Request method is `GET`                                | Other methods change state                              |
+| No `Cookie` / `Authorization` request header           | The response may be personal ([details](#logged-in-users)) |
+| Response status is `200 OK`                            | Errors and redirects aren't worth pinning               |
+| Body is buffered and ≤ `max_body_size` (default 1 MiB) | Streams and SSE pass through                            |
+| No `Set-Cookie` response header                        | Never hand one user's cookie to another                 |
+| No `Cache-Control: no-store`, `no-cache` or `private`  | The handler opted out                                   |
+| No `Vary` on a header the cache doesn't key on         | The cache can't tell those variants apart               |
+
+So a handler can opt out of caching for one response with
+`ctx.header("cache-control", "no-store")`.
+
+## Invalidation
+
+```rust
+cache.invalidate("/products").await?; // every query string and vary variant of /products
+cache.clear().await?;                 // everything in this cache's scope
+```
+
+`invalidate` matches the path exactly: `/products` doesn't touch
+`/products/42`. Both return an error if the store can't be reached (Redis
+down), so a failed invalidation isn't silent.
+
+## Vary
+
+List request headers whose values change the response. Each distinct value
+gets its own entry:
+
+```rust
+let cache = Cache::new(Duration::from_secs(300)).vary(["accept-language"]);
+```
+
+If your app serves several domains from one instance, add `"host"`.
+
+## Logged-in users
+
+By default, requests carrying `Cookie` or `Authorization` **bypass the cache**:
+neither read from it nor stored. Without that rule, the first logged-in user's
+dashboard could be served to everyone. You have two ways to cache them anyway:
+
+- **Per user** — key on the credential, so each user gets their own entries:
+
+  ```rust
+  Cache::new(Duration::from_secs(30)).vary(["authorization"])
+  ```
+
+  (`vary(["cookie"])` keys on the whole `Cookie` header, so any cookie change
+  is a new entry.)
+
+- **Shared** — the responses are the same for everyone (a public catalog
+  behind a site that sets analytics cookies):
+
+  ```rust
+  Cache::new(Duration::from_secs(60)).public()
+  ```
+
+## Several caches, one store
+
+Give each its own scope so `clear()` only touches its own entries:
+
+```rust
+use ultimo::cache::{Cache, MemoryCacheStore};
+
+let store = MemoryCacheStore::new().max_entries(50_000);
+let catalog = Cache::new(Duration::from_secs(300)).store(store.clone()).scope("catalog");
+let search = Cache::new(Duration::from_secs(10)).store(store).scope("search");
+```
+
+A cache usually applies to the whole app; to cache only some routes, wrap the
+middleware and check the path first (see [Custom Middleware](/api-reference)).
+
+## Sharing across instances (Redis)
+
+```rust
+use ultimo::redis::{connect, RedisCacheStore};
+
+let conn = connect("redis://127.0.0.1:6379").await?;
+let cache = Cache::new(Duration::from_secs(60)).store(RedisCacheStore::new(conn));
+```
+
+Every instance now serves from one cache, and `invalidate` on any instance
+clears the entry for all of them. See [Redis](/redis#response-cache).
+
+## Middleware order
+
+Register the cache **after** (inside) `compression`, `etag`, `request_id()`,
+`session` and auth middleware:
+
+```rust
+app.use_middleware(compression());
+app.use_middleware(etag());
+app.use_middleware(request_id());
+app.use_middleware(cache.middleware()); // last: caches the handler's own output
+```
+
+Then compression follows each client's `Accept-Encoding`, ETags and `304`s
+work on hits, and request ids aren't replayed from the cache. Auth middleware
+that runs before the cache still rejects requests that shouldn't see the page.
+
+## Configuration
+
+| Method                     | Effect                                                                 |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `Cache::new(ttl)`          | Keep each response for `ttl`, in a new in-memory store                 |
+| `.store(store)`            | Use another `CacheStore` (e.g. `RedisCacheStore`)                      |
+| `.scope(name)`             | Namespace keys within a shared store (default `default`)               |
+| `.vary([headers])`         | Request headers that are part of the key                               |
+| `.public()`                | Also cache requests with `Cookie` / `Authorization`, shared by all     |
+| `.max_body_size(bytes)`    | Largest body to store (default 1 MiB)                                  |
+| `.middleware()`            | The middleware to register                                             |
+| `.invalidate(path).await`  | Drop every variant of `path`                                           |
+| `.clear().await`           | Drop everything in this scope                                          |
+
+`MemoryCacheStore::new().max_entries(n)` caps the in-memory store (default
+10 000 entries; expired entries are dropped first, then the one closest to
+expiry).
+
+## Your own store
+
+Implement `CacheStore` to keep entries elsewhere (Memcached, a database, …).
+`CachedResponse::encode()` / `decode()` turn an entry into bytes and back:
+
+```rust
+use std::time::Duration;
+use ultimo::cache::{CacheStore, CachedResponse};
+
+struct MyStore;
+
+#[async_trait::async_trait]
+impl CacheStore for MyStore {
+    async fn get(&self, key: &str) -> Option<CachedResponse> {
+        let bytes = my_backend_get(key).await?;
+        CachedResponse::decode(&bytes)
+    }
+    async fn set(&self, key: &str, value: CachedResponse, ttl: Duration) {
+        my_backend_set(key, value.encode(), ttl).await;
+    }
+    async fn remove_prefix(&self, prefix: &str) -> ultimo::Result<()> {
+        my_backend_delete_prefix(prefix).await
+    }
+}
+```
+
+`get` and `set` can't fail a request: log errors and behave as a miss.
+
+## Good to know
+
+- **Concurrent misses** for the same key all run the handler; the last one
+  stored wins. Fine for most apps — the cache is about load over time, not
+  coalescing a burst.
+- Clients can't bypass the cache with `Cache-Control: no-cache` request
+  headers: that would let anyone force the expensive path.
+- `HEAD` requests aren't served from the cache.
+
+## Example
+
+[`examples/response-cache`](https://github.com/ultimo-rs/ultimo/tree/main/examples/response-cache)
+shows a slow endpoint becoming instant, `X-Cache` headers and invalidation from
+a browser page:
+
+```bash
+cargo run -p response-cache-example
+```
+
+See also: [Redis](/redis) · [Rate limiting](/api-reference) ·
+[API Reference](/api-reference).
