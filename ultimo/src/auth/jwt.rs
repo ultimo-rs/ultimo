@@ -63,12 +63,18 @@ pub struct Jwt {
 
 impl Jwt {
     /// Configure HS256 with a symmetric secret. The same secret signs and verifies.
+    ///
+    /// # Panics
+    /// If `secret` is empty — an empty HMAC key would let anyone forge tokens.
     pub fn hs256(secret: impl AsRef<[u8]>) -> Self {
         let secret = secret.as_ref();
+        let (encoding, decoding) = EncodingKey::from_secret(secret)
+            .and_then(|e| Ok((e, DecodingKey::from_secret(secret)?)))
+            .unwrap_or_else(|_| panic!("Jwt::hs256: the HMAC secret must not be empty"));
         Self {
             key: KeySource::Static {
-                encoding: Some(EncodingKey::from_secret(secret)),
-                decoding: DecodingKey::from_secret(secret),
+                encoding: Some(encoding),
+                decoding,
             },
             validation: Validation::new(Algorithm::HS256),
             source: TokenSource::Bearer,

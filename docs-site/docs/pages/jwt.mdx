@@ -76,7 +76,7 @@ let mine: MyClaims = ctx.jwt::<MyClaims>().await?;
 
 | Method | Effect |
 |---|---|
-| `Jwt::hs256(secret)` | Configure HS256 with a symmetric secret (signs + verifies). |
+| `Jwt::hs256(secret)` | Configure HS256 with a symmetric secret (signs + verifies). Panics on an empty secret. |
 | `.issuer(s)` | Require the `iss` claim to equal `s`. |
 | `.audience(s)` | Require the `aud` claim to equal `s`. |
 | `.leeway(secs)` | Clock-skew tolerance applied to `exp`/`nbf`. |
@@ -160,6 +160,9 @@ For air-gapped setups, `Jwt::jwks_from_set(set)` verifies against an in-memory
   carry an `aud` claim but you don't call `.audience(...)` on the verifier, they
   will be **rejected**. Either set `.audience(...)` to match, or don't include
   `aud` in your tokens.
+- **Critical header extensions:** tokens whose header lists a `crit`
+  extension the verifier doesn't understand are rejected
+  ([RFC 7515 §4.1.11](https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.11)).
 
 ## Full example
 
