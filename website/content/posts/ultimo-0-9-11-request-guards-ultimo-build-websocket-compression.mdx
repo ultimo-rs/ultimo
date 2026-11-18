@@ -1,0 +1,143 @@
+---
+title: "Ultimo 0.9.11: Request Guards, ultimo build and WebSocket Compression"
+description: "Ultimo 0.9.11 adds request guards and geo-blocking, a real one-command production build in the CLI, and permessage-deflate WebSocket compression that cut JSON traffic by 63% in our measurements."
+date: "2026-11-18T19:00:00Z"
+author: "Ultimo Team"
+tags: ["release", "security", "websocket", "cli"]
+---
+
+# Ultimo 0.9.11: Request Guards, `ultimo build` and WebSocket Compression
+
+[Ultimo](https://github.com/ultimo-rs/ultimo) 0.9.11 is out with three additions:
+
+- **Request guards and geo-blocking**: your own allow/deny rules before any handler runs, and country rules from your CDN or a GeoIP lookup.
+- **`ultimo build`**: one command that builds the Rust backend, regenerates the TypeScript client and builds the frontend, in the right order.
+- **WebSocket compression**: permessage-deflate, which every major browser already asks for, behind one config flag.
+
+All three are additive, so upgrading is one command:
+
+```bash
+cargo update -p ultimo
+cargo install ultimo-cli --force   # for `ultimo build`
+```
+
+## Request guards
+
+Every API eventually collects rules that aren't authentication: block a scanner by its user agent, hide an admin path from the internet, refuse a misbehaving client. `Guard` gives those rules one home. It takes a synchronous predicate over the request and returns a `Decision`:
+
+```rust
+use ultimo::guard::{Decision, Guard};
+use ultimo::prelude::*;
+
+// Block well-known scanners.
+app.use_middleware(
+    Guard::new(|ctx: &Context| {
+        let ua = ctx.req.header("user-agent").unwrap_or_default();
+        Decision::deny_if(ua.contains("sqlmap") || ua.contains("nikto"))
+    })
+    .build(),
+);
+
+// Answer 404 for /admin unless the request comes through the internal gateway.
+app.use_middleware(
+    Guard::new(|ctx: &Context| {
+        if ctx.req.path().starts_with("/admin") && ctx.req.header("x-internal").is_none() {
+            Decision::respond(404, "Not Found")
+        } else {
+            Decision::Allow
+        }
+    })
+    .build(),
+);
+```
+
+`Decision::Deny` answers `403 Forbidden` (change it with `.deny_status(...)`), and `Decision::respond(status, body)` answers with anything you like — a 404 is often better than a 403 for paths you'd rather not advertise. Guards run in the order you register them, and blocked requests are logged at `debug` with the path and client IP.
+
+The predicate runs on every request, so keep it cheap. Rules that need I/O, like a database blocklist, belong in a [custom middleware](https://docs.ultimo.dev/middleware).
+
+## Geo-blocking
+
+`GeoFilter` allows or blocks countries by ISO code. Ultimo doesn't bundle a GeoIP database: the country comes from your CDN's header or a lookup function you provide.
+
+```rust
+use ultimo::guard::GeoFilter;
+
+// Behind Cloudflare: trust the proxy, then use its country header.
+app.trust_proxy(true);
+app.use_middleware(GeoFilter::allow(&["US", "CA"]).header("CF-IPCountry").build());
+```
+
+Two defaults are worth knowing:
+
+- **The header is only read when `trust_proxy(true)` is set.** Without a proxy in front, any client could send `CF-IPCountry: US` and walk through your allow-list.
+- **An unknown country is denied on an allow-list and allowed on a deny-list.** That's the safe reading of each, and `.allow_unknown()` / `.deny_unknown()` override it.
+
+Handlers can read the resolved country with `ctx.country().await`, which is handy for defaults like currency even when you're not blocking anyone. The full rules are in the [security guide](https://docs.ultimo.dev/security). As with any geo rule, VPNs change the apparent location, so for compliance-grade restrictions enforce them at the edge too.
+
+## `ultimo build`
+
+`ultimo build` was listed in the CLI but used to print "not implemented yet". It now builds the whole project:
+
+```bash
+ultimo build                  # release profile
+ultimo build --profile debug  # quicker, for checking a build
+```
+
+It works out the layout itself — a single crate, or a fullstack project with `backend/` and `frontend/` — and runs three steps in order, stopping at the first failure:
+
+1. **Compiles the Rust crate** with `cargo build --release`.
+2. **Regenerates the TypeScript client** through your `generate-client` binary, reusing what step 1 just compiled. The frontend can't ship against a stale client.
+3. **Builds the frontend** with the package manager its lockfile names — pnpm, yarn, bun or npm — installing dependencies first if `node_modules` is missing.
+
+Then it tells you where everything ended up:
+
+```
+✨ Build complete
+   🦀 /app/backend/target/release/my-app-backend
+   🌐 /app/frontend/dist
+```
+
+When a step fails it exits non-zero and names the command that failed, so the same line works in CI. `--skip-frontend`, `--skip-client` and `--client <path>` cover deployments where the pieces ship separately. See the [CLI docs](https://docs.ultimo.dev/cli).
+
+## WebSocket compression
+
+Browsers have offered WebSocket compression for years: every `new WebSocket(url)` asks the server for permessage-deflate ([RFC 7692](https://datatracker.ietf.org/doc/html/rfc7692)). Ultimo now says yes when you let it:
+
+```toml
+[dependencies]
+ultimo = { version = "0.9", features = ["websocket-compression"] }
+```
+
+```rust
+use ultimo::websocket::WebSocketConfig;
+
+let config = WebSocketConfig {
+    compression: true,
+    ..Default::default()
+};
+app.websocket_with_config("/ws", ChatHandler, config);
+```
+
+Your handlers don't change, and neither does the browser code. Messages of 32 bytes or more are compressed, and all of a connection's messages share a 32 KiB window, so a key like `"symbol"` that appears in every message is sent in full only once.
+
+On a stream of roughly 100-byte JSON messages — price ticks and chat lines — we measured **63% fewer bytes** on the wire, at about 3 µs per message to compress and the same to decompress. Larger, more repetitive payloads compress further.
+
+### The trade-off: memory
+
+A connection that has sent and received compressed messages holds about **350 KiB** for its compressor and decompressor. That's nothing for a few hundred connections, but it's about 3.5 GB at 10,000. That's why compression is off by default and switched on per route: turn it on where bandwidth matters more than memory, and measure first if you hold very many connections.
+
+### Safe by default
+
+A compressed message is small on the wire but can expand enormously — the classic decompression bomb. `max_message_size` applies to the **decompressed** size and is enforced while inflating, so a message that would grow past it is refused with close code `1009` before it's fully expanded. Corrupt compressed data closes the connection with `1007`.
+
+The `websocket` feature itself still has zero extra dependencies; only `websocket-compression` adds the pure-Rust `flate2`. The [WebSocket guide](https://docs.ultimo.dev/websocket) has the details.
+
+## One behavior change
+
+While adding compression we made the WebSocket frame parser follow RFC 6455 more strictly. A frame with reserved bits set that weren't negotiated is now a protocol error, and the connection closes with `1002`. Before, those bits were silently ignored. No mainstream client sets them, so this should only affect broken or hostile clients.
+
+## What's next
+
+Next on the [roadmap](https://docs.ultimo.dev/roadmap) is authentication in the generated OpenAPI spec, so Swagger UI can call your protected endpoints. After that come Rust client generation and the stabilization work toward 1.0.
+
+Catching up? [What's new in Ultimo 0.7 to 0.9](/blog/whats-new-in-ultimo-0-7-to-0-9) covers the thirteen releases before this one, and [Scaling a Rust API across instances](/blog/scaling-rust-api-redis-sessions-rate-limits-caching) pairs well with today's WebSocket changes.
