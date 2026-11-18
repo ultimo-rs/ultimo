@@ -23,6 +23,13 @@ const CLIENT_SECRET: &str = "my-secret";
 const REDIRECT_URI: &str = "http://app.test/auth/callback";
 
 /// RSA key generation is slow in debug builds: do it once for all tests.
+///
+/// [`fake_provider`] forces this before it starts serving. Never let the first
+/// call happen inside a request handler: in a debug build a 2048-bit keygen
+/// takes anywhere from ~1 s to well over 10 s (prime search is random), and
+/// while it runs every other test's `/token` request waits on the `OnceLock`
+/// — long enough to trip the OAuth2 client's 10 s HTTP timeout, which fails
+/// all of them at once with "error sending request".
 fn signing_key() -> &'static (String, serde_json::Value) {
     static KEY: OnceLock<(String, serde_json::Value)> = OnceLock::new();
     KEY.get_or_init(|| {
@@ -59,6 +66,9 @@ struct Fake {
 
 /// Start the fake provider on 127.0.0.1:<random>.
 async fn fake_provider() -> Fake {
+    // Generate the key now, before any HTTP request (and its timeout) is in
+    // flight — see `signing_key`.
+    signing_key();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let issuer = format!("http://{}", listener.local_addr().unwrap());
     let fake = Fake {
