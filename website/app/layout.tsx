@@ -7,6 +7,7 @@ import "./globals.css";
 import { JsonLd } from "@/components/json-ld";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { getStarCount } from "@/lib/github";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -89,11 +90,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const stars = await getStarCount();
   return (
     <html lang="en">
       <head>
@@ -102,7 +104,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background text-foreground selection:bg-orange-500/30`}
       >
-        <SiteHeader />
+        <SiteHeader stars={stars} />
         {children}
         <SiteFooter />
         <Analytics />

@@ -12,8 +12,10 @@ const frameworks = [
       auth: true,
       clientGen: "auto",
       cors: true,
-      rateLimit: "planned",
-      devServer: "planned",
+      rateLimit: true,
+      websocket: true,
+      sessions: true,
+      devServer: true,
     },
   },
   {
@@ -28,6 +30,8 @@ const frameworks = [
       clientGen: "manual",
       cors: "manual",
       rateLimit: "manual",
+      websocket: "manual",
+      sessions: "manual",
       devServer: false,
     },
   },
@@ -43,6 +47,8 @@ const frameworks = [
       clientGen: "manual",
       cors: "manual",
       rateLimit: "manual",
+      websocket: "manual",
+      sessions: "manual",
       devServer: false,
     },
   },
@@ -58,6 +64,8 @@ const frameworks = [
       clientGen: "manual",
       cors: "manual",
       rateLimit: "manual",
+      websocket: "manual",
+      sessions: "manual",
       devServer: false,
     },
   },
@@ -73,6 +81,8 @@ const frameworks = [
       clientGen: "manual",
       cors: "manual",
       rateLimit: "manual",
+      websocket: "manual",
+      sessions: "manual",
       devServer: false,
     },
   },
@@ -88,7 +98,9 @@ const featureLabels = {
   clientGen: "Client Generation",
   cors: "CORS",
   rateLimit: "Rate Limiting",
-  devServer: "Dev Server",
+  websocket: "WebSocket Pub/Sub",
+  sessions: "Sessions & CSRF",
+  devServer: "Hot-Reload Dev Server",
 };
 
 function FeatureCell({ value }: { value: string | boolean }) {
@@ -256,8 +268,6 @@ export function ComparisonSection() {
             Built-in &nbsp;&nbsp;
             <Minus className="inline h-4 w-4 text-yellow-500 mr-1" />
             Requires manual setup/crates &nbsp;&nbsp;
-            <Minus className="inline h-4 w-4 text-muted-foreground mr-1" />
-            Planned &nbsp;&nbsp;
             <X className="inline h-4 w-4 text-red-500/50 mr-1" />
             Not available
           </p>

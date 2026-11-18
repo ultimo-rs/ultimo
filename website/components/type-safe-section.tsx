@@ -40,21 +40,24 @@ export function TypeSafeSection() {
             <div className="p-6 font-mono text-sm overflow-x-auto flex-1 bg-zinc-950 text-zinc-300">
               <pre>
                 <code>
+                  <span className="text-purple-400">#[derive(Serialize, TS)]</span>
+                  {"\n"}
                   <span className="text-purple-400">struct</span>{" "}
-                  <span className="text-yellow-300">User</span> {"{"} {"\n"}
-                  {"    "}id: <span className="text-blue-400">u32</span>, {"\n"}
-                  {"    "}name: <span className="text-blue-400">String</span>,{" "}
+                  <span className="text-yellow-300">User</span> {"{"}
+                  {"\n    "}id: <span className="text-blue-400">u32</span>,
+                  {"\n    "}name: <span className="text-blue-400">String</span>,
+                  {"\n    "}email: <span className="text-blue-400">String</span>,
                   {"\n"}
-                  {"    "}email: <span className="text-blue-400">String</span>{" "}
+                  {"}"}
+                  {"\n\n"}
+                  rpc.<span className="text-yellow-300">query</span>(
+                  <span className="text-orange-300">"getUser"</span>, |id:{" "}
+                  <span className="text-blue-400">u32</span>|{" "}
+                  <span className="text-blue-400">async move</span> {"{"}
+                  {"\n    "}
+                  <span className="text-zinc-500">// load the user…</span>
                   {"\n"}
-                  {"}"} {"\n\n"}
-                  rpc.<span className="text-yellow-300">query</span>( {"\n"}
-                  {"    "}
-                  <span className="text-orange-300">"getUser"</span>, {"\n"}
-                  {"    "}|id: <span className="text-blue-400">u32</span>|{" "}
-                  <span className="text-blue-400">async move</span> {"{"}...
-                  {"}"} {"\n"}
-                  );
+                  {"});"}
                 </code>
               </pre>
             </div>
@@ -73,22 +76,22 @@ export function TypeSafeSection() {
             <div className="p-6 font-mono text-sm overflow-x-auto flex-1 bg-zinc-950 text-zinc-300">
               <pre>
                 <code>
-                  <span className="text-purple-400">export interface</span>{" "}
-                  <span className="text-yellow-300">User</span> {"{"} {"\n"}
-                  {"    "}id: <span className="text-blue-400">number</span>;{" "}
+                  <span className="text-purple-400">export type</span>{" "}
+                  <span className="text-yellow-300">User</span> = {"{"}
+                  {"\n    "}id: <span className="text-blue-400">number</span>,
+                  {"\n    "}name: <span className="text-blue-400">string</span>,
+                  {"\n    "}email: <span className="text-blue-400">string</span>,
                   {"\n"}
-                  {"    "}name: <span className="text-blue-400">string</span>;{" "}
+                  {"};"}
+                  {"\n\n"}
+                  <span className="text-zinc-500">// user: User</span>
                   {"\n"}
-                  {"    "}email: <span className="text-blue-400">string</span>;{" "}
-                  {"\n"}
-                  {"}"} {"\n\n"}
-                  <span className="text-zinc-400">// Fully typed!</span> {"\n"}
                   <span className="text-blue-400">const</span> user ={" "}
                   <span className="text-purple-400">await</span> client.
-                  <span className="text-yellow-300">getUser</span>(1); {"\n"}
+                  <span className="text-yellow-300">getUser</span>(1);
+                  {"\n"}
                   console.<span className="text-yellow-300">log</span>(user.
-                  <span className="text-blue-400">name</span>
-                  );
+                  <span className="text-blue-400">name</span>);
                 </code>
               </pre>
             </div>

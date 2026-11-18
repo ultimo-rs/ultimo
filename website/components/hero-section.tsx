@@ -1,5 +1,6 @@
-import { ArrowRight, Terminal } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { CopyCommand } from "@/components/copy-command";
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/lib/config";
 
@@ -34,19 +35,12 @@ export function HeroSection() {
 
         <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
           <Button size="lg" className="h-12 px-8 text-base" asChild>
-            <Link href={siteConfig.nav.getStarted} rel="noopener noreferrer">
+            <Link href={siteConfig.nav.getStarted}>
               Start Building
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            className="h-12 px-8 text-base border-input bg-background/50 text-foreground hover:bg-accent hover:text-accent-foreground"
-          >
-            <Terminal className="mr-2 h-4 w-4" />
-            cargo install ultimo
-          </Button>
+          <CopyCommand command="cargo add ultimo" />
         </div>
 
         <div className="mt-8 flex flex-wrap items-center gap-2 justify-center">
@@ -91,26 +85,25 @@ export function HeroSection() {
                 <span className="text-yellow-300">main</span>() {"->"}{" "}
                 <span className="text-zinc-100">ultimo::Result{"<()>"}</span>{" "}
                 {"{"}
-                {"\n"} <span className="text-zinc-400">// Initialize app</span>
-                {"\n"} <span className="text-blue-400">let</span>{" "}
-                <span className="text-blue-400">mut</span> app ={" "}
+                {"\n    "}
+                <span className="text-blue-400">let mut</span> app ={" "}
                 <span className="text-green-400">Ultimo</span>::
                 <span className="text-yellow-300">new</span>();
-                {"\n\n"}
-                {"\n"} <span className="text-zinc-400">// Define a route</span>
-                {"\n"} app.<span className="text-yellow-300">get</span>(
-                <span className="text-orange-300">"/hello"</span>, |ctx|{" "}
+                {"\n\n    "}
+                app.<span className="text-yellow-300">get</span>(
+                <span className="text-orange-300">"/hello"</span>, |ctx:{" "}
+                <span className="text-green-400">Context</span>|{" "}
                 <span className="text-blue-400">async move</span> {"{"}
-                {"\n"} ctx.<span className="text-yellow-300">json</span>(
-                <span className="text-green-400">json!</span>({"{"}{" "}
+                {"\n        "}
+                ctx.<span className="text-yellow-300">json</span>(
+                <span className="text-green-400">json!</span>({"{ "}
                 <span className="text-orange-300">"message"</span>:{" "}
-                <span className="text-orange-300">"Hello from Ultimo!"</span>{" "}
-                {"}"})).
-                <span className="text-blue-400">await</span>
-                {"\n"} {"}"});
-                {"\n\n"}
-                {"\n"} <span className="text-zinc-400">// Start server</span>
-                {"\n"} app.<span className="text-yellow-300">listen</span>(
+                <span className="text-orange-300">"Hello from Ultimo!"</span>
+                {" })"}).<span className="text-blue-400">await</span>
+                {"\n    "}
+                {"});"}
+                {"\n\n    "}
+                app.<span className="text-yellow-300">listen</span>(
                 <span className="text-orange-300">"127.0.0.1:3000"</span>).
                 <span className="text-blue-400">await</span>
                 {"\n"}

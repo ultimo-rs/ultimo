@@ -77,38 +77,81 @@ export function StatsSection() {
           <div className="relative">
             <div className="absolute -inset-4 bg-orange-500/20 blur-3xl rounded-full opacity-20" />
             <div className="relative rounded-xl border border-border bg-card p-6 shadow-xl">
-              <h3 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wider">
-                Route lookup time
+              <h3 className="text-base font-semibold text-foreground mb-1">
+                Route lookup cost as the app grows
               </h3>
-              <p className="text-xs text-muted-foreground mb-6">
-                In-process micro-benchmark — constant as the routing table grows.
+              <p className="text-sm text-muted-foreground mb-6">
+                Relative to 10 routes. Our benchmark suite caught a linear scan
+                in the router; static routes are now a hash-map lookup.
               </p>
 
-              <div className="space-y-4">
-                {[
-                  { label: "10 routes" },
-                  { label: "100 routes" },
-                  { label: "500 routes" },
-                ].map((row) => (
-                  <div key={row.label} className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium text-muted-foreground">
-                        {row.label}
-                      </span>
-                      <span className="text-orange-500 font-bold">O(1)</span>
-                    </div>
-                    <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-orange-500 to-red-500 w-[34%]" />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <table className="w-full text-sm">
+                <caption className="sr-only">
+                  Route lookup time relative to a 10-route app, before and
+                  after the router fix
+                </caption>
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th scope="col" className="pb-3 font-medium">
+                      Routes
+                    </th>
+                    <th scope="col" className="pb-3 font-medium">
+                      Before (linear scan)
+                    </th>
+                    <th scope="col" className="pb-3 font-medium">
+                      Now (O(1))
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { routes: "10", before: 1, label: "1×" },
+                    { routes: "100", before: 3.6, label: "3.6×" },
+                    { routes: "500", before: 15, label: "15×" },
+                  ].map((row) => (
+                    <tr key={row.routes} className="border-t border-border/50">
+                      <th
+                        scope="row"
+                        className="py-3 pr-4 text-left font-medium text-foreground tabular-nums"
+                      >
+                        {row.routes}
+                      </th>
+                      <td className="py-3 pr-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 flex-1 rounded-full bg-secondary">
+                            <div
+                              className="h-full rounded-full bg-muted-foreground/50"
+                              style={{ width: `${(row.before / 15) * 100}%` }}
+                            />
+                          </div>
+                          <span className="w-10 text-right tabular-nums text-muted-foreground">
+                            {row.label}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 flex-1 rounded-full bg-secondary">
+                            <div
+                              className="h-full rounded-full bg-orange-500"
+                              style={{ width: `${(1 / 15) * 100}%` }}
+                            />
+                          </div>
+                          <span className="w-10 text-right tabular-nums text-orange-500 font-semibold">
+                            1×
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
               <a
                 href="https://docs.ultimo.dev/performance"
                 className="mt-6 inline-block text-sm font-medium text-orange-500 hover:underline"
               >
-                Reproduce it yourself → docs/performance
+                How we measure, and how to reproduce it
               </a>
             </div>
           </div>
