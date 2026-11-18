@@ -148,10 +148,8 @@ ultimo generate --project ./backend --output ./client  # generate the TypeScript
 
 ```bash
 ultimo dev --port 3000   # hot-reload dev server (watches src/, restarts on change)
+ultimo build             # release build: Rust binary, fresh TypeScript client, frontend
 ```
-
-> `ultimo build` is **not implemented yet** — use `cargo build --release` for now.
-> See the [roadmap](https://docs.ultimo.dev/roadmap).
 
 ## Documentation
 

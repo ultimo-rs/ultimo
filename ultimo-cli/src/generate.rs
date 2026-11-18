@@ -14,7 +14,7 @@ pub async fn run(project: PathBuf, output: PathBuf, watch: bool) -> Result<()> {
     println!("📝 Output: {}", output.display().to_string().cyan());
 
     // Run once first
-    generate_once(&project, &output)?;
+    generate_once(&project, &output, false)?;
 
     if !watch {
         return Ok(());
@@ -45,7 +45,7 @@ pub async fn run(project: PathBuf, output: PathBuf, watch: bool) -> Result<()> {
             Ok(Ok(_events)) => {
                 println!();
                 println!("{}", "♻  Change detected, regenerating...".cyan());
-                match generate_once(&project, &output) {
+                match generate_once(&project, &output, false) {
                     Ok(()) => {}
                     Err(e) => {
                         println!("{}", format!("❌ {e}").red());
@@ -63,8 +63,9 @@ pub async fn run(project: PathBuf, output: PathBuf, watch: bool) -> Result<()> {
     Ok(())
 }
 
-/// Run the generate-client binary once.
-fn generate_once(project: &Path, output: &Path) -> Result<()> {
+/// Run the generate-client binary once. With `release`, it runs from the
+/// release profile, reusing the binary a `cargo build --release` just made.
+pub(crate) fn generate_once(project: &Path, output: &Path, release: bool) -> Result<()> {
     let cargo_toml = project.join("Cargo.toml");
     if !cargo_toml.exists() {
         anyhow::bail!("No Cargo.toml found in {}", project.display());
@@ -77,9 +78,12 @@ fn generate_once(project: &Path, output: &Path) -> Result<()> {
 
     println!("{}", "🔨 Running generate-client binary...".bold());
 
-    let status = Command::new("cargo")
-        .arg("run")
-        .arg("--quiet")
+    let mut cargo = Command::new("cargo");
+    cargo.arg("run").arg("--quiet");
+    if release {
+        cargo.arg("--release");
+    }
+    let status = cargo
         .arg("--bin")
         .arg("generate-client")
         .current_dir(project)

@@ -41,13 +41,183 @@ fn dev_shows_help() {
         .stdout(contains("hot reload"));
 }
 
+/// Write a minimal cargo package at `dir`: a server binary plus, optionally, a
+/// `generate-client` binary that writes a marker client to its first argument.
+fn write_crate(dir: &std::path::Path, main_rs: &str, with_generator: bool) {
+    fs::create_dir_all(dir.join("src/bin")).unwrap();
+    let mut cargo = String::from(
+        "[package]\nname = \"app\"\nversion = \"0.0.0\"\nedition = \"2021\"\ndefault-run = \"app\"\n\n[workspace]\n",
+    );
+    if with_generator {
+        cargo.push_str(
+            "\n[[bin]]\nname = \"generate-client\"\npath = \"src/bin/generate-client.rs\"\n",
+        );
+        fs::write(
+            dir.join("src/bin/generate-client.rs"),
+            "fn main() {\n    let out = std::env::args().nth(1).expect(\"output path\");\n    std::fs::create_dir_all(std::path::Path::new(&out).parent().unwrap()).unwrap();\n    std::fs::write(&out, \"// generated client\\n\").unwrap();\n}\n",
+        )
+        .unwrap();
+    }
+    fs::write(dir.join("Cargo.toml"), cargo).unwrap();
+    fs::write(dir.join("src/main.rs"), main_rs).unwrap();
+}
+
+fn node_available() -> bool {
+    std::process::Command::new("node")
+        .arg("--version")
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+
 #[test]
-fn build_reports_not_implemented() {
+fn build_errors_helpfully_outside_a_project() {
+    let tmp = tempfile::tempdir().unwrap();
     ultimo()
+        .current_dir(tmp.path())
         .arg("build")
         .assert()
+        .failure()
+        .stderr(contains("No Cargo.toml"))
+        .stderr(contains("--project"));
+}
+
+#[test]
+fn build_rejects_an_unknown_profile() {
+    ultimo()
+        .args(["build", "--profile", "fast"])
+        .assert()
+        .failure()
+        .stderr(contains("debug"))
+        .stderr(contains("release"));
+}
+
+#[test]
+fn build_compiles_a_crate_and_reports_the_binary() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_crate(tmp.path(), "fn main() {}\n", false);
+
+    ultimo()
+        .current_dir(tmp.path())
+        .env_remove("CARGO_TARGET_DIR")
+        .args(["build", "--profile", "debug"])
+        .assert()
         .success()
-        .stdout(contains("not implemented"));
+        .stdout(contains("Build complete"))
+        .stdout(contains(format!("app{}", std::env::consts::EXE_SUFFIX)));
+
+    let bin = tmp
+        .path()
+        .join("target/debug")
+        .join(format!("app{}", std::env::consts::EXE_SUFFIX));
+    assert!(bin.is_file(), "expected {} to exist", bin.display());
+}
+
+#[test]
+fn build_stops_with_a_clear_error_when_rust_fails() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_crate(tmp.path(), "fn main() { this is not rust }\n", false);
+
+    ultimo()
+        .current_dir(tmp.path())
+        .env_remove("CARGO_TARGET_DIR")
+        .args(["build", "--profile", "debug"])
+        .assert()
+        .failure()
+        .stderr(contains("`cargo build` failed"));
+}
+
+#[test]
+fn build_client_flag_regenerates_the_client_for_a_single_crate() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_crate(tmp.path(), "fn main() {}\n", true);
+
+    ultimo()
+        .current_dir(tmp.path())
+        .env_remove("CARGO_TARGET_DIR")
+        .args(["build", "--profile", "debug", "--client", "web/client.ts"])
+        .assert()
+        .success();
+
+    let client = fs::read_to_string(tmp.path().join("web/client.ts")).unwrap();
+    assert!(client.contains("generated client"));
+}
+
+#[test]
+fn build_client_flag_without_a_generator_is_an_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_crate(tmp.path(), "fn main() {}\n", false);
+
+    ultimo()
+        .current_dir(tmp.path())
+        .env_remove("CARGO_TARGET_DIR")
+        .args(["build", "--profile", "debug", "--client", "client.ts"])
+        .assert()
+        .failure()
+        .stderr(contains("generate-client"));
+}
+
+/// The fullstack order matters: the client must be regenerated *before* the
+/// frontend builds, or the frontend compiles against a stale client. The
+/// frontend's build script copies the client into `dist/` to prove it existed.
+#[test]
+fn build_fullstack_generates_the_client_then_builds_the_frontend() {
+    if !node_available() {
+        eprintln!("skipping: node is not installed");
+        return;
+    }
+    let tmp = tempfile::tempdir().unwrap();
+    write_crate(&tmp.path().join("backend"), "fn main() {}\n", true);
+    fs::create_dir_all(tmp.path().join("frontend")).unwrap();
+    fs::write(
+        tmp.path().join("frontend/package.json"),
+        r#"{
+  "name": "frontend",
+  "private": true,
+  "scripts": {
+    "build": "node -e \"const fs=require('fs');fs.mkdirSync('dist',{recursive:true});fs.copyFileSync('src/generated/client.ts','dist/client.ts')\""
+  }
+}
+"#,
+    )
+    .unwrap();
+
+    ultimo()
+        .current_dir(tmp.path())
+        .env_remove("CARGO_TARGET_DIR")
+        .args(["build", "--profile", "debug"])
+        .assert()
+        .success()
+        .stdout(contains("dist"));
+
+    let built = fs::read_to_string(tmp.path().join("frontend/dist/client.ts")).unwrap();
+    assert!(built.contains("generated client"));
+}
+
+#[test]
+fn build_skip_frontend_builds_only_rust() {
+    let tmp = tempfile::tempdir().unwrap();
+    write_crate(&tmp.path().join("backend"), "fn main() {}\n", true);
+    fs::create_dir_all(tmp.path().join("frontend")).unwrap();
+    // A build script that would fail if it ran.
+    fs::write(
+        tmp.path().join("frontend/package.json"),
+        r#"{"scripts": {"build": "exit 1"}}"#,
+    )
+    .unwrap();
+
+    ultimo()
+        .current_dir(tmp.path())
+        .env_remove("CARGO_TARGET_DIR")
+        .args(["build", "--profile", "debug", "--skip-frontend"])
+        .assert()
+        .success()
+        .stdout(contains("Skipped frontend"));
+
+    // The client is still regenerated for the frontend to pick up later.
+    assert!(tmp
+        .path()
+        .join("frontend/src/generated/client.ts")
+        .is_file());
 }
 
 #[test]
