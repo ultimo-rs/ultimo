@@ -8,8 +8,10 @@ import { SecuritySection } from "@/components/security-section";
 import { StatsSection } from "@/components/stats-section";
 import { TypeSafeSection } from "@/components/type-safe-section";
 import { UseCasesSection } from "@/components/use-cases-section";
+import { getStarCount } from "@/lib/github";
 
-export default function Home() {
+export default async function Home() {
+  const stars = await getStarCount();
   return (
     <div className="min-h-screen selection:bg-orange-500/30">
       <main>
@@ -22,7 +24,7 @@ export default function Home() {
         <TypeSafeSection />
         <ComparisonSection />
         <BlogSection />
-        <CTASection />
+        <CTASection stars={stars} />
       </main>
     </div>
   );

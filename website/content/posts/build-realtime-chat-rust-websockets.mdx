@@ -10,7 +10,7 @@ tags: ["tutorial", "websocket", "realtime"]
 
 Real-time communication is a baseline expectation for modern applications. Chat, notifications, collaborative editing, live dashboards — they all depend on bidirectional server-client communication over persistent connections.
 
-This tutorial walks through building a fully functional chat server in [Rust](https://www.rust-lang.org) using Ultimo's built-in [WebSocket](/getting-started) support with pub/sub channels. We will build a multi-room chat with presence tracking, message history, and a working browser client — all in a single Rust binary.
+This tutorial walks through building a fully functional chat server in [Rust](https://www.rust-lang.org) using Ultimo's built-in [WebSocket](https://docs.ultimo.dev/websocket) support with pub/sub channels. We will build a multi-room chat with presence tracking, message history, and a working browser client — all in a single Rust binary.
 
 ## What We Are Building
 
@@ -462,7 +462,7 @@ Ultimo's WebSocket support gives you:
 The combination of Rust's memory safety, Tokio's async runtime, and Ultimo's pub/sub abstraction produces a chat server that handles thousands of connections with predictable latency and minimal resource usage.
 
 **Next steps:**
-- [WebSocket pub/sub documentation](/getting-started) — full API reference
+- [WebSocket pub/sub documentation](https://docs.ultimo.dev/websocket) — full API reference
 - [websocket-chat example](https://github.com/ultimo-rs/ultimo/tree/main/examples/websocket-chat) — complete working code
 - [TypeScript codegen](/blog/how-typescript-codegen-works) — generate typed WebSocket message types for your React client
 - [Latency-sensitive backends](/blog/rust-for-latency-sensitive-backends) — why Rust is ideal for real-time services

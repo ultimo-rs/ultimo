@@ -5,6 +5,7 @@ import {
   Radio,
   Server,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const useCases = [
   {
@@ -58,11 +59,16 @@ export function UseCasesSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {useCases.map((useCase) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 max-w-5xl mx-auto">
+          {useCases.map((useCase, idx) => (
             <div
               key={useCase.title}
-              className="group relative rounded-xl border border-border bg-card p-6 transition-all hover:border-orange-500/30 hover:shadow-lg hover:shadow-orange-500/5"
+              className={cn(
+                "group relative rounded-xl border border-border bg-card p-6 transition-all hover:border-orange-500/30 hover:shadow-lg hover:shadow-orange-500/5",
+                // 3 cards on the first row, 2 wider ones on the second.
+                idx < 3 ? "lg:col-span-2" : "lg:col-span-3",
+                idx === useCases.length - 1 && "md:col-span-2 lg:col-span-3",
+              )}
             >
               <div className="p-2.5 rounded-lg bg-orange-500/10 text-orange-500 border border-orange-500/20 w-fit mb-4 group-hover:bg-orange-500/20 transition-colors">
                 <useCase.icon className="h-5 w-5" />

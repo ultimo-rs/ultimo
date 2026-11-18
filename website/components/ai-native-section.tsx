@@ -21,9 +21,9 @@ const pillars = [
   },
   {
     icon: Plug,
-    title: "MCP server (soon)",
+    title: "MCP server",
     description:
-      "An `ultimo mcp` server will give your agent live, typed tools — search docs, scaffold, and introspect your project's RPC surface.",
+      "`ultimo mcp` gives your agent live tools: search the current docs, read examples, scaffold a project, and introspect your RPC API.",
   },
 ];
 

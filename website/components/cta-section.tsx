@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/lib/config";
 
-export function CTASection() {
+export function CTASection({ stars }: { stars: number | null }) {
   return (
     <section className="py-24 relative overflow-hidden">
       <div className="absolute inset-0 -z-10">
@@ -15,8 +15,23 @@ export function CTASection() {
           Ready to build your next high-performance backend?
         </h2>
         <p className="text-muted-foreground text-lg mb-10 max-w-2xl mx-auto">
-          Join the developers building faster, safer, and more reliable
-          applications with Ultimo.
+          {stars !== null ? (
+            <>
+              {stars.toLocaleString("en-US")} developers have starred Ultimo
+              on{" "}
+              <Link
+                href={siteConfig.links.github}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground underline decoration-orange-500/60 underline-offset-4 hover:decoration-orange-500"
+              >
+                GitHub
+              </Link>
+              . Start with the docs and have an API running in minutes.
+            </>
+          ) : (
+            "Start with the docs and have an API running in minutes."
+          )}
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -25,7 +40,7 @@ export function CTASection() {
             className="h-12 px-8 text-base bg-white text-black hover:bg-zinc-200"
             asChild
           >
-            <Link href={siteConfig.nav.getStarted} rel="noopener noreferrer">
+            <Link href={siteConfig.nav.getStarted}>
               Get Started
             </Link>
           </Button>
@@ -35,7 +50,7 @@ export function CTASection() {
             className="h-12 px-8 text-base border-zinc-800 hover:bg-zinc-900 text-white bg-transparent"
             asChild
           >
-            <Link href={siteConfig.nav.documentation} rel="noopener noreferrer">
+            <Link href={siteConfig.nav.documentation}>
               Read Documentation
             </Link>
           </Button>

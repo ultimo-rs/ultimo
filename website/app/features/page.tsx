@@ -40,17 +40,17 @@ const faqs = [
   {
     question: "Can I use Ultimo with my existing database setup?",
     answer:
-      "Absolutely. Ultimo is database-agnostic and works with SQLx, Diesel, SeaORM, or any Rust database library. It provides connection pooling and transaction middleware without vendor lock-in.",
+      "Yes. Ultimo has first-class SQLx and Diesel integration (PostgreSQL, MySQL, SQLite) with connection pooling and test transactions, and you can use any other Rust database library directly in your handlers.",
   },
   {
     question: "Is Ultimo production-ready?",
     answer:
-      "Yes. Ultimo uses #![forbid(unsafe_code)] for memory safety, includes built-in security features (JWT, CSRF, rate limiting), and ships with testing utilities. It's benchmarked in CI to prevent performance regressions.",
+      "Ultimo is pre-1.0, so its API can still change between minor versions. It's built for production use: #![forbid(unsafe_code)], built-in security (OAuth2/OIDC login, JWT, CSRF, rate limiting), graceful shutdown, metrics and tracing, testing utilities, and benchmarks that guard against performance regressions in CI.",
   },
   {
     question: "How do I deploy an Ultimo application?",
     answer:
-      "Ultimo compiles to a single static binary with no runtime dependencies. Deploy anywhere Rust runs: Docker containers, Kubernetes, bare metal servers, or edge computing platforms.",
+      "Ultimo compiles to a single binary. Run it in a Docker container, on Kubernetes, on a VM or on bare metal — the docs have guides for AWS, Google Cloud Run, Azure, DigitalOcean, Fly.io, Railway and Kubernetes.",
   },
   {
     question: "Does Ultimo support WebSocket?",
@@ -95,7 +95,7 @@ const features = [
       "Auto-generated OpenAPI 3.0 specs",
       "Swagger UI integration",
       "Compatible with all OpenAPI tools",
-      "Request/response validation",
+      "Swagger UI served at /docs",
       "Interactive API documentation",
     ],
   },
@@ -115,24 +115,24 @@ const features = [
   {
     title: "Built-in Security & Validation",
     description:
-      "Authentication, authorization, CORS, rate limiting, and request validation are included out of the box. Focus on building features, not security infrastructure.",
+      "Login, authorization, CORS, rate limiting and request validation are included out of the box. Focus on building features, not security infrastructure.",
     icon: ShieldCheck,
     highlights: [
-      "JWT authentication support",
-      "Role-based access control",
-      "Request/response validation",
+      "OAuth2/OIDC login, JWT and API keys",
+      "Scope-based authorization guards",
+      "Request validation with typed extractors",
       "CORS middleware",
-      "Rate limiting built-in",
+      "Rate limiting, IP and geo filtering",
     ],
   },
   {
     title: "Developer-First Experience",
     description:
-      "Ergonomic APIs, helpful error messages, comprehensive CLI tools, and excellent documentation. Designed to make you productive from day one.",
+      "Ergonomic APIs, a CLI for scaffolding and hot reload, in-process testing utilities, and documentation written for both people and coding agents.",
     icon: Code2,
     highlights: [
       "Intuitive, chainable APIs",
-      "Clear, actionable error messages",
+      "In-process TestClient for tests",
       "CLI for scaffolding & development",
       "Hot reload in development",
       "Comprehensive documentation",
@@ -141,26 +141,26 @@ const features = [
   {
     title: "Database Agnostic",
     description:
-      "Works seamlessly with SQLx, Diesel, SeaORM, or any Rust database library. Use your preferred ORM or go with raw SQL—Ultimo doesn't lock you in.",
+      "First-class SQLx and Diesel integration, and any other Rust database library works in your handlers. Use an ORM or raw SQL — Ultimo doesn't lock you in.",
     icon: Database,
     highlights: [
-      "Works with SQLx, Diesel, SeaORM",
-      "Connection pooling support",
-      "Transaction middleware",
-      "Migration tools compatibility",
+      "SQLx and Diesel integration",
+      "PostgreSQL, MySQL, SQLite",
+      "Connection pooling",
+      "Test transactions that roll back",
       "No vendor lock-in",
     ],
   },
   {
     title: "Universal Deployment",
     description:
-      "Deploy anywhere Rust runs: traditional servers, containers, edge computing, or serverless. Compile to a single binary with no runtime dependencies.",
+      "Compile to a single binary and run it on any server, container platform or Kubernetes cluster, with graceful shutdown and request timeouts built in.",
     icon: Globe,
     highlights: [
       "Single binary deployment",
       "No runtime dependencies",
       "Docker & Kubernetes ready",
-      "Edge computing compatible",
+      "Graceful shutdown + timeouts",
       "Minimal resource footprint",
     ],
   },

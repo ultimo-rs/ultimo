@@ -5,9 +5,12 @@ export const siteConfig = {
   links: {
     docs: "https://docs.ultimo.dev",
     github: "https://github.com/ultimo-rs/ultimo",
-    discord: "https://discord.gg/ultimo",
-    twitter: "https://twitter.com/ultimo_rs",
+    discussions: "https://github.com/ultimo-rs/ultimo/discussions",
+    contributing:
+      "https://github.com/ultimo-rs/ultimo/blob/main/CONTRIBUTING.md",
+    crates: "https://crates.io/crates/ultimo",
   },
+  repo: "ultimo-rs/ultimo",
   nav: {
     getStarted: "https://docs.ultimo.dev/getting-started",
     documentation: "https://docs.ultimo.dev",
@@ -15,6 +18,7 @@ export const siteConfig = {
     examples: "https://github.com/ultimo-rs/ultimo/tree/main/examples",
     blog: "/blog",
     features: "/features",
+    performance: "/#performance",
     roadmap: "https://docs.ultimo.dev/roadmap",
     changelog: "https://docs.ultimo.dev/changelog",
   },

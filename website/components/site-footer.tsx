@@ -1,7 +1,46 @@
-import { Disc, Github, Twitter } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { siteConfig } from "@/lib/config";
+
+type FooterLink = { label: string; href: string; external?: boolean };
+
+const columns: { title: string; links: FooterLink[] }[] = [
+  {
+    title: "Product",
+    links: [
+      { label: "Features", href: siteConfig.nav.features },
+      { label: "Performance", href: siteConfig.nav.performance },
+      { label: "Roadmap", href: siteConfig.nav.roadmap },
+      { label: "Changelog", href: siteConfig.nav.changelog },
+    ],
+  },
+  {
+    title: "Resources",
+    links: [
+      { label: "Documentation", href: siteConfig.nav.documentation },
+      { label: "API Reference", href: siteConfig.nav.apiReference },
+      { label: "Examples", href: siteConfig.nav.examples, external: true },
+      { label: "Blog", href: siteConfig.nav.blog },
+    ],
+  },
+  {
+    title: "Community",
+    links: [
+      { label: "GitHub", href: siteConfig.links.github, external: true },
+      {
+        label: "Discussions",
+        href: siteConfig.links.discussions,
+        external: true,
+      },
+      {
+        label: "Contributing",
+        href: siteConfig.links.contributing,
+        external: true,
+      },
+      { label: "crates.io", href: siteConfig.links.crates, external: true },
+    ],
+  },
+];
 
 export function SiteFooter() {
   return (
@@ -14,172 +53,52 @@ export function SiteFooter() {
               className="flex items-center gap-2 font-bold text-xl mb-4"
             >
               <div className="relative h-6 w-6">
-                <Image src="/logo.svg" alt="Ultimo" fill />
+                <Image src="/logo.svg" alt="" fill />
               </div>
               <span>Ultimo</span>
             </Link>
-            <p className="text-muted-foreground text-sm max-w-xs mb-6">
-              A modern, high-performance web framework for Rust. Type-safe,
-              fast, and developer friendly.
+            <p className="text-muted-foreground text-sm max-w-xs">
+              A Rust web framework for REST, JSON-RPC and WebSockets, with typed
+              TypeScript clients generated from your Rust code.
             </p>
-            <div className="flex gap-4">
-              <Link
-                href={siteConfig.links.github}
-                target="_blank"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="GitHub"
-              >
-                <Github className="h-5 w-5" />
-              </Link>
-              <Link
-                href={siteConfig.links.twitter}
-                target="_blank"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Twitter"
-              >
-                <Twitter className="h-5 w-5" />
-              </Link>
-              <Link
-                href={siteConfig.links.discord}
-                target="_blank"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Discord"
-              >
-                <Disc className="h-5 w-5" />
-              </Link>
+          </div>
+
+          {columns.map((column) => (
+            <div key={column.title}>
+              <h3 className="font-semibold text-foreground mb-4">
+                {column.title}
+              </h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                {column.links.map((link) => (
+                  <li key={link.label}>
+                    <Link
+                      href={link.href}
+                      {...(link.external
+                        ? { target: "_blank", rel: "noopener noreferrer" }
+                        : {})}
+                      className="hover:text-orange-500 transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-foreground mb-4">Product</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link
-                  href={siteConfig.nav.features}
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  Features
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/#performance"
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  Performance
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={siteConfig.nav.roadmap}
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  Roadmap
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={siteConfig.nav.changelog}
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  Changelog
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-foreground mb-4">Resources</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link
-                  href={siteConfig.nav.documentation}
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  Documentation
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={siteConfig.nav.apiReference}
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  API Reference
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={siteConfig.nav.examples}
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  Examples
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={siteConfig.nav.blog}
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  Blog
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-foreground mb-4">Community</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link
-                  href={siteConfig.links.github}
-                  target="_blank"
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  GitHub
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={siteConfig.links.discord}
-                  target="_blank"
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  Discord
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={siteConfig.links.twitter}
-                  target="_blank"
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  Twitter
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="#"
-                  className="hover:text-orange-500 transition-colors"
-                >
-                  Contributing
-                </Link>
-              </li>
-            </ul>
-          </div>
+          ))}
         </div>
 
-        <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-muted-foreground text-sm">
-            © {new Date().getFullYear()} Ultimo Framework. MIT License.
+        <div className="border-t border-border pt-8 text-sm text-muted-foreground">
+          <p>
+            © {new Date().getFullYear()} Ultimo ·{" "}
+            <Link
+              href="https://github.com/ultimo-rs/ultimo/blob/main/LICENSE"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+            >
+              MIT License
+            </Link>
           </p>
-          <div className="flex gap-6 text-sm text-muted-foreground">
-            <Link href="#" className="hover:text-foreground">
-              Privacy Policy
-            </Link>
-            <Link href="#" className="hover:text-foreground">
-              Terms of Service
-            </Link>
-          </div>
         </div>
       </div>
     </footer>

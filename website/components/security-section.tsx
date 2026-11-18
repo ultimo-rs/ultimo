@@ -3,12 +3,12 @@ import { KeyRound, Lock, ShieldCheck } from "lucide-react";
 const capabilities = [
   "100% safe Rust — #![forbid(unsafe_code)], zero unsafe in the framework",
   "Secure-by-default sessions & cookies (HttpOnly/Secure/SameSite, 256-bit ids)",
-  "JWT auth (HS256, algorithm pinned, exp validated)",
-  "API-key auth with a pluggable store (SHA-256 hashed, constant-time)",
-  "Authorization guards — scope checks across JWT & API-key identities",
+  "Sign in with Google, GitHub, Okta… (OAuth2 + OIDC with PKCE)",
+  "JWT (HS256 or OIDC/JWKS) and API-key auth, with scope-based authorization",
   "CSRF protection (double-submit cookie, constant-time compare)",
-  "Security-headers middleware (HSTS, X-Frame-Options, Referrer-Policy, …)",
-  "Request body-size limits (DoS guard)",
+  "Security-headers middleware (HSTS, CSP, X-Frame-Options, …)",
+  "Rate limiting, IP allow/deny, request guards and geo-blocking",
+  "Request timeouts and body-size limits",
   "Supply-chain CI — cargo-audit + cargo-deny on every change",
 ];
 
@@ -36,7 +36,7 @@ export function SecuritySection() {
             </h2>
             <p className="text-muted-foreground text-lg mb-8 leading-relaxed">
               Built in safe Rust with secure defaults across the stack —
-              authentication, authorization, CSRF, hardened headers, and
+              login, authorization, CSRF, rate limiting, hardened headers and
               supply-chain checks ship in the box, not as an afterthought.
             </p>
             <a

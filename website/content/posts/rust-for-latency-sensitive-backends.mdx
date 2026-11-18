@@ -96,7 +96,7 @@ No hand-maintained types. No drift.
 
 ### JSON-RPC for Internal Services
 
-For internal service-to-service communication — the latency-critical path — REST over HTTP/1.1 carries overhead: headers, content negotiation, URL routing. [JSON-RPC](/rpc) over a persistent connection reduces this to a framing concern.
+For internal service-to-service communication — the latency-critical path — REST over HTTP/1.1 carries overhead: headers, content negotiation, URL routing. [JSON-RPC](https://docs.ultimo.dev/rpc) over a persistent connection reduces this to a framing concern.
 
 Ultimo supports both REST and JSON-RPC in the same application. You can expose a REST API for external consumers while using typed JSON-RPC for internal service calls:
 
@@ -120,7 +120,7 @@ The generated TypeScript client wraps these as async functions with full type in
 
 Market data feeds, trade confirmations, position updates, and risk alerts are fundamentally push-based. Polling a REST endpoint for these is wasteful and introduces latency proportional to your polling interval.
 
-Ultimo includes [RFC 6455 WebSocket support](/getting-started) with built-in pub/sub channels:
+Ultimo includes [RFC 6455 WebSocket support](https://docs.ultimo.dev/websocket) with built-in pub/sub channels:
 
 ```rust
 app.websocket("/market-data/:symbol", |ctx: Context| async move {
@@ -347,7 +347,7 @@ Ultimo adds the developer experience layer on top: type-safe TypeScript codegen,
 If your backend's correctness and tail latency directly affect revenue, Rust and Ultimo are worth a serious evaluation.
 
 **Next steps:**
-- [Get started with Ultimo](/getting-started) — create your first API in minutes
+- [Get started with Ultimo](https://docs.ultimo.dev/getting-started) — create your first API in minutes
 - [TypeScript client codegen](/blog/how-typescript-codegen-works) — how types flow from Rust to TypeScript
-- [WebSocket pub/sub](/getting-started) — real-time channels for market data and notifications
+- [WebSocket pub/sub](https://docs.ultimo.dev/websocket) — real-time channels for market data and notifications
 - [Benchmark examples](https://github.com/ultimo-rs/ultimo/tree/main/examples/benchmark) — run your own performance tests
