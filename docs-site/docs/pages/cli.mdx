@@ -4,23 +4,16 @@ The Ultimo CLI provides commands for generating TypeScript clients, managing pro
 
 ## Installation
 
-Install the CLI from your Ultimo project:
+Install the CLI from crates.io:
 
 ```bash
-cargo install --path ultimo-cli
+cargo install ultimo-cli
 ```
 
-Or use the installation script:
-
-```bash
-./install-cli.sh
-```
-
-Verify installation:
+This installs the `ultimo` binary. Verify it:
 
 ```bash
 ultimo --version
-# ultimo 0.4.1
 ```
 
 ## Commands
@@ -174,7 +167,7 @@ jobs:
           toolchain: stable
 
       - name: Install Ultimo CLI
-        run: cargo install --path ultimo-cli
+        run: cargo install ultimo-cli
 
       - name: Generate TypeScript client
         run: ultimo generate -p ./backend -o ./frontend/src/lib/client.ts
@@ -248,6 +241,51 @@ the running server, rebuilds with `cargo build`, and restarts. Compilation
 errors are printed inline — the watcher stays active so the server restarts
 automatically once you fix the error.
 
+## Production Build
+
+Build the whole project for production in one command:
+
+```bash
+ultimo build                     # release profile (the default)
+ultimo build --profile debug     # faster to compile, for checking a build
+```
+
+`ultimo build` works out the layout from the project root — a single crate, or a
+[fullstack](#create-a-new-project) project with `backend/` and `frontend/` — and
+runs these steps in order, stopping at the first failure:
+
+1. **Compiles the Rust crate** with `cargo build --release` (or `cargo build`
+   for `--profile debug`).
+2. **Regenerates the TypeScript client** by running the project's
+   `generate-client` binary, so the frontend never ships against a stale
+   client. For a fullstack project it writes `frontend/src/generated/client.ts`;
+   for a single crate, pass `--client <path>` to generate one. The binary
+   compiled in step 1 is reused, so this doesn't build the crate twice.
+3. **Builds the frontend**, if there is a `frontend/package.json` with a `build`
+   script. It uses the package manager matching the lockfile (`pnpm`, `yarn`,
+   `bun`, otherwise `npm`), and installs dependencies first when
+   `node_modules` is missing.
+
+It finishes by printing where the outputs are:
+
+```
+✨ Build complete
+   🦀 /path/to/my-app/backend/target/release/my-app-backend
+   🌐 /path/to/my-app/frontend/dist
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--profile <debug\|release>` | Cargo profile (default `release`) |
+| `--project <dir>` | Project root (default `.`) |
+| `--client <path>` | Write the TypeScript client here as well (needs a `generate-client` binary) |
+| `--skip-client` | Don't regenerate the TypeScript client |
+| `--skip-frontend` | Build only the Rust side, e.g. when the frontend is deployed separately |
+
+When a step fails, `ultimo build` exits with a non-zero status and names the
+command that failed, so it works as-is in CI. For deployment, the release
+binary is self-contained — see the [deployment guides](/deployment).
+
 ## MCP Server (for AI coding agents)
 
 `ultimo mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io)
@@ -261,12 +299,10 @@ ultimo mcp   # speaks MCP over stdio (run by your agent, not directly)
 
 ## Future Commands
 
-> ⚠️ **Not implemented yet.** These commands exist as placeholders and currently
-> print a notice. Until they land, use the cargo equivalents.
+These aren't part of the CLI. Use the cargo equivalents.
 
 | Command | Status | Use instead |
 | --- | --- | --- |
-| `ultimo build` | Planned — production build wrapper | `cargo build --release` |
 | `ultimo test` | Not planned yet | `cargo test` |
 | `ultimo fmt` / `ultimo lint` | Not planned yet | `cargo fmt` / `cargo clippy` |
 

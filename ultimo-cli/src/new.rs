@@ -36,6 +36,7 @@ When editing it, follow these conventions.
 - `cargo test` — run tests.
 - `ultimo dev` — hot-reload dev server (rebuilds on change).
 - `ultimo generate -o ./client.ts` — regenerate the typed TypeScript client (RPC projects).
+- `ultimo build` — production build: release binary, fresh TypeScript client, frontend.
 
 ## Adding a route
 

@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use std::path::PathBuf;
 
+mod build;
 mod dev;
 mod generate;
 mod mcp;
@@ -54,11 +55,27 @@ enum Commands {
         host: String,
     },
 
-    /// [not implemented yet] Production build — use `cargo build --release` for now
+    /// Build the project for production: the Rust crate, the TypeScript client and the frontend
     Build {
         /// Build profile (debug or release)
-        #[arg(short, long, default_value = "release")]
+        #[arg(short, long, default_value = "release", value_parser = ["debug", "release"])]
         profile: String,
+
+        /// Project root (a crate, or a fullstack project with backend/ and frontend/)
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+
+        /// Also write the TypeScript client here (default: frontend/src/generated/client.ts when there is a frontend)
+        #[arg(long)]
+        client: Option<PathBuf>,
+
+        /// Don't regenerate the TypeScript client
+        #[arg(long)]
+        skip_client: bool,
+
+        /// Don't build the frontend
+        #[arg(long)]
+        skip_frontend: bool,
     },
 
     /// Run a Model Context Protocol server (stdio) for AI coding agents
@@ -92,12 +109,21 @@ async fn main() -> anyhow::Result<()> {
         Commands::Dev { port, host } => {
             dev::run(port, host).await?;
         }
-        Commands::Build { profile: _ } => {
-            println!("{}", "`ultimo build` is not implemented yet.".yellow());
-            println!(
-                "Build with cargo for now:  {}",
-                "cargo build --release".cyan()
-            );
+        Commands::Build {
+            profile,
+            project,
+            client,
+            skip_client,
+            skip_frontend,
+        } => {
+            build::run(build::Options {
+                project,
+                profile: build::Profile::parse(&profile)?,
+                client,
+                skip_client,
+                skip_frontend,
+            })
+            .await?;
         }
         // Handled before the banner above.
         Commands::Mcp => unreachable!(),
