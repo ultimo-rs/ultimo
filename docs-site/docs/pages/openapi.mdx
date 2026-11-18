@@ -256,6 +256,146 @@ The generated `openapi.json` looks like:
 }
 ```
 
+## Documenting REST routes
+
+For routes you register yourself, describe each operation with the
+constructors in `ultimo::openapi`:
+
+```rust
+use ultimo::openapi::{OpenApiBuilder, Operation, Parameter, PathItem, RequestBody, Response, Schema};
+
+let mut spec = OpenApiBuilder::new().title("User API").version("1.0.0").build();
+
+spec.add_schema("User", Schema::object([
+    ("id", Schema::integer()),
+    ("name", Schema::string()),
+]));
+
+spec.add_path(
+    "/users/{id}",
+    PathItem::new().get(
+        Operation::new()
+            .summary("Get user by ID")
+            .tag("users")
+            .parameter(Parameter::path("id", Schema::integer()))
+            .response("200", Response::json("The user", Schema::reference("User")))
+            .response("404", Response::new("Not found")),
+    ),
+);
+
+spec.add_path(
+    "/users",
+    PathItem::new().post(
+        Operation::new()
+            .summary("Create a user")
+            .request_body(RequestBody::json(Schema::reference("User")))
+            .response("201", Response::json("Created", Schema::reference("User"))),
+    ),
+);
+
+app.serve_docs("/docs", spec); // Swagger UI at /docs, the spec at /docs/openapi.json
+```
+
+The types are `#[non_exhaustive]`, so build them with these constructors
+(`Operation::new()`, `Response::json(..)`, `Schema::object(..)`, …) rather than
+struct literals. Every field stays public: set anything without a helper
+directly, e.g. `op.description = Some("…".into())`.
+
+## Authentication
+
+Declare how clients authenticate and Swagger UI shows an **Authorize** button.
+Once someone enters a token or key there, every "Try it out" request sends it.
+
+```rust
+use ultimo::openapi::{OpenApiBuilder, Operation, SecurityScheme};
+
+let mut spec = OpenApiBuilder::new()
+    .title("User API")
+    .version("1.0.0")
+    .security_scheme("bearerAuth", SecurityScheme::bearer_jwt())
+    .security("bearerAuth") // required on every operation by default
+    .build();
+
+// Opt one operation out of the default:
+let health = Operation::new().summary("Health check").public();
+
+// Or require something else on one operation (alternatives are OR-ed):
+let delete = Operation::new()
+    .security("bearerAuth")
+    .security_with_scopes("oauth", &["users:delete"]);
+```
+
+Pick the scheme that matches the auth middleware you use:
+
+| You protect routes with | Declare |
+| --- | --- |
+| [`Jwt::hs256` / `Jwt::oidc`](/jwt) | `SecurityScheme::bearer_jwt()` |
+| [`ApiKey`](/api-keys) | `SecurityScheme::api_key_header("X-API-Key")` (or `api_key_query` / `api_key_cookie`) |
+| [`BasicAuth`](/middleware) | `SecurityScheme::basic()` |
+| Tokens from an OpenID Connect provider | `SecurityScheme::open_id_connect(discovery_url)` |
+| Tokens from an OAuth2 provider | `SecurityScheme::oauth2_authorization_code(auth_url, token_url, &[("scope", "description")])` or `oauth2_client_credentials(token_url, scopes)` |
+
+`.description(..)` on any scheme adds text to the Authorize dialog.
+
+The spec **documents** authentication; it doesn't enforce it. Your middleware
+still does the checking, so keep the two in step: an operation marked
+`.public()` should really be reachable without credentials.
+
+**For a generated spec** — from `RpcRegistry::generate_openapi` — add security
+after the fact:
+
+```rust
+let mut spec = rpc.generate_openapi("My API", "1.0.0", "/api");
+spec.add_security_scheme("bearerAuth", SecurityScheme::bearer_jwt());
+spec.require_security("bearerAuth");
+if let Some(op) = spec.operation_mut("/api/health", "get") {
+    op.security = Some(vec![]); // public
+}
+```
+
+The [`openapi-demo`](https://github.com/ultimo-rs/ultimo/tree/main/examples/openapi-demo)
+REST server protects its write endpoints with an API key and documents it this
+way — run it and try the Authorize button.
+
+## Upgrading from 0.9
+
+0.10 made the OpenAPI types `#[non_exhaustive]` so that new OpenAPI fields can
+be added later without breaking your code again. Code that built them with
+struct literals needs to switch to the constructors:
+
+```rust
+// 0.9
+let op = Operation {
+    summary: Some("Get user".to_string()),
+    description: None,
+    operation_id: Some("getUser".to_string()),
+    tags: Some(vec!["users".to_string()]),
+    parameters: None,
+    request_body: None,
+    responses: HashMap::new(),
+};
+spec.add_path("/users/{id}".to_string(), PathItem { get: Some(op), post: None, put: None, delete: None, patch: None });
+
+// 0.10
+let op = Operation::new().summary("Get user").operation_id("getUser").tag("users");
+spec.add_path("/users/{id}", PathItem::new().get(op));
+```
+
+| 0.9 literal | 0.10 |
+| --- | --- |
+| `Operation { .. }` | `Operation::new()` + `.summary()`, `.tag()`, `.parameter()`, `.request_body()`, `.response()` |
+| `PathItem { .. }` | `PathItem::new().get(op).post(op)…` |
+| `Parameter { .. }` | `Parameter::path(name, schema)`, `::query`, `::header`, `::new(name, location, schema)` |
+| `RequestBody { .. }` | `RequestBody::json(schema)` |
+| `Response { .. }` | `Response::new(description)`, `Response::json(description, schema)` |
+| `MediaType { .. }` | `MediaType::new(schema).example(json)` |
+| `Schema { .. }` | `Schema::string()`, `::integer()`, `::of_type(..)`, `::array(..)`, `::object([..])`, `::reference("User")` |
+| `Server` / `Tag` / `Info` / `License` | `::new(..)`, or the `OpenApiBuilder` methods |
+
+Reading fields, matching on them and mutating them works as before.
+`add_path` and `add_schema` now take `impl Into<String>`, so `.to_string()`
+on the path is no longer needed (it still compiles).
+
 ## View with Swagger UI
 
 Use Docker to quickly view your API docs:

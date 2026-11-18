@@ -17,6 +17,10 @@ struct CreateUserInput {
 
 type UserStore = Arc<Mutex<Vec<User>>>;
 
+/// The key this demo accepts for writes. A real API would issue and check
+/// keys with `ultimo::auth::api_key` (the `api-key` feature).
+const DEMO_API_KEY: &str = "demo-key";
+
 #[tokio::main]
 async fn main() -> ultimo::Result<()> {
     println!("🚀 Ultimo OpenAPI Demo - Regular REST Mode");
@@ -43,6 +47,21 @@ async fn main() -> ultimo::Result<()> {
 
     // Add logger middleware
     app.use_middleware(ultimo::middleware::builtin::logger());
+
+    // Writes (POST/DELETE) need the demo API key in `X-API-Key`. The OpenAPI
+    // spec below documents this, so Swagger UI can send the key for you.
+    app.use_middleware(
+        ultimo::guard::Guard::new(|ctx: &Context| {
+            let writes = matches!(ctx.req.method().as_str(), "POST" | "DELETE");
+            let authorized = ctx.req.header("x-api-key").as_deref() == Some(DEMO_API_KEY);
+            if writes && !authorized {
+                ultimo::guard::Decision::respond(401, "Missing or wrong X-API-Key")
+            } else {
+                ultimo::guard::Decision::Allow
+            }
+        })
+        .build(),
+    );
 
     // Regular REST endpoints - no RPC
     let users_get = users.clone();
@@ -119,11 +138,10 @@ async fn main() -> ultimo::Result<()> {
         }
     });
 
-    // Manually create OpenAPI spec for REST endpoints
-    use std::collections::HashMap;
+    // Describe the REST endpoints with OpenAPI
     use ultimo::openapi::{
-        MediaType, OpenApiBuilder, Operation, Parameter, ParameterLocation, PathItem, RequestBody,
-        Response, Schema,
+        OpenApiBuilder, Operation, Parameter, PathItem, RequestBody, Response, Schema,
+        SecurityScheme,
     };
 
     println!("📋 Generating OpenAPI specification...");
@@ -135,375 +153,92 @@ async fn main() -> ultimo::Result<()> {
         .description("User management API using regular REST endpoints")
         .server(&server_url, Some("API server".to_string()))
         .tag("users", Some("User management operations".to_string()))
+        // Writes need an API key. Declaring the scheme gives Swagger UI an
+        // "Authorize" button; the guard above is what actually enforces it.
+        .security_scheme(
+            "apiKey",
+            SecurityScheme::api_key_header("X-API-Key")
+                .description(format!("Use `{DEMO_API_KEY}` in this demo.")),
+        )
         .build();
 
-    // GET /api/users/:id
-    let mut get_user_op = Operation {
-        summary: Some("Get user by ID".to_string()),
-        description: Some("Retrieve a single user by their ID".to_string()),
-        operation_id: Some("getUser".to_string()),
-        tags: Some(vec!["users".to_string()]),
-        parameters: Some(vec![Parameter {
-            name: "id".to_string(),
-            location: ParameterLocation::Path,
-            description: Some("User ID".to_string()),
-            required: Some(true),
-            schema: Schema {
-                schema_type: Some("integer".to_string()),
-                format: Some("int32".to_string()),
-                properties: None,
-                required: None,
-                items: None,
-                reference: None,
-            },
-        }]),
-        request_body: None,
-        responses: HashMap::new(),
-    };
-    get_user_op.responses.insert(
-        "200".to_string(),
-        Response {
-            description: "Successful response".to_string(),
-            content: Some({
-                let mut content = HashMap::new();
-                content.insert(
-                    "application/json".to_string(),
-                    MediaType {
-                        schema: Schema {
-                            schema_type: Some("object".to_string()),
-                            format: None,
-                            properties: Some({
-                                let mut props = HashMap::new();
-                                props.insert(
-                                    "id".to_string(),
-                                    Box::new(Schema {
-                                        schema_type: Some("integer".to_string()),
-                                        format: Some("int32".to_string()),
-                                        properties: None,
-                                        required: None,
-                                        items: None,
-                                        reference: None,
-                                    }),
-                                );
-                                props.insert(
-                                    "name".to_string(),
-                                    Box::new(Schema {
-                                        schema_type: Some("string".to_string()),
-                                        format: None,
-                                        properties: None,
-                                        required: None,
-                                        items: None,
-                                        reference: None,
-                                    }),
-                                );
-                                props.insert(
-                                    "email".to_string(),
-                                    Box::new(Schema {
-                                        schema_type: Some("string".to_string()),
-                                        format: Some("email".to_string()),
-                                        properties: None,
-                                        required: None,
-                                        items: None,
-                                        reference: None,
-                                    }),
-                                );
-                                props
-                            }),
-                            required: Some(vec![
-                                "id".to_string(),
-                                "name".to_string(),
-                                "email".to_string(),
-                            ]),
-                            items: None,
-                            reference: None,
-                        },
-                        example: None,
-                    },
-                );
-                content
-            }),
-        },
-    );
-    get_user_op.responses.insert(
-        "404".to_string(),
-        Response {
-            description: "User not found".to_string(),
-            content: None,
-        },
-    );
+    let user_schema = Schema::object([
+        ("id", Schema::integer()),
+        ("name", Schema::string()),
+        ("email", Schema::string().format("email")),
+    ]);
+    openapi.add_schema("User", user_schema);
+    let id_param = || Parameter::path("id", Schema::integer()).description("User ID");
 
+    // GET /api/users/{id} + DELETE /api/users/{id}
     openapi.add_path(
-        "/api/users/{id}".to_string(),
-        PathItem {
-            get: Some(get_user_op),
-            post: None,
-            put: None,
-            delete: None,
-            patch: None,
-        },
+        "/api/users/{id}",
+        PathItem::new()
+            .get(
+                Operation::new()
+                    .summary("Get user by ID")
+                    .description("Retrieve a single user by their ID")
+                    .operation_id("getUser")
+                    .tag("users")
+                    .parameter(id_param())
+                    .response(
+                        "200",
+                        Response::json("User found", Schema::reference("User")),
+                    )
+                    .response("404", Response::new("User not found")),
+            )
+            .delete(
+                Operation::new()
+                    .summary("Delete user")
+                    .description("Delete a user by ID. Requires an API key.")
+                    .operation_id("deleteUser")
+                    .tag("users")
+                    .parameter(id_param())
+                    .security("apiKey")
+                    .response("204", Response::new("User deleted successfully"))
+                    .response("401", Response::new("Missing or wrong API key"))
+                    .response("404", Response::new("User not found")),
+            ),
     );
 
-    // GET /api/users
-    let mut list_users_op = Operation {
-        summary: Some("List all users".to_string()),
-        description: Some("Retrieve a list of all users".to_string()),
-        operation_id: Some("listUsers".to_string()),
-        tags: Some(vec!["users".to_string()]),
-        parameters: None,
-        request_body: None,
-        responses: HashMap::new(),
-    };
-    list_users_op.responses.insert(
-        "200".to_string(),
-        Response {
-            description: "Successful response".to_string(),
-            content: Some({
-                let mut content = HashMap::new();
-                content.insert(
-                    "application/json".to_string(),
-                    MediaType {
-                        schema: Schema {
-                            schema_type: Some("array".to_string()),
-                            format: None,
-                            properties: None,
-                            required: None,
-                            items: Some(Box::new(Schema {
-                                schema_type: Some("object".to_string()),
-                                format: None,
-                                properties: Some({
-                                    let mut props = HashMap::new();
-                                    props.insert(
-                                        "id".to_string(),
-                                        Box::new(Schema {
-                                            schema_type: Some("integer".to_string()),
-                                            format: Some("int32".to_string()),
-                                            properties: None,
-                                            required: None,
-                                            items: None,
-                                            reference: None,
-                                        }),
-                                    );
-                                    props.insert(
-                                        "name".to_string(),
-                                        Box::new(Schema {
-                                            schema_type: Some("string".to_string()),
-                                            format: None,
-                                            properties: None,
-                                            required: None,
-                                            items: None,
-                                            reference: None,
-                                        }),
-                                    );
-                                    props.insert(
-                                        "email".to_string(),
-                                        Box::new(Schema {
-                                            schema_type: Some("string".to_string()),
-                                            format: Some("email".to_string()),
-                                            properties: None,
-                                            required: None,
-                                            items: None,
-                                            reference: None,
-                                        }),
-                                    );
-                                    props
-                                }),
-                                required: Some(vec![
-                                    "id".to_string(),
-                                    "name".to_string(),
-                                    "email".to_string(),
-                                ]),
-                                items: None,
-                                reference: None,
-                            })),
-                            reference: None,
-                        },
-                        example: None,
-                    },
-                );
-                content
-            }),
-        },
-    );
-
+    // GET /api/users + POST /api/users
+    let mut create_body = RequestBody::json(Schema::object([
+        ("name", Schema::string()),
+        ("email", Schema::string().format("email")),
+    ]))
+    .description("User to create");
+    if let Some(media) = create_body.content.get_mut("application/json") {
+        media.example = Some(serde_json::json!({ "name": "Carol", "email": "carol@example.com" }));
+    }
     openapi.add_path(
-        "/api/users".to_string(),
-        PathItem {
-            get: Some(list_users_op),
-            post: None,
-            put: None,
-            delete: None,
-            patch: None,
-        },
+        "/api/users",
+        PathItem::new()
+            .get(
+                Operation::new()
+                    .summary("List all users")
+                    .description("Retrieve a list of all users")
+                    .operation_id("listUsers")
+                    .tag("users")
+                    .response(
+                        "200",
+                        Response::json("List of users", Schema::array(Schema::reference("User"))),
+                    ),
+            )
+            .post(
+                Operation::new()
+                    .summary("Create user")
+                    .description("Create a new user. Requires an API key.")
+                    .operation_id("createUser")
+                    .tag("users")
+                    .security("apiKey")
+                    .request_body(create_body)
+                    .response(
+                        "200",
+                        Response::json("User created", Schema::reference("User")),
+                    )
+                    .response("401", Response::new("Missing or wrong API key")),
+            ),
     );
-
-    // POST /api/users
-    let mut create_user_op = Operation {
-        summary: Some("Create a new user".to_string()),
-        description: Some("Create a new user with name and email".to_string()),
-        operation_id: Some("createUser".to_string()),
-        tags: Some(vec!["users".to_string()]),
-        parameters: None,
-        request_body: Some(RequestBody {
-            description: Some("User data".to_string()),
-            content: {
-                let mut content = HashMap::new();
-                content.insert(
-                    "application/json".to_string(),
-                    MediaType {
-                        schema: Schema {
-                            schema_type: Some("object".to_string()),
-                            format: None,
-                            properties: Some({
-                                let mut props = HashMap::new();
-                                props.insert(
-                                    "name".to_string(),
-                                    Box::new(Schema {
-                                        schema_type: Some("string".to_string()),
-                                        format: None,
-                                        properties: None,
-                                        required: None,
-                                        items: None,
-                                        reference: None,
-                                    }),
-                                );
-                                props.insert(
-                                    "email".to_string(),
-                                    Box::new(Schema {
-                                        schema_type: Some("string".to_string()),
-                                        format: Some("email".to_string()),
-                                        properties: None,
-                                        required: None,
-                                        items: None,
-                                        reference: None,
-                                    }),
-                                );
-                                props
-                            }),
-                            required: Some(vec!["name".to_string(), "email".to_string()]),
-                            items: None,
-                            reference: None,
-                        },
-                        example: None,
-                    },
-                );
-                content
-            },
-            required: Some(true),
-        }),
-        responses: HashMap::new(),
-    };
-    create_user_op.responses.insert(
-        "200".to_string(),
-        Response {
-            description: "User created successfully".to_string(),
-            content: Some({
-                let mut content = HashMap::new();
-                content.insert(
-                    "application/json".to_string(),
-                    MediaType {
-                        schema: Schema {
-                            schema_type: Some("object".to_string()),
-                            format: None,
-                            properties: Some({
-                                let mut props = HashMap::new();
-                                props.insert(
-                                    "id".to_string(),
-                                    Box::new(Schema {
-                                        schema_type: Some("integer".to_string()),
-                                        format: Some("int32".to_string()),
-                                        properties: None,
-                                        required: None,
-                                        items: None,
-                                        reference: None,
-                                    }),
-                                );
-                                props.insert(
-                                    "name".to_string(),
-                                    Box::new(Schema {
-                                        schema_type: Some("string".to_string()),
-                                        format: None,
-                                        properties: None,
-                                        required: None,
-                                        items: None,
-                                        reference: None,
-                                    }),
-                                );
-                                props.insert(
-                                    "email".to_string(),
-                                    Box::new(Schema {
-                                        schema_type: Some("string".to_string()),
-                                        format: Some("email".to_string()),
-                                        properties: None,
-                                        required: None,
-                                        items: None,
-                                        reference: None,
-                                    }),
-                                );
-                                props
-                            }),
-                            required: Some(vec![
-                                "id".to_string(),
-                                "name".to_string(),
-                                "email".to_string(),
-                            ]),
-                            items: None,
-                            reference: None,
-                        },
-                        example: None,
-                    },
-                );
-                content
-            }),
-        },
-    );
-
-    // Update the path with POST operation
-    if let Some(path_item) = openapi.paths.get_mut("/api/users") {
-        path_item.post = Some(create_user_op);
-    }
-
-    // DELETE /api/users/:id
-    let mut delete_user_op = Operation {
-        summary: Some("Delete a user".to_string()),
-        description: Some("Delete a user by their ID".to_string()),
-        operation_id: Some("deleteUser".to_string()),
-        tags: Some(vec!["users".to_string()]),
-        parameters: Some(vec![Parameter {
-            name: "id".to_string(),
-            location: ParameterLocation::Path,
-            description: Some("User ID".to_string()),
-            required: Some(true),
-            schema: Schema {
-                schema_type: Some("integer".to_string()),
-                format: Some("int32".to_string()),
-                properties: None,
-                required: None,
-                items: None,
-                reference: None,
-            },
-        }]),
-        request_body: None,
-        responses: HashMap::new(),
-    };
-    delete_user_op.responses.insert(
-        "204".to_string(),
-        Response {
-            description: "User deleted successfully".to_string(),
-            content: None,
-        },
-    );
-    delete_user_op.responses.insert(
-        "404".to_string(),
-        Response {
-            description: "User not found".to_string(),
-            content: None,
-        },
-    );
-
-    // Add DELETE operation to /api/users/:id path
-    if let Some(path_item) = openapi.paths.get_mut("/api/users/{id}") {
-        path_item.delete = Some(delete_user_op);
-    }
 
     // Save OpenAPI spec
     openapi
@@ -541,7 +276,8 @@ Powered by <a href="https://github.com/ultimo-rs/ultimo" style="color:#92400e;fo
     println!("Available endpoints:");
     println!("  GET  /api/users/:id");
     println!("  GET  /api/users");
-    println!("  POST /api/users");
+    println!("  POST /api/users        (needs X-API-Key: {DEMO_API_KEY})");
+    println!("  DELETE /api/users/:id  (needs X-API-Key: {DEMO_API_KEY})");
     println!();
     println!("📖 Interactive API Documentation:");
     println!("  Swagger UI: http://127.0.0.1:3000/docs");

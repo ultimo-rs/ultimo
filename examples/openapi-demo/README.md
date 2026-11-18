@@ -238,21 +238,23 @@ let mut openapi = OpenApiBuilder::new()
     .version("1.0.0")
     .build();
 
-// Define detailed operation
-let mut operation = Operation {
-    summary: Some("Get user by ID".to_string()),
-    parameters: Some(vec![...]),
-    responses: HashMap::new(),
-    // ... detailed schema definitions
-};
+// Describe each operation with the constructors
+openapi.add_path(
+    "/api/users/{id}",
+    PathItem::new().get(
+        Operation::new()
+            .summary("Get user by ID")
+            .parameter(Parameter::path("id", Schema::integer()))
+            .response("200", Response::json("User found", Schema::reference("User"))),
+    ),
+);
 
-openapi.add_path("/api/users/{id}".to_string(), PathItem {
-    get: Some(operation),
-    post: None,
-    put: None,
-    delete: None,
-    patch: None,
-});
+// Writes need an API key: declaring it gives Swagger UI an "Authorize" button
+// (a Guard middleware enforces it). Use `demo-key`.
+let openapi = OpenApiBuilder::new()
+    .security_scheme("apiKey", SecurityScheme::api_key_header("X-API-Key"))
+    .build();
+let create = Operation::new().summary("Create user").security("apiKey");
 ```
 
 ### RPC Mode Code

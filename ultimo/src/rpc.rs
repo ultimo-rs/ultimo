@@ -698,10 +698,9 @@ function useUltimoClient(): UltimoRpcClient {
         base_path: &str,
     ) -> crate::openapi::OpenApiSpec {
         use crate::openapi::{
-            MediaType, OpenApiBuilder, Operation, Parameter, ParameterLocation, PathItem,
-            RequestBody, Response,
+            OpenApiBuilder, OpenApiSpec, Operation, Parameter, PathItem, RequestBody, Response,
+            Schema,
         };
-        use std::collections::HashMap;
 
         let mut spec = OpenApiBuilder::new()
             .title(title)
@@ -725,225 +724,80 @@ function useUltimoClient(): UltimoRpcClient {
                     let path = format!("{}/{}", base_path, type_def.name);
                     let method = if is_query { "GET" } else { "POST" };
 
-                    // Create operation
-                    let mut operation = Operation {
-                        summary: Some(format!("{} {}", method, type_def.name)),
-                        description: None,
-                        operation_id: Some(type_def.name.clone()),
-                        tags: Some(vec!["RPC".to_string()]),
-                        parameters: None,
-                        request_body: None,
-                        responses: HashMap::new(),
-                    };
-
-                    // Add response
-                    let response_schema =
-                        crate::openapi::OpenApiSpec::ts_to_schema(&type_def.ts_output);
-                    let mut content = HashMap::new();
-                    content.insert(
-                        "application/json".to_string(),
-                        MediaType {
-                            schema: response_schema,
-                            example: None,
-                        },
-                    );
-
-                    operation.responses.insert(
-                        "200".to_string(),
-                        Response {
-                            description: "Successful response".to_string(),
-                            content: Some(content),
-                        },
-                    );
-
-                    // Add request body for POST or query params for GET
-                    if is_query {
-                        // GET: Add query parameters if input type is object
-                        if type_def.ts_input != "{}" {
-                            let _param_schema =
-                                crate::openapi::OpenApiSpec::ts_to_schema(&type_def.ts_input);
-                            let mut parameters = vec![];
-
-                            // Simple parameter extraction (could be enhanced)
-                            if type_def.ts_input.contains("id") {
-                                parameters.push(Parameter {
-                                    name: "id".to_string(),
-                                    location: ParameterLocation::Query,
-                                    description: Some("Request parameter".to_string()),
-                                    required: Some(true),
-                                    schema: crate::openapi::Schema {
-                                        schema_type: Some("string".to_string()),
-                                        format: None,
-                                        properties: None,
-                                        required: None,
-                                        items: None,
-                                        reference: None,
-                                    },
-                                });
-                            }
-
-                            if !parameters.is_empty() {
-                                operation.parameters = Some(parameters);
-                            }
-                        }
-                    } else {
-                        // POST: Add request body
-                        let request_schema =
-                            crate::openapi::OpenApiSpec::ts_to_schema(&type_def.ts_input);
-                        let mut content = HashMap::new();
-                        content.insert(
-                            "application/json".to_string(),
-                            MediaType {
-                                schema: request_schema,
-                                example: None,
-                            },
+                    let mut operation = Operation::new()
+                        .summary(format!("{} {}", method, type_def.name))
+                        .operation_id(type_def.name.clone())
+                        .tag("RPC")
+                        .response(
+                            "200",
+                            Response::json(
+                                "Successful response",
+                                OpenApiSpec::ts_to_schema(&type_def.ts_output),
+                            ),
                         );
 
-                        operation.request_body = Some(RequestBody {
-                            description: Some("Request body".to_string()),
-                            content,
-                            required: Some(true),
-                        });
-                    }
-
-                    // Add to spec
-                    let mut path_item = PathItem {
-                        get: None,
-                        post: None,
-                        put: None,
-                        delete: None,
-                        patch: None,
-                    };
-
                     if is_query {
-                        path_item.get = Some(operation);
+                        // GET: simple parameter extraction (could be enhanced)
+                        if type_def.ts_input != "{}" && type_def.ts_input.contains("id") {
+                            operation = operation.parameter(
+                                Parameter::query("id", Schema::string())
+                                    .description("Request parameter")
+                                    .required(true),
+                            );
+                        }
                     } else {
-                        path_item.post = Some(operation);
+                        operation = operation.request_body(
+                            RequestBody::json(OpenApiSpec::ts_to_schema(&type_def.ts_input))
+                                .description("Request body"),
+                        );
                     }
 
+                    let path_item = if is_query {
+                        PathItem::new().get(operation)
+                    } else {
+                        PathItem::new().post(operation)
+                    };
                     spec.add_path(path, path_item);
                 }
             }
             RpcMode::JsonRpc => {
                 // Generate single JSON-RPC endpoint
-                let path = "/rpc".to_string();
+                let response_schema = Schema::object([("result", Schema::of_type("object"))]);
+                let request_schema = Schema::object([
+                    ("method", Schema::string()),
+                    ("params", Schema::of_type("object")),
+                ]);
+                let example_method = type_defs
+                    .first()
+                    .map(|t| t.name.clone())
+                    .unwrap_or_else(|| "exampleMethod".to_string());
 
-                let mut responses = HashMap::new();
-                responses.insert(
-                    "200".to_string(),
-                    Response {
-                        description: "Successful RPC response".to_string(),
-                        content: Some({
-                            let mut content = HashMap::new();
-                            content.insert(
-                                "application/json".to_string(),
-                                MediaType {
-                                    schema: crate::openapi::Schema {
-                                        schema_type: Some("object".to_string()),
-                                        format: None,
-                                        properties: Some({
-                                            let mut props = HashMap::new();
-                                            props.insert(
-                                                "result".to_string(),
-                                                Box::new(crate::openapi::Schema {
-                                                    schema_type: Some("object".to_string()),
-                                                    format: None,
-                                                    properties: None,
-                                                    required: None,
-                                                    items: None,
-                                                    reference: None,
-                                                }),
-                                            );
-                                            props
-                                        }),
-                                        required: Some(vec!["result".to_string()]),
-                                        items: None,
-                                        reference: None,
-                                    },
-                                    example: None,
-                                },
-                            );
-                            content
-                        }),
-                    },
-                );
+                let mut request_body =
+                    RequestBody::json(request_schema).description("JSON-RPC request");
+                if let Some(media) = request_body.content.get_mut("application/json") {
+                    media.example =
+                        Some(serde_json::json!({ "method": example_method, "params": {} }));
+                }
 
-                let operation = Operation {
-                    summary: Some("JSON-RPC endpoint".to_string()),
-                    description: Some(format!(
+                let operation = Operation::new()
+                    .summary("JSON-RPC endpoint")
+                    .description(format!(
                         "Available methods: {}",
                         type_defs
                             .iter()
-                            .map(|t| &t.name)
-                            .cloned()
+                            .map(|t| t.name.as_str())
                             .collect::<Vec<_>>()
                             .join(", ")
-                    )),
-                    operation_id: Some("rpc".to_string()),
-                    tags: Some(vec!["JSON-RPC".to_string()]),
-                    parameters: None,
-                    request_body: Some(RequestBody {
-                        description: Some("JSON-RPC request".to_string()),
-                        content: {
-                            let mut content = HashMap::new();
-                            content.insert(
-                                "application/json".to_string(),
-                                MediaType {
-                                    schema: crate::openapi::Schema {
-                                        schema_type: Some("object".to_string()),
-                                        format: None,
-                                        properties: Some({
-                                            let mut props = HashMap::new();
-                                            props.insert(
-                                                "method".to_string(),
-                                                Box::new(crate::openapi::Schema {
-                                                    schema_type: Some("string".to_string()),
-                                                    format: None,
-                                                    properties: None,
-                                                    required: None,
-                                                    items: None,
-                                                    reference: None,
-                                                }),
-                                            );
-                                            props.insert(
-                                                "params".to_string(),
-                                                Box::new(crate::openapi::Schema {
-                                                    schema_type: Some("object".to_string()),
-                                                    format: None,
-                                                    properties: None,
-                                                    required: None,
-                                                    items: None,
-                                                    reference: None,
-                                                }),
-                                            );
-                                            props
-                                        }),
-                                        required: Some(vec!["method".to_string(), "params".to_string()]),
-                                        items: None,
-                                        reference: None,
-                                    },
-                                    example: Some(serde_json::json!({
-                                        "method": type_defs.first().map(|t| &t.name).unwrap_or(&"exampleMethod".to_string()),
-                                        "params": {}
-                                    })),
-                                },
-                            );
-                            content
-                        },
-                        required: Some(true),
-                    }),
-                    responses,
-                };
+                    ))
+                    .operation_id("rpc")
+                    .tag("JSON-RPC")
+                    .request_body(request_body)
+                    .response(
+                        "200",
+                        Response::json("Successful RPC response", response_schema),
+                    );
 
-                let path_item = PathItem {
-                    get: None,
-                    post: Some(operation),
-                    put: None,
-                    delete: None,
-                    patch: None,
-                };
-
-                spec.add_path(path, path_item);
+                spec.add_path("/rpc", PathItem::new().post(operation));
             }
         }
 

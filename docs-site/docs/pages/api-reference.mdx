@@ -1096,43 +1096,70 @@ app.use_middleware(my_middleware());
 
 ## OpenAPI
 
-### `OpenApiSpec`
+### `OpenApiBuilder` / `OpenApiSpec`
 
-Generate OpenAPI 3.0 specifications for your API.
+Build an OpenAPI 3.0 spec and serve it with Swagger UI (`app.serve_docs`).
+Full guide: [OpenAPI](/openapi).
 
 ```rust
-use ultimo::openapi::OpenApiSpec;
+use ultimo::openapi::{OpenApiBuilder, Operation, PathItem, Response, Schema, SecurityScheme};
 
-let mut spec = OpenApiSpec::new("My API", "1.0.0");
+let mut spec = OpenApiBuilder::new()
+    .title("My API")
+    .version("1.0.0")
+    .security_scheme("bearerAuth", SecurityScheme::bearer_jwt())
+    .security("bearerAuth")
+    .build();
 
-spec.add_endpoint(
-    "/users",
-    "get",
-    "Get all users",
-    Some("UserListInput"),
-    "UserList",
-);
-
-let json = spec.to_json()?;
+spec.add_path("/users", PathItem::new().get(
+    Operation::new().summary("List users")
+        .response("200", Response::json("Users", Schema::array(Schema::reference("User")))),
+));
 ```
 
-#### Methods
+#### `OpenApiBuilder`
 
-##### `new(title: &str, version: &str) -> Self`
+| Method | Purpose |
+| --- | --- |
+| `new()` | Start a builder (title "API", version "1.0.0") |
+| `title(..)`, `version(..)`, `description(..)` | Info fields |
+| `server(url, Option<description>)` | Add a server |
+| `tag(name, Option<description>)` | Add a tag |
+| `contact(name, email, url)`, `license(name, url)` | Info contact / license |
+| `security_scheme(name, SecurityScheme)` | Declare a scheme (`components.securitySchemes`) |
+| `security(name)`, `security_with_scopes(name, &[..])` | Default requirement for every operation |
+| `build() -> OpenApiSpec` | Build the spec |
 
-Create a new OpenAPI specification.
+#### `OpenApiSpec`
 
-##### `add_endpoint(&mut self, path: &str, method: &str, summary: &str, request_schema: Option<&str>, response_schema: &str)`
+| Method | Purpose |
+| --- | --- |
+| `add_path(path, PathItem)` | Add or replace a path |
+| `add_schema(name, Schema)` | Add to `components.schemas` |
+| `add_security_scheme(name, SecurityScheme)` | Declare a scheme on a built spec |
+| `require_security(name)` | Add a default requirement on a built spec |
+| `operation_mut(path, method) -> Option<&mut Operation>` | Adjust one operation |
+| `to_json()`, `write_to_file(path)` | Serialize |
+| `swagger_ui_html(spec_url)` | Swagger UI page for a spec URL |
+| `ts_to_schema(ts_type)` | Map a TypeScript type string to a `Schema` |
 
-Add an API endpoint to the specification.
+#### Model types (`#[non_exhaustive]`; build with constructors)
 
-##### `add_schema(&mut self, name: &str, schema: Value)`
+| Type | Constructors and setters |
+| --- | --- |
+| `PathItem` | `new()`, `.get(op)`, `.post(op)`, `.put(op)`, `.delete(op)`, `.patch(op)`, `operation_mut(method)` |
+| `Operation` | `new()`, `.summary()`, `.description()`, `.operation_id()`, `.tag()`, `.parameter()`, `.request_body()`, `.response(status, Response)`, `.security(name)`, `.security_with_scopes(name, scopes)`, `.public()`, `.deprecated()` |
+| `Parameter` | `new(name, location, schema)`, `path(..)`, `query(..)`, `header(..)`, `.description()`, `.required()` |
+| `RequestBody` | `json(schema)`, `.description()`, `.required()` |
+| `Response` | `new(description)`, `json(description, schema)` |
+| `MediaType` | `new(schema)`, `.example(json)` |
+| `Schema` | `of_type(..)`, `string()`, `integer()`, `array(items)`, `object([(name, schema)])`, `reference("User")`, `.format(..)` |
+| `SecurityScheme` | `bearer()`, `bearer_jwt()`, `basic()`, `api_key_header(name)`, `api_key_query(name)`, `api_key_cookie(name)`, `open_id_connect(url)`, `oauth2_authorization_code(auth_url, token_url, scopes)`, `oauth2_client_credentials(token_url, scopes)`, `.description()` |
+| `Info`, `Server`, `Tag`, `License` | `new(..)` |
 
-Add a JSON schema definition.
-
-##### `to_json(&self) -> Result<String>`
-
-Serialize the specification to JSON.
+`SecurityRequirement` is `BTreeMap<String, Vec<String>>` (scheme → scopes).
+On `Operation`, `security: None` inherits the spec default and `Some(vec![])`
+means public.
 
 ---
 

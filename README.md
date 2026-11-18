@@ -178,7 +178,7 @@ Try them without cloning (hosted on Render free tier — first request may take 
 | [jwt-auth](https://jwt-auth-example-16kq.onrender.com/)        | JWT authentication + scope guards |
 | [websocket-chat](https://websocket-chat-example.onrender.com/) | WebSocket pub/sub chat room       |
 | [spa-demo](https://spa-demo-example.onrender.com/)             | Static files + SPA fallback       |
-| [openapi-demo](https://openapi-demo-example.onrender.com/)     | Swagger UI + OpenAPI spec         |
+| [openapi-demo](https://openapi-demo-example.onrender.com/)     | Swagger UI + OpenAPI spec + auth  |
 
 ## Contributing
 
