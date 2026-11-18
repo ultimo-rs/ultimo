@@ -42,7 +42,7 @@ the framework is 100% safe Rust (`#![forbid(unsafe_code)]`).
 - 🌊 **Streaming responses** — chunked/streaming bodies via `ctx.stream(...)`.
 - 📡 **Server-Sent Events** — typed server→client push via `ctx.sse(...)` + `EventSource`.
 - 🔐 **Auth, built in** — "Sign in with Google/GitHub/…" ([OAuth2 + OIDC login](https://docs.ultimo.dev/oauth2) with PKCE), JWT, API-key and HTTP Basic auth middleware, plus scope-based [authorization guards](https://docs.ultimo.dev/authorization).
-- 🛡️ **Secure by default** — 100% safe Rust, secure sessions/cookies, CSRF, security-headers middleware, request body-size limits, and supply-chain CI.
+- 🛡️ **Secure by default** — 100% safe Rust, secure sessions/cookies, CSRF, security-headers middleware, request body-size limits, IP allow/deny, custom [request guards and geo-blocking](https://docs.ultimo.dev/security#request-guards-custom-rules), and supply-chain CI.
 - ⚡ **Fast** — native Rust on the Hyper + Tokio core, O(1) constant-time routing, benchmarks regression-guarded in CI ([details](https://docs.ultimo.dev/performance)).
 - 📈 **Prometheus metrics** — request counter, latency histogram and in-flight gauge labelled by route pattern, served from `/metrics` with zero extra dependencies ([details](https://docs.ultimo.dev/metrics)).
 - 🗃️ **Response caching** — `Cache` middleware serves repeat `GET`s from memory or Redis, with per-path invalidation and safe defaults for logged-in users ([details](https://docs.ultimo.dev/caching)).

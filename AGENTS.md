@@ -63,7 +63,7 @@ Cargo workspace (`resolver = "2"`). Members:
 
 - `app.rs` (`Ultimo` builder), `context.rs` (`Context`), `router.rs`, `handler.rs`, `middleware.rs`
 - `rpc.rs` — JSON-RPC registry + **TypeScript client codegen** (`RpcRegistry`)
-- `cache.rs` (`Cache` response-cache middleware + `CacheStore`)
+- `cache.rs` (`Cache` response-cache middleware + `CacheStore`), `guard.rs` (`Guard` request guards + `GeoFilter`)
 - `response.rs`, `error.rs` (`UltimoError`/`Result`), `validation.rs` (`validate`), `openapi.rs` (+ `openapi/docs.rs`)
 - `cookie.rs` (core), `session/` (`session`), `csrf.rs` (`csrf`), `testing/` (`testing`)
 - `database/` = `sqlx.rs` + `diesel.rs` (behind `database`); `websocket/` (behind `websocket`)
@@ -171,7 +171,8 @@ their feature belongs to.
   done. Still open: OpenTelemetry metrics push (`request_id()`, Prometheus
   `metrics` and OpenTelemetry tracing via `otel` shipped).
 - **Phase 10 (Distribution & DX): started.** Middleware pack shipped
-  (request-id, cache-control/ETag, server-timing, basic-auth, trailing-slash).
+  (request-id, cache-control/ETag, server-timing, basic-auth, trailing-slash),
+  plus request guards + geo-blocking (`ultimo::guard`).
   Redis session + rate-limit stores shipped (`redis`), and response caching
   (`ultimo::cache`, Redis-backed via `RedisCacheStore`). Still open: WebSocket
   compression, `#[derive(UltimoType)]`.
