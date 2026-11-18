@@ -296,10 +296,9 @@ jobs:
           feature-group: all-features
 
   # ── Dependency security advisories (RUSTSEC) ──────────────────────────
-  # Fails on NEW vulnerabilities. The --ignore list holds two advisories with
-  # no compatible fixed version available yet: idna (RUSTSEC-2024-0421, via
-  # url/reqwest) and rsa (RUSTSEC-2023-0071, no upstream fix; only reachable
-  # via the optional sqlx-mysql backend). Revisit/remove once each has a fix.
+  # Fails on NEW vulnerabilities. The --ignore list holds advisories with no
+  # compatible fixed version available yet (reasons in deny.toml). Revisit/remove
+  # once each has a fix.
   audit:
     name: cargo-audit
     runs-on: ubuntu-latest
@@ -311,12 +310,11 @@ jobs:
           tool: cargo-audit
       - name: cargo audit (committed Cargo.lock)
         # Keep in sync with deny.toml's [advisories].ignore (reasons there):
-        # idna, rsa, crypto-bigint, libsqlite3-sys — no compatible fix yet.
+        # idna, rsa, libsqlite3-sys — no compatible fix yet.
         run: |
           cargo audit \
             --ignore RUSTSEC-2024-0421 \
             --ignore RUSTSEC-2023-0071 \
-            --ignore RUSTSEC-2026-0387 \
             --ignore RUSTSEC-2026-0459
 
   # ── Supply-chain checks (cargo-deny) ──────────────────────────────────

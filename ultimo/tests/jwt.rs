@@ -131,3 +131,9 @@ async fn cookie_source_reads_token_from_cookie() {
     let res = app(jwt).oneshot(req).await;
     assert_eq!(res.status(), 200);
 }
+
+#[test]
+#[should_panic(expected = "HMAC secret must not be empty")]
+fn empty_hs256_secret_is_rejected_at_startup() {
+    let _ = Jwt::hs256("");
+}
