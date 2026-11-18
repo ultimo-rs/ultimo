@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.10.0...ultimo-v0.10.1) - 2026-11-18
+
+### Fixed
+
+- *(server)* keep accepting connections after a transient accept() error ([#232](https://github.com/ultimo-rs/ultimo/pull/232))
+
 ## [0.10.0](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.11...ultimo-v0.10.0) - 2026-11-18
 
 ### Added
