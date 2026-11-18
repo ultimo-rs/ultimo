@@ -20,13 +20,13 @@ We use a GitHub Projects Kanban board to track all work. See [`.github/README.md
 
 ## Code of Conduct
 
-By participating in this project, you agree to maintain a respectful and inclusive environment for everyone.
+This project follows our [Code of Conduct](CODE_OF_CONDUCT.md) (the Contributor Covenant). By participating, you agree to uphold it.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Rust 1.75.0 or higher
+- Rust 1.86.0 or higher (the library's MSRV; the CLI and the `redis`, `jwt`, `oidc` and `oauth2` features need 1.88)
 - Node.js 18+ (for examples and docs)
 - Git
 
