@@ -1,6 +1,6 @@
 {
   "name": "ultimo-website",
-  "version": "0.9.11",
+  "version": "0.10.0",
   "private": true,
   "scripts": {
     "build": "next build",
