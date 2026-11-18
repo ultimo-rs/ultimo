@@ -77,6 +77,8 @@ tracing-subscriber = { workspace = true }
 proptest = "1.5"
 criterion = { version = "0.5", features = ["async_tokio"] }
 tokio-tungstenite = "0.24"
+# Raw DEFLATE for the permessage-deflate end-to-end tests' hand-rolled client.
+flate2 = "1"
 futures-util = "0.3"
 reqwest = { version = "0.12", features = ["json"] }
 # Offline test keys for OIDC/JWKS verification (generate an RSA keypair + JWKS).
@@ -90,6 +92,10 @@ default = []
 
 # WebSocket feature (zero additional dependencies)
 websocket = []
+
+# permessage-deflate compression for WebSocket messages (RFC 7692), pure Rust.
+# Turn it on per route with `WebSocketConfig { compression: true, .. }`.
+websocket-compression = ["websocket", "dep:flate2"]
 
 # Test helpers (for integration tests)
 test-helpers = []

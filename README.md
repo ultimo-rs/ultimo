@@ -116,6 +116,7 @@ Everything is opt-in (`default = []`):
 | Feature                                              | What it enables                                                   |
 | ---------------------------------------------------- | ----------------------------------------------------------------- |
 | `websocket`                                          | RFC 6455 WebSocket support + pub/sub                              |
+| `websocket-compression`                              | WebSocket per-message deflate (RFC 7692); implies `websocket`     |
 | `session`                                            | Cookie-based session management                                   |
 | `jwt`                                                | JWT authentication middleware (HS256)                             |
 | `api-key`                                            | API-key authentication with a pluggable store                     |

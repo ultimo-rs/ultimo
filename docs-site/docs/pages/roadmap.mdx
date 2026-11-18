@@ -29,7 +29,8 @@ a stable **1.0**.
 
 ### Real-time & streaming
 
-- 🗜️ **WebSocket compression** — per-message deflate (RFC 7692).
+- ~~🗜️ **WebSocket compression** — per-message deflate (RFC 7692).~~ _(Shipped:
+  `websocket-compression` feature.)_
 
 ### Production-readiness
 
@@ -143,7 +144,7 @@ version number yet.
 | Request Timeouts + HTTP Graceful Shutdown               | ✅ Available     | 0.9.3                                |
 | Redis sessions + rate-limit store (`redis` feature)     | ✅ Available     | 0.9.7                                |
 | Response caching (`Cache` + `RedisCacheStore`)          | ✅ Available     | 0.9.9                                |
-| WebSocket Compression                                   | 📋 Planned       | Distribution & Dev Experience        |
+| WebSocket Compression (`websocket-compression`)         | ✅ Available     | 0.9.11                               |
 | Hot Reload (`ultimo dev`)                               | ✅ Available     | 0.5.1                                |
 | `#[derive(UltimoType)]`                                 | 📋 Planned       | Distribution & Dev Experience        |
 | Built-in Middleware Pack (request-id, ETag, cache-control, server-timing, basic-auth, trailing-slash) | ✅ Available | 0.9.4 |
@@ -260,7 +261,7 @@ Ultimo's two headline pillars: **secure-by-default** and **proven performance**.
 
 - ✅ **Redis integration** — sessions, cache, and rate-limit store (one dependency)
   _(`redis` feature: sessions + rate-limit store in 0.9.7, response cache in 0.9.9)_
-- WebSocket compression (per-message deflate)
+- ✅ **WebSocket compression** — per-message deflate, RFC 7692 (`websocket-compression` feature)
 - `#[derive(UltimoType)]` (drop the `ts-rs` dependency papercut)
 - ✅ Built-in middleware pack (request-id, cache-control/ETag, server-timing, basic-auth, trailing-slash normalization)
 - ✅ Request-guard middleware (`Guard`, WAF-lite predicate hook) + geo-blocking (`GeoFilter`, CDN header or pluggable lookup; no bundled GeoIP data)

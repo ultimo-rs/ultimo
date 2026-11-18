@@ -50,6 +50,10 @@ jobs:
       - name: clippy (websocket + test-helpers + testing + session + csrf + jwt + api-key, all targets)
         run: cargo clippy -p ultimo --all-targets --features "websocket,test-helpers,testing,session,csrf,jwt,api-key" -- -D warnings
 
+      # WebSocket permessage-deflate: the codec only compiles with this feature.
+      - name: clippy (websocket-compression, lib + its tests)
+        run: cargo clippy -p ultimo --lib --test websocket_compression --features "websocket-compression,test-helpers" -- -D warnings
+
       # Static-files + compression are pure-Rust, no system deps — lint lib only.
       # --all-targets would pull in WebSocket integration tests that need their
       # own feature; the dedicated test steps below verify the test targets.
@@ -102,6 +106,12 @@ jobs:
       # This is the gap that previously let them rot silently.
       - name: Integration tests (websocket + test-helpers)
         run: cargo test -p ultimo --features "websocket,test-helpers" --tests
+
+      # permessage-deflate: codec unit tests + end-to-end over a raw socket.
+      - name: WebSocket compression tests
+        run: |
+          cargo test -p ultimo --features "websocket-compression" --lib websocket
+          cargo test -p ultimo --features "websocket-compression" --test websocket_compression
 
       - name: CLI tests
         run: cargo test -p ultimo-cli

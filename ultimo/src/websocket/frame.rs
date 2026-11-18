@@ -112,6 +112,20 @@ impl Frame {
         buf: &mut BytesMut,
         max_frame_size: Option<usize>,
     ) -> Result<Option<Self>, io::Error> {
+        Ok(Self::parse_with_rsv(buf, max_frame_size)?.map(|(frame, _)| frame))
+    }
+
+    /// Parse a frame, also returning its three RSV bits (`0b100` = RSV1).
+    /// Extensions such as `permessage-deflate` signal through them.
+    ///
+    /// `#[inline]` keeps [`Self::parse`] and [`Self::parse_with_limits`] as
+    /// fast as before this was split out: without it, the extra call layer
+    /// and tuple return cost ~10 ns per frame on small frames.
+    #[inline]
+    pub(crate) fn parse_with_rsv(
+        buf: &mut BytesMut,
+        max_frame_size: Option<usize>,
+    ) -> Result<Option<(Self, u8)>, io::Error> {
         if buf.len() < 2 {
             return Ok(None); // Need at least 2 bytes
         }
@@ -119,6 +133,7 @@ impl Frame {
         // First byte: FIN (1 bit) + RSV (3 bits) + OpCode (4 bits)
         let first = buf[0];
         let fin = (first & 0x80) != 0;
+        let rsv = (first >> 4) & 0x07;
         let opcode = OpCode::from_u8(first)?;
 
         // Second byte: MASK (1 bit) + Payload length (7 bits)
@@ -189,23 +204,35 @@ impl Frame {
             }
         }
 
-        Ok(Some(Frame {
-            fin,
-            opcode,
-            mask,
-            payload: payload.freeze(),
-        }))
+        Ok(Some((
+            Frame {
+                fin,
+                opcode,
+                mask,
+                payload: payload.freeze(),
+            },
+            rsv,
+        )))
     }
 
     /// Encode frame to bytes
     pub fn encode(&self) -> Bytes {
+        self.encode_with_rsv1(false)
+    }
+
+    /// Encode the frame, optionally setting RSV1 (the `permessage-deflate`
+    /// "compressed" bit, set on the first frame of a compressed message).
+    pub(crate) fn encode_with_rsv1(&self, rsv1: bool) -> Bytes {
         let payload_len = self.payload.len();
-        let mut buf = BytesMut::new();
+        let mut buf = BytesMut::with_capacity(payload_len + 14);
 
         // First byte: FIN + RSV + OpCode
         let mut first = self.opcode as u8;
         if self.fin {
             first |= 0x80;
+        }
+        if rsv1 {
+            first |= 0x40;
         }
         buf.put_u8(first);
 
@@ -379,6 +406,20 @@ impl Message {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_rsv1_round_trip() {
+        let frame = Frame::text("compressed");
+        let mut buf = BytesMut::from(frame.encode_with_rsv1(true).as_ref());
+        let (decoded, rsv) = Frame::parse_with_rsv(&mut buf, None).unwrap().unwrap();
+        assert_eq!(rsv, 0b100);
+        assert_eq!(decoded.opcode, OpCode::Text);
+        assert!(decoded.fin);
+
+        let mut buf = BytesMut::from(frame.encode().as_ref());
+        let (_, rsv) = Frame::parse_with_rsv(&mut buf, None).unwrap().unwrap();
+        assert_eq!(rsv, 0);
+    }
 
     #[test]
     fn test_frame_text_encode_decode() {

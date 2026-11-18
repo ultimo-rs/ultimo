@@ -1,5 +1,6 @@
 //! WebSocket connection handling
 
+use super::deflate::PerMessageDeflate;
 use super::frame::{Frame, Message, OpCode};
 use super::pubsub::ChannelManager;
 use super::WebSocketConfig;
@@ -192,6 +193,7 @@ pub(crate) struct ConnectionHandler {
     channel_manager: Arc<ChannelManager>,
     connection_id: uuid::Uuid,
     config: Arc<WebSocketConfig>,
+    deflate: Option<PerMessageDeflate>,
 }
 
 /// Fragment accumulator for reassembling fragmented messages
@@ -199,6 +201,87 @@ struct FragmentAccumulator {
     opcode: Option<OpCode>,
     fragments: BytesMut,
     total_size: usize,
+    /// RSV1 was set on the first frame: the reassembled payload is compressed.
+    compressed: bool,
+}
+
+/// Why the connection is being closed by the server mid-stream.
+struct CloseReason {
+    code: u16,
+    reason: &'static str,
+}
+
+impl CloseReason {
+    const PROTOCOL_ERROR: Self = Self {
+        code: 1002,
+        reason: "Protocol error",
+    };
+
+    fn for_inflate_error(e: &io::Error) -> Self {
+        if e.kind() == ErrorKind::FileTooLarge {
+            Self {
+                code: 1009,
+                reason: "Message too big",
+            }
+        } else {
+            Self {
+                code: 1007,
+                reason: "Invalid compressed data",
+            }
+        }
+    }
+}
+
+/// Encode an outgoing message as wire frames, compressing it when
+/// `permessage-deflate` was negotiated and the message is large enough.
+fn encode_outgoing(
+    message: &Message,
+    max_frame_size: usize,
+    deflate: Option<&mut PerMessageDeflate>,
+) -> io::Result<Vec<Bytes>> {
+    let (opcode, payload): (OpCode, &[u8]) = match message {
+        Message::Text(text) => (OpCode::Text, text.as_bytes()),
+        Message::Binary(data) => (OpCode::Binary, data),
+        _ => {
+            return Ok(message
+                .to_fragmented_frames(max_frame_size)
+                .iter()
+                .map(Frame::encode)
+                .collect())
+        }
+    };
+    let Some(deflate) = deflate.filter(|d| d.should_compress(payload.len())) else {
+        return Ok(message
+            .to_fragmented_frames(max_frame_size)
+            .iter()
+            .map(Frame::encode)
+            .collect());
+    };
+
+    let compressed = Bytes::from(deflate.compress(payload)?);
+    let chunk = max_frame_size.max(1);
+    let mut frames = Vec::with_capacity(compressed.len() / chunk + 1);
+    let mut offset = 0;
+    loop {
+        let end = (offset + chunk).min(compressed.len());
+        let frame = Frame {
+            fin: end == compressed.len(),
+            opcode: if offset == 0 {
+                opcode
+            } else {
+                OpCode::Continue
+            },
+            mask: None,
+            payload: compressed.slice(offset..end),
+        };
+        // RSV1 marks the message as compressed, on its first frame only.
+        frames.push(frame.encode_with_rsv1(offset == 0));
+        if end == compressed.len() {
+            break;
+        }
+        offset = end;
+    }
+    Ok(frames)
 }
 
 impl ConnectionHandler {
@@ -206,6 +289,7 @@ impl ConnectionHandler {
         upgraded: Upgraded,
         channel_manager: Arc<ChannelManager>,
         config: Arc<WebSocketConfig>,
+        deflate: Option<PerMessageDeflate>,
     ) -> (
         Self,
         mpsc::Sender<Message>,
@@ -228,6 +312,7 @@ impl ConnectionHandler {
             channel_manager,
             connection_id,
             config,
+            deflate,
         };
 
         (handler, tx, incoming_rx, drain_rx)
@@ -251,6 +336,7 @@ impl ConnectionHandler {
         let incoming_tx = self.incoming_tx;
         let drain_tx = self.drain_tx;
         let config = self.config;
+        let mut deflate = self.deflate;
         let mut fragment_accumulator: Option<FragmentAccumulator> = None;
 
         // Track write buffer state for backpressure
@@ -265,7 +351,7 @@ impl ConnectionHandler {
         let ping_timeout = Duration::from_secs(config.ping_timeout);
 
         tracing::info!("Entering main WebSocket loop");
-        loop {
+        'conn: loop {
             // Check for ping timeout
             if config.ping_interval.is_some() && last_pong_received.elapsed() > ping_timeout {
                 tracing::warn!("Ping timeout - closing connection");
@@ -297,11 +383,39 @@ impl ConnectionHandler {
                         Ok(0) => break, // Connection closed
                         Ok(_) => {
                             // Try to parse frames with size limits
-                            while let Some(frame) = Frame::parse_with_limits(&mut read_buf, Some(config.max_frame_size))? {
+                            let mut close_with: Option<CloseReason> = None;
+                            while let Some((frame, rsv)) = Frame::parse_with_rsv(&mut read_buf, Some(config.max_frame_size))? {
+                                // RSV1 means "compressed" once permessage-deflate is
+                                // negotiated, and only on the first frame of a data
+                                // message. Any other RSV bit is a protocol error
+                                // (RFC 6455 §5.2, RFC 7692 §6).
+                                let compressed = rsv & 0b100 != 0;
+                                if rsv & 0b011 != 0
+                                    || (compressed
+                                        && (deflate.is_none()
+                                            || !matches!(frame.opcode, OpCode::Text | OpCode::Binary)))
+                                {
+                                    close_with = Some(CloseReason::PROTOCOL_ERROR);
+                                    break;
+                                }
+
                                 match frame.opcode {
                                     OpCode::Text | OpCode::Binary => {
                                         if frame.fin {
                                             // Single unfragmented message
+                                            let frame = if compressed {
+                                                let codec = deflate.as_mut().expect("checked above");
+                                                match codec.decompress(&frame.payload, config.max_message_size) {
+                                                    Ok(payload) => Frame { payload: Bytes::from(payload), ..frame },
+                                                    Err(e) => {
+                                                        tracing::debug!("WebSocket inflate error: {}", e);
+                                                        close_with = Some(CloseReason::for_inflate_error(&e));
+                                                        break;
+                                                    }
+                                                }
+                                            } else {
+                                                frame
+                                            };
                                             if let Ok(message) = Message::from_frame_with_limit(frame, Some(config.max_message_size)) {
                                                 let _ = incoming_tx.send(message);
                                             }
@@ -317,6 +431,7 @@ impl ConnectionHandler {
                                                 opcode: Some(frame.opcode),
                                                 fragments: BytesMut::from(frame.payload.as_ref()),
                                                 total_size: frame.payload.len(),
+                                                compressed,
                                             });
                                         }
                                     }
@@ -346,11 +461,24 @@ impl ConnectionHandler {
                                         if should_clear {
                                             // Take ownership and reassemble
                                             if let Some(accumulator) = fragment_accumulator.take() {
+                                                let payload = if accumulator.compressed {
+                                                    let codec = deflate.as_mut().expect("compressed implies negotiated");
+                                                    match codec.decompress(&accumulator.fragments, config.max_message_size) {
+                                                        Ok(payload) => Bytes::from(payload),
+                                                        Err(e) => {
+                                                            tracing::debug!("WebSocket inflate error: {}", e);
+                                                            close_with = Some(CloseReason::for_inflate_error(&e));
+                                                            break;
+                                                        }
+                                                    }
+                                                } else {
+                                                    accumulator.fragments.freeze()
+                                                };
                                                 let reassembled_frame = Frame {
                                                     fin: true,
                                                     opcode: accumulator.opcode.unwrap(),
                                                     mask: None,
-                                                    payload: accumulator.fragments.freeze(),
+                                                    payload,
                                                 };
 
                                                 if let Ok(message) = Message::from_frame(reassembled_frame) {
@@ -381,6 +509,11 @@ impl ConnectionHandler {
                                     }
                                 }
                             }
+                            if let Some(CloseReason { code, reason }) = close_with {
+                                let close_frame = Frame::close(Some(code), Some(reason));
+                                let _ = writer.write_all(&close_frame.encode()).await;
+                                break 'conn;
+                            }
                         }
                         Err(e) => {
                             tracing::error!("Error reading from socket: {}", e);
@@ -394,11 +527,16 @@ impl ConnectionHandler {
                     // Check if buffer was full before this recv
                     let is_now_draining = was_full;
 
-                    // Use fragmentation if message exceeds max frame size
-                    let frames = message.to_fragmented_frames(config.max_frame_size);
+                    // Compress if negotiated; fragment if it exceeds max frame size
+                    let frames = match encode_outgoing(&message, config.max_frame_size, deflate.as_mut()) {
+                        Ok(frames) => frames,
+                        Err(e) => {
+                            tracing::error!("Error encoding WebSocket message: {}", e);
+                            break;
+                        }
+                    };
 
-                    for frame in frames {
-                        let encoded = frame.encode();
+                    for encoded in frames {
                         if let Err(e) = writer.write_all(&encoded).await {
                             tracing::error!("Error writing to socket: {}", e);
                             break;
