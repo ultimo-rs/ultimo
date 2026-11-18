@@ -92,6 +92,89 @@ app.use_middleware(IpFilter::deny(&["203.0.113.0/24"]).build());
 Denied requests receive a `403 Forbidden` response. Supports IPv4 and IPv6,
 bare IPs (treated as `/32` or `/128`), and any valid prefix length.
 
+## Request guards (custom rules)
+
+`Guard` runs your own predicate on every request, before it reaches a handler —
+a lightweight in-app "WAF-lite" hook for rules on IP, path, user agent, headers
+or anything else on the `Context`:
+
+```rust
+use ultimo::guard::{Decision, Guard};
+
+// Block well-known scanners.
+app.use_middleware(
+    Guard::new(|ctx: &Context| {
+        let ua = ctx.req.header("user-agent").unwrap_or_default();
+        Decision::deny_if(ua.contains("sqlmap") || ua.contains("nikto"))
+    })
+    .build(),
+);
+
+// Hide /admin (answer 404) unless the request carries the internal header.
+app.use_middleware(
+    Guard::new(|ctx: &Context| {
+        if ctx.req.path().starts_with("/admin") && ctx.req.header("x-internal").is_none() {
+            Decision::respond(404, "Not Found")
+        } else {
+            Decision::Allow
+        }
+    })
+    .build(),
+);
+```
+
+| Decision                       | Effect                                                          |
+| ------------------------------ | --------------------------------------------------------------- |
+| `Decision::Allow`              | Continue to the next middleware and the handler                 |
+| `Decision::Deny`               | `403 Forbidden` (change with `.deny_status(status, body)`)      |
+| `Decision::respond(status, b)` | Answer with that status and plain-text body                     |
+
+`Decision::deny_if(cond)` and `Decision::allow_if(cond)` turn a boolean into a
+decision. The predicate is synchronous and runs on every request, so keep it
+cheap; register several guards for several rules (they run in order). Blocked
+requests are logged at `debug` level with the path and client IP. For checks
+that need I/O (a database blocklist, say), write a
+[custom middleware](/middleware) instead.
+
+## Geo-blocking
+
+`GeoFilter` allows or blocks countries (ISO 3166-1 alpha-2 codes, compared
+case-insensitively). Ultimo bundles **no GeoIP database** — the country comes
+from your CDN or from a lookup you supply:
+
+```rust
+use ultimo::guard::GeoFilter;
+
+// Behind Cloudflare: use its country header.
+app.trust_proxy(true);
+app.use_middleware(GeoFilter::allow(&["US", "CA"]).header("CF-IPCountry").build());
+
+// Or resolve the client IP yourself, e.g. with a MaxMind GeoLite2 reader.
+app.use_middleware(
+    GeoFilter::deny(&["KP"])
+        .lookup(move |ip| reader.lookup_country(ip)) // -> Option<String>
+        .build(),
+);
+```
+
+- **The header is read only when `app.trust_proxy(true)`.** Without a proxy in
+  front, any client could send `CF-IPCountry: US` and walk through an
+  allow-list. Common headers: `CF-IPCountry` (Cloudflare),
+  `CloudFront-Viewer-Country` (AWS CloudFront), `X-Vercel-IP-Country` (Vercel).
+- With both `.header(...)` and `.lookup(...)`, the header wins and the lookup is
+  the fallback (it receives [`client_ip()`](#client-ip--trusted-proxies)).
+- **Unknown country** (no header, lookup returns `None`, or Cloudflare's `XX`):
+  denied on an allow-list, allowed on a deny-list. Override with
+  `.allow_unknown()` / `.deny_unknown()`.
+- Blocked requests get `403 Forbidden`. Handlers can read the resolved country
+  with `ctx.country().await` (`Option<String>`, e.g. `Some("US")`).
+
+:::info
+Country rules decide who reaches your app, not who is legally in which
+country: VPNs and proxies change the apparent location. For compliance-grade
+geo restrictions and DDoS protection, enforce them at the edge too.
+:::
+
 ## Sessions & cookies
 
 Cookie-based sessions are secure by default (HttpOnly, Secure, SameSite, 256-bit
@@ -150,6 +233,6 @@ Please report privately — see [SECURITY.md](https://github.com/ultimo-rs/ultim
 
 ## Roadmap
 
-Planned for v0.4.0: auth middleware (JWT / API keys),
-authorization guards, IP allow/deny, request guards, and geo-blocking hooks.
-See the [roadmap](/roadmap).
+Auth middleware (JWT, API keys, OIDC, OAuth2 login), authorization guards, IP
+allow/deny, request guards and geo-blocking have all shipped. See the
+[roadmap](/roadmap) for what's next.

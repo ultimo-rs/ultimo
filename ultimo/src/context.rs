@@ -378,6 +378,13 @@ impl Context {
             .await
     }
 
+    /// The ISO 3166-1 alpha-2 country (e.g. `US`) resolved by the
+    /// [`GeoFilter`](crate::guard::GeoFilter) middleware. `None` if that
+    /// middleware isn't registered or the country is unknown.
+    pub async fn country(&self) -> Option<String> {
+        self.get(crate::guard::COUNTRY_STATE_KEY).await
+    }
+
     /// Read a request cookie by name.
     pub fn cookie(&self, name: &str) -> Option<String> {
         self.req
@@ -415,6 +422,11 @@ impl Context {
     pub(crate) fn set_client(&mut self, addr: Option<SocketAddr>, trust_proxy: bool) {
         self.client_addr = addr;
         self.trust_proxy = trust_proxy;
+    }
+
+    /// Whether the app trusts proxy headers (`app.trust_proxy(true)`).
+    pub(crate) fn trusts_proxy(&self) -> bool {
+        self.trust_proxy
     }
 
     /// The peer address of the underlying connection, if known. This is the

@@ -35,6 +35,7 @@ pub mod context;
 pub mod cookie;
 pub mod error;
 pub mod extract;
+pub mod guard;
 pub mod handler;
 pub mod middleware;
 pub mod openapi;

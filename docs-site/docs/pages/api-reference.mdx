@@ -373,6 +373,14 @@ let ip = ctx.client_ip();
 The username authenticated by the [`BasicAuth`](#basicauth--http-basic-authentication)
 middleware; `None` if it isn't registered.
 
+#### Country
+
+##### `country(&self) -> Option<String>`
+
+The ISO 3166-1 alpha-2 country (e.g. `"US"`) resolved by the
+[`GeoFilter`](#guard--geofilter--request-guards-and-geo-blocking) middleware;
+`None` if it isn't registered or the country is unknown.
+
 #### Session (requires `session` feature)
 
 ##### `session(&self) -> Session`
@@ -854,6 +862,22 @@ app.use_middleware(IpFilter::allow(&[
 
 // Or deny specific ranges:
 app.use_middleware(IpFilter::deny(&["203.0.113.0/24"]).build());
+```
+
+#### `Guard` / `GeoFilter` — request guards and geo-blocking
+
+`ultimo::guard` (core, no feature). See [Security](/security#request-guards-custom-rules).
+
+- `Guard::new(|ctx: &Context| -> Decision)`, `.deny_status(status, body)` (default `403` / `Forbidden`), `.build() -> BoxedMiddleware`
+- `Decision` (`non_exhaustive`) — `Allow`, `Deny`, `Respond { status, body }`; helpers `Decision::deny_if(bool)`, `Decision::allow_if(bool)`, `Decision::respond(status, body)`
+- `GeoFilter::allow(&[codes])` / `GeoFilter::deny(&[codes])` (panic on a code that isn't two ASCII letters/digits), `.header(name)` (read only when `trust_proxy` is on), `.lookup(|ip: IpAddr| -> Option<String>)`, `.allow_unknown()`, `.deny_unknown()`, `.build()` (panics without a header or lookup). Unknown countries are denied on an allow-list and allowed on a deny-list by default
+
+```rust
+use ultimo::guard::{Decision, GeoFilter, Guard};
+app.use_middleware(Guard::new(|ctx: &Context| {
+    Decision::deny_if(ctx.req.header("user-agent").is_some_and(|ua| ua.contains("sqlmap")))
+}).build());
+app.use_middleware(GeoFilter::deny(&["KP"]).header("CF-IPCountry").build());
 ```
 
 #### `rate_limiter()` / `RateLimiter` — Rate limiting (token bucket)
