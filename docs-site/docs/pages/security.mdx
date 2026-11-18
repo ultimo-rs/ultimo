@@ -130,7 +130,8 @@ app.use_middleware(
 | `Decision::respond(status, b)` | Answer with that status and plain-text body                     |
 
 `Decision::deny_if(cond)` and `Decision::allow_if(cond)` turn a boolean into a
-decision. The predicate is synchronous and runs on every request, so keep it
+decision. `Guard`, `Decision` and `GeoFilter` live in `ultimo::guard` and are
+also available from `ultimo::middleware::builtin`, next to `IpFilter`. The predicate is synchronous and runs on every request, so keep it
 cheap; register several guards for several rules (they run in order). Blocked
 requests are logged at `debug` level with the path and client IP. For checks
 that need I/O (a database blocklist, say), write a

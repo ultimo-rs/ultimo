@@ -866,7 +866,7 @@ app.use_middleware(IpFilter::deny(&["203.0.113.0/24"]).build());
 
 #### `Guard` / `GeoFilter` — request guards and geo-blocking
 
-`ultimo::guard` (core, no feature). See [Security](/security#request-guards-custom-rules).
+`ultimo::guard` (core, no feature), also re-exported from `ultimo::middleware::builtin` next to `IpFilter`. See [Security](/security#request-guards-custom-rules).
 
 - `Guard::new(|ctx: &Context| -> Decision)`, `.deny_status(status, body)` (default `403` / `Forbidden`), `.build() -> BoxedMiddleware`
 - `Decision` (`non_exhaustive`) — `Allow`, `Deny`, `Respond { status, body }`; helpers `Decision::deny_if(bool)`, `Decision::allow_if(bool)`, `Decision::respond(status, body)`

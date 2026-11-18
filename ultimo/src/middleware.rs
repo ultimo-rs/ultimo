@@ -110,6 +110,10 @@ pub mod builtin {
     use std::time::Instant;
     use tracing::{error, info};
 
+    /// Request guards and geo-blocking, also available here next to
+    /// [`IpFilter`]. See [`crate::guard`].
+    pub use crate::guard::{Decision, GeoFilter, Guard};
+
     /// Logger middleware that logs request/response details.
     ///
     /// # Requires a `tracing` subscriber

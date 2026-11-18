@@ -86,6 +86,18 @@ async fn guard_deny_status_is_configurable() {
     assert_eq!(res.text(), "Unavailable");
 }
 
+#[tokio::test]
+async fn guard_types_are_also_in_middleware_builtin() {
+    use ultimo::middleware::builtin;
+    let guard = builtin::Guard::new(|_: &Context| builtin::Decision::Deny);
+    let res = TestClient::new(app_with(guard.build(), false))
+        .get("/")
+        .send()
+        .await;
+    assert_eq!(res.status(), 403);
+    let _ = builtin::GeoFilter::deny(&["KP"]);
+}
+
 #[test]
 fn decision_helpers() {
     assert_eq!(Decision::deny_if(true), Decision::Deny);

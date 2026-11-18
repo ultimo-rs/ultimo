@@ -9,6 +9,10 @@
 //!   header (e.g. Cloudflare's `CF-IPCountry`) or from a lookup function you
 //!   supply (e.g. a MaxMind database). Ultimo bundles no GeoIP data.
 //!
+//! All three types are also re-exported from
+//! [`middleware::builtin`](crate::middleware::builtin), next to
+//! [`IpFilter`](crate::middleware::builtin::IpFilter).
+//!
 //! These are primitives for app-level rules. A full WAF, DDoS protection and
 //! bot management belong at the edge (Cloudflare, AWS WAF, …), in front of the
 //! app.
