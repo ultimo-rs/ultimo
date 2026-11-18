@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.11...ultimo-v0.10.0) - 2026-11-18
+
+### Added
+
+- *(openapi)* [**breaking**] security schemes, so Swagger UI can call protected endpoints ([#228](https://github.com/ultimo-rs/ultimo/pull/228))
+
 ## [0.9.11](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.10...ultimo-v0.9.11) - 2026-11-18
 
 ### Added
