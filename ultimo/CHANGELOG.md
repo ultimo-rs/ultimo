@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.11](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.10...ultimo-v0.9.11) - 2026-11-18
+
+### Added
+
+- *(websocket)* permessage-deflate compression (RFC 7692) ([#225](https://github.com/ultimo-rs/ultimo/pull/225))
+- *(cli)* implement `ultimo build` ([#224](https://github.com/ultimo-rs/ultimo/pull/224))
+- *(guard)* request-guard middleware and geo-blocking ([#219](https://github.com/ultimo-rs/ultimo/pull/219))
+
 ## [0.9.10](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.9.9...ultimo-v0.9.10) - 2026-11-18
 
 ### Fixed

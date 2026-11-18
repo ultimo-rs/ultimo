@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.11](https://github.com/ultimo-rs/ultimo/compare/ultimo-cli-v0.9.10...ultimo-cli-v0.9.11) - 2026-11-18
+
+### Added
+
+- *(cli)* implement `ultimo build` ([#224](https://github.com/ultimo-rs/ultimo/pull/224))
+
 ## [0.9.4](https://github.com/ultimo-rs/ultimo/compare/ultimo-cli-v0.9.3...ultimo-cli-v0.9.4) - 2026-10-18
 
 ### Added
