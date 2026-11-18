@@ -46,6 +46,11 @@ a stable **1.0**.
   serve Swagger UI / Scalar / ReDoc wired to the generated OpenAPI spec
   (FastAPI's signature `/docs`). The Swagger UI helper exists today; this makes
   it one line.~~ ✅ Shipped in 0.5.1
+- ~~🔐 **Authentication in the OpenAPI spec** — security schemes (bearer/JWT,
+  API key, basic, OAuth2, OpenID Connect) with global and per-operation
+  requirements, so Swagger UI can call protected endpoints.~~ ✅ Shipped in 0.10.0
+  (request examples per parameter, response headers and webhooks from
+  [#23](https://github.com/ultimo-rs/ultimo/issues/23) are still open)
 - ~~🧩 **Built-in middleware pack** — small, expected pieces: `request-id`,
   `cache-control` / ETag helpers, `server-timing`, basic-auth, trailing-slash
   normalization (Hono-style breadth).~~ ✅ Shipped in 0.9.4
@@ -103,6 +108,7 @@ version number yet.
 | **RPC System**                                          | ✅ Available     | 0.1.0                                |
 | **TypeScript Generation**                               | ✅ Available     | 0.1.0                                |
 | **OpenAPI Support**                                     | ✅ Available     | 0.1.0                                |
+| OpenAPI security schemes (Swagger UI "Authorize")       | ✅ Available     | 0.10.0                               |
 | **CLI Tools**                                           | ✅ Available     | 0.1.0                                |
 | **CORS**                                                | ✅ Available     | 0.1.0                                |
 | **Database Integration**                                | ✅ Available     | 0.1.0                                |

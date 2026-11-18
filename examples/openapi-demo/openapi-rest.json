@@ -1,103 +1,206 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "User API (REST Mode)",
-    "version": "1.0.0"
+    "title": "User API - REST Mode",
+    "version": "1.0.0",
+    "description": "User management API using regular REST endpoints"
   },
   "servers": [
     {
-      "url": "http://localhost:3000",
-      "description": "Development server"
+      "url": "/",
+      "description": "API server"
     }
   ],
   "paths": {
-    "/api/listUsers": {
+    "/api/users/{id}": {
       "get": {
-        "summary": "GET listUsers",
-        "operationId": "listUsers",
+        "summary": "Get user by ID",
+        "description": "Retrieve a single user by their ID",
+        "operationId": "getUser",
         "tags": [
-          "RPC"
+          "users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "User ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
           "200": {
-            "description": "Successful response",
+            "description": "User found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete user",
+        "description": "Delete a user by ID. Requires an API key.",
+        "operationId": "deleteUser",
+        "tags": [
+          "users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "User ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Missing or wrong API key"
+          },
+          "204": {
+            "description": "User deleted successfully"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/users": {
+      "get": {
+        "summary": "List all users",
+        "description": "Retrieve a list of all users",
+        "operationId": "listUsers",
+        "tags": [
+          "users"
+        ],
+        "responses": {
+          "200": {
+            "description": "List of users",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object"
+                    "$ref": "#/components/schemas/User"
                   }
                 }
               }
             }
           }
         }
-      }
-    },
-    "/api/createUser": {
+      },
       "post": {
-        "summary": "POST createUser",
+        "summary": "Create user",
+        "description": "Create a new user. Requires an API key.",
         "operationId": "createUser",
         "tags": [
-          "RPC"
+          "users"
         ],
         "requestBody": {
-          "description": "Request body",
+          "description": "User to create",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "name"
+                ]
+              },
+              "example": {
+                "email": "carol@example.com",
+                "name": "Carol"
               }
             }
           },
           "required": true
         },
         "responses": {
+          "401": {
+            "description": "Missing or wrong API key"
+          },
           "200": {
-            "description": "Successful response",
+            "description": "User created",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/User"
                 }
               }
             }
           }
-        }
-      }
-    },
-    "/api/getUser": {
-      "get": {
-        "summary": "GET getUser",
-        "operationId": "getUser",
-        "tags": [
-          "RPC"
-        ],
-        "parameters": [
+        },
+        "security": [
           {
-            "name": "id",
-            "in": "query",
-            "description": "Request parameter",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "apiKey": []
           }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          }
-        }
+        ]
       }
     }
-  }
+  },
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "email",
+          "id",
+          "name"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "name": "X-API-Key",
+        "in": "header",
+        "description": "Use `demo-key` in this demo."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "users",
+      "description": "User management operations"
+    }
+  ]
 }
