@@ -1,11 +1,13 @@
 //! WebSocket upgrade mechanism for Hyper
 
 use super::connection::{ConnectionHandler, WebSocket};
+use super::deflate;
 use super::frame::Message;
 use super::pubsub::ChannelManager;
 use super::WebSocketConfig;
 use hyper::header::{
-    CONNECTION, ORIGIN, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE,
+    CONNECTION, ORIGIN, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_EXTENSIONS, SEC_WEBSOCKET_KEY,
+    SEC_WEBSOCKET_VERSION, UPGRADE,
 };
 use hyper::{Request as HyperRequest, Response as HyperResponse, StatusCode};
 use sha1::{Digest, Sha1};
@@ -137,6 +139,15 @@ where
             .header(CONNECTION, "Upgrade")
             .header(SEC_WEBSOCKET_ACCEPT, accept_key);
 
+        // permessage-deflate, if enabled and offered by the client
+        let deflate = match deflate::accept(self.config.compression, self.request.headers()) {
+            Some((codec, header)) => {
+                response = response.header(SEC_WEBSOCKET_EXTENSIONS, header);
+                Some(codec)
+            }
+            None => None,
+        };
+
         // Add custom headers
         for (key, value) in self.headers {
             response = response.header(key, value);
@@ -152,8 +163,12 @@ where
         tokio::spawn(async move {
             match hyper::upgrade::on(self.request).await {
                 Ok(upgraded) => {
-                    let (handler, sender, mut incoming_rx, mut _drain_rx) =
-                        ConnectionHandler::new(upgraded, channel_manager.clone(), config.clone());
+                    let (handler, sender, mut incoming_rx, mut _drain_rx) = ConnectionHandler::new(
+                        upgraded,
+                        channel_manager.clone(),
+                        config.clone(),
+                        deflate,
+                    );
                     let connection_id = handler.connection_id();
                     channel_manager
                         .register_connection(connection_id, sender.clone())
@@ -253,6 +268,15 @@ where
             .header(CONNECTION, "Upgrade")
             .header(SEC_WEBSOCKET_ACCEPT, accept_key);
 
+        // permessage-deflate, if enabled and offered by the client
+        let deflate = match deflate::accept(self.config.compression, self.request.headers()) {
+            Some((codec, header)) => {
+                response = response.header(SEC_WEBSOCKET_EXTENSIONS, header);
+                Some(codec)
+            }
+            None => None,
+        };
+
         // Add custom headers
         for (key, value) in self.headers {
             response = response.header(key, value);
@@ -268,8 +292,12 @@ where
         tokio::spawn(async move {
             match hyper::upgrade::on(self.request).await {
                 Ok(upgraded) => {
-                    let (handler, sender, incoming_rx, drain_rx) =
-                        ConnectionHandler::new(upgraded, channel_manager.clone(), config.clone());
+                    let (handler, sender, incoming_rx, drain_rx) = ConnectionHandler::new(
+                        upgraded,
+                        channel_manager.clone(),
+                        config.clone(),
+                        deflate,
+                    );
                     let connection_id = handler.connection_id();
                     channel_manager
                         .register_connection(connection_id, sender.clone())

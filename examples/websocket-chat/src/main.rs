@@ -109,6 +109,10 @@ async fn main() -> Result<()> {
         // Backpressure handling
         max_write_queue_size: 100, // Buffer up to 100 messages per connection
 
+        // permessage-deflate: browsers offer it automatically, so chat
+        // messages travel compressed (needs the `websocket-compression` feature)
+        compression: true,
+
         ..Default::default()
     };
 
@@ -120,6 +124,7 @@ async fn main() -> Result<()> {
     tracing::info!("  - Automatic ping/pong heartbeat (30s interval)");
     tracing::info!("  - Message fragmentation (for messages > 1MB)");
     tracing::info!("  - Backpressure handling (100 message buffer)");
+    tracing::info!("  - permessage-deflate compression (check the handshake in dev tools)");
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "4000".to_string());
     let addr = format!("0.0.0.0:{port}");

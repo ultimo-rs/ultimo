@@ -4,6 +4,7 @@
 //! inspired by Bun's WebSocket API design.
 
 mod connection;
+mod deflate;
 mod frame;
 mod pubsub;
 mod upgrade;
@@ -91,7 +92,19 @@ pub struct WebSocketConfig {
     /// Ping timeout in seconds (default: 10 seconds)
     pub ping_timeout: u64,
 
-    /// Reserved for per-message deflate (RFC 7692); not yet implemented and currently ignored.
+    /// Offer `permessage-deflate` compression (RFC 7692) to clients that ask
+    /// for it (default: false). Every major browser asks.
+    ///
+    /// Needs the `websocket-compression` Cargo feature; without it this flag
+    /// is ignored and a warning is logged once. When a client negotiates it,
+    /// text and binary messages of 32 bytes or more are compressed, sharing a
+    /// 32 KiB window across messages unless the client asks otherwise.
+    ///
+    /// The trade-off is memory: about 350 KiB per connection once it has both
+    /// sent and received a compressed message (the compressor and
+    /// decompressor are created on first use). Incoming messages are still
+    /// limited by [`max_message_size`](Self::max_message_size), measured
+    /// *after* decompression.
     pub compression: bool,
 
     /// Write buffer size in bytes (default: 128 KB)

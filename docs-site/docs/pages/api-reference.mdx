@@ -1332,6 +1332,7 @@ ultimo = { version = "0.9", features = ["sqlx-postgres"] }
 All features are off by default (`default = []`).
 
 - `websocket` - RFC 6455 WebSocket support (zero extra dependencies)
+- `websocket-compression` - per-message deflate (RFC 7692) for WebSocket; implies `websocket`. Enable per route with `WebSocketConfig { compression: true, .. }`
 - `session` - Cookie-based session management ([Sessions](/sessions))
 - `csrf` - Double-submit-cookie CSRF protection ([Security](/security))
 - `jwt` - HS256 JWT authentication middleware ([JWT Authentication](/jwt))

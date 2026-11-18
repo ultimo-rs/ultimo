@@ -16,7 +16,7 @@ change is a potential breaking change. **The public API contract** — changing
 any of it requires a deliberate version bump:
 
 - Any `pub` item (types, fns, traits, enum variants, fields) and the `prelude`
-- **Cargo feature names** (`websocket`, `testing`, `session`, `csrf`, `jwt`, `oidc`, `oauth2`, `api-key`, `static-files`, `compression`, `metrics`, `otel`, `redis`, `client-gen`, `database`, `sqlx-*`, `diesel-*`, `test-helpers`) — renaming/removing breaks `features = [...]` downstream
+- **Cargo feature names** (`websocket`, `websocket-compression`, `testing`, `session`, `csrf`, `jwt`, `oidc`, `oauth2`, `api-key`, `static-files`, `compression`, `metrics`, `otel`, `redis`, `client-gen`, `database`, `sqlx-*`, `diesel-*`, `test-helpers`) — renaming/removing breaks `features = [...]` downstream
 - **MSRV** (`rust-version`) — raising it is breaking (we're at 1.86.0)
 - **Direct dependency floors** — raising one (e.g. `bytes`, `diesel`) constrains downstream resolution; a dep type re-exported in our API (e.g. `bytes::Bytes` in WebSocket messages) makes that dep's version part of _our_ API
 - CLI subcommands / flags of `ultimo-cli`
@@ -75,7 +75,8 @@ The crate is `#![forbid(unsafe_code)]` — 100% safe Rust, no `unsafe`.
 ## Cargo features (`ultimo/Cargo.toml`)
 
 `default = []` — **everything is opt-in.** When adding code under a feature, gate
-it with `#[cfg(feature = "...")]`. Features: `websocket`, `testing`
+it with `#[cfg(feature = "...")]`. Features: `websocket`, `websocket-compression`
+(permessage-deflate; implies `websocket`), `testing`
 (TestClient/assertions/fixtures), `session`, `csrf`, `jwt`, `oidc` (implies
 `jwt`), `oauth2` (OAuth2/OIDC login; implies `oidc` + `session`), `api-key`, `static-files`, `compression`, `metrics` (Prometheus), `otel` (OpenTelemetry tracing), `redis` (session, rate-limit + response-cache stores; needs Rust 1.88),
 `client-gen` (ts-rs type
@@ -173,9 +174,9 @@ their feature belongs to.
 - **Phase 10 (Distribution & DX): started.** Middleware pack shipped
   (request-id, cache-control/ETag, server-timing, basic-auth, trailing-slash),
   plus request guards + geo-blocking (`ultimo::guard`).
-  Redis session + rate-limit stores shipped (`redis`), and response caching
-  (`ultimo::cache`, Redis-backed via `RedisCacheStore`). Still open: WebSocket
-  compression, `#[derive(UltimoType)]`.
+  Redis session + rate-limit stores shipped (`redis`), response caching
+  (`ultimo::cache`, Redis-backed via `RedisCacheStore`), and WebSocket
+  compression (`websocket-compression`). Still open: `#[derive(UltimoType)]`.
 - **Phase 11 (Stabilization → 1.0):** end-to-end typed errors, public-API
   audit + SemVer freeze, documentation completeness, production battle-testing.
 - **Post-1.0 / demand-driven:** typed RPC subscriptions (derived SSE event
