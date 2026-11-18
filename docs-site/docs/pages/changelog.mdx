@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.10] - 2026-11-18
+
+### Fixed
+
+- *(jwt)* upgrade jsonwebtoken to 12, clearing RUSTSEC-2026-0387 ([#217](https://github.com/ultimo-rs/ultimo/pull/217))
+
 ## [0.9.9] - 2026-11-17
 
 ### Added
