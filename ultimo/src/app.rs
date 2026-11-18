@@ -732,7 +732,9 @@ impl Ultimo {
         self.dispatch_parts(parts, bytes, None).await
     }
 
-    /// Start the HTTP server
+    /// Start the HTTP server. Runs until the process exits; it only returns an
+    /// error if `addr` is invalid or can't be bound. Failed `accept()` calls
+    /// (e.g. out of file descriptors) are logged and retried, not returned.
     pub async fn listen(self, addr: &str) -> Result<()> {
         let addr: SocketAddr = addr
             .parse()
@@ -745,7 +747,7 @@ impl Ultimo {
         let app = Arc::new(self);
 
         loop {
-            let (stream, peer_addr) = listener.accept().await?;
+            let (stream, peer_addr) = accept(&listener).await;
             let io = TokioIo::new(stream);
             let app = app.clone();
 
@@ -802,6 +804,9 @@ impl Ultimo {
     ///
     /// Taking a bound listener (rather than an address) lets callers bind port
     /// `0` and read the chosen port from `listener.local_addr()`.
+    ///
+    /// Failed `accept()` calls (e.g. out of file descriptors under load) are
+    /// logged and retried after a short back-off; they never stop the server.
     pub async fn serve_with_shutdown<F>(self, listener: TcpListener, shutdown: F) -> Result<()>
     where
         F: std::future::Future<Output = ()>,
@@ -818,8 +823,7 @@ impl Ultimo {
 
         loop {
             tokio::select! {
-                accepted = listener.accept() => {
-                    let (stream, peer_addr) = accepted?;
+                (stream, peer_addr) = accept(&listener) => {
                     let io = TokioIo::new(stream);
                     let app = app.clone();
                     let mut stop_rx = stop_rx.clone();
@@ -889,6 +893,37 @@ impl Ultimo {
         }
         Ok(())
     }
+}
+
+/// Accept the next connection, riding out `accept()` errors instead of
+/// returning them: a server must not stop listening because one accept failed.
+///
+/// Errors about a single connection (e.g. the client reset it while it sat in
+/// the backlog) are retried at once. Anything else — typically running out of
+/// file descriptors (`EMFILE`/`ENFILE`) under load — is logged and retried
+/// after a short back-off, so that closing connections can free resources
+/// without the loop spinning.
+async fn accept(listener: &TcpListener) -> (tokio::net::TcpStream, SocketAddr) {
+    loop {
+        match listener.accept().await {
+            Ok(conn) => return conn,
+            Err(err) if is_connection_error(&err) => {}
+            Err(err) => {
+                error!("Accept error: {} (retrying in 1s)", err);
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        }
+    }
+}
+
+/// Errors that concern only the connection being accepted, not the listener.
+fn is_connection_error(err: &std::io::Error) -> bool {
+    matches!(
+        err.kind(),
+        std::io::ErrorKind::ConnectionRefused
+            | std::io::ErrorKind::ConnectionAborted
+            | std::io::ErrorKind::ConnectionReset
+    )
 }
 
 /// A future that completes when the process receives Ctrl+C (all platforms)
