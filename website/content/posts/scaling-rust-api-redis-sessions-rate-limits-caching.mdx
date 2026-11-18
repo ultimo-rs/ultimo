@@ -1,0 +1,200 @@
+---
+title: "Scaling a Rust API Across Instances: Redis Sessions, Rate Limits and Caching"
+description: "What breaks when you run a second copy of your Rust API, and how to fix it with Ultimo's Redis stores: shared sessions, one rate limit across every instance, and a response cache you can invalidate from anywhere."
+date: "2026-11-18"
+author: "Ultimo Team"
+tags: ["tutorial", "redis", "scaling", "production"]
+---
+
+# Scaling a Rust API Across Instances: Redis Sessions, Rate Limits and Caching
+
+A single [Ultimo](https://github.com/ultimo-rs/ultimo) process handles a lot of traffic, so most apps reach for a second instance for availability before they need it for speed: zero-downtime deploys, surviving a crashed node, running in two zones. The moment a load balancer spreads requests over two copies of your app, anything kept in process memory stops working. Three things break first:
+
+1. **Sessions.** A user logs in on instance A; their next request lands on B, which has never heard of that session. They're logged out, at random.
+2. **Rate limits.** "100 requests a minute" quietly becomes "100 per instance", so two instances allow 200 and ten allow 1,000.
+3. **Caches.** Each instance caches its own copy, and when the data changes you can only clear the copy on the instance that handled the update. The others keep serving stale pages until they expire.
+
+All three have the same fix: move that state somewhere every instance shares. Ultimo's `redis` feature provides a [Redis](https://redis.io) store for each, behind the same APIs you use in a single process.
+
+## Setup
+
+```toml
+[dependencies]
+ultimo = { version = "0.9", features = ["redis", "session"] }
+tokio = { version = "1", features = ["full"] }
+```
+
+The `redis` feature is built on the [`redis`](https://docs.rs/redis) crate 1.x, which needs Rust 1.88 or newer. Start a Redis to develop against:
+
+```bash
+docker run --rm -p 6379:6379 redis:7-alpine
+```
+
+Open one connection at startup and share it:
+
+```rust
+use ultimo::redis::connect;
+
+let conn = connect(&std::env::var("REDIS_URL").expect("REDIS_URL")).await?;
+```
+
+`connect` returns a `ConnectionManager`: a single multiplexed connection that is cheap to clone and reconnects on its own if Redis restarts. Every store below takes a clone of it — no connection pool to size.
+
+## 1. Shared sessions
+
+Swap the in-memory session store for `RedisSessionStore`:
+
+```rust
+use ultimo::redis::RedisSessionStore;
+use ultimo::session::{session, SessionConfig};
+
+app.use_middleware(session(
+    RedisSessionStore::new(conn.clone()),
+    SessionConfig::default(),
+));
+```
+
+Nothing else changes: handlers still call `ctx.session().await`, and the session middleware still handles the cookie. Each session is stored as JSON under `ultimo:session:{id}` and expires with the session's TTL, so Redis cleans up abandoned sessions by itself.
+
+A login handler should still rotate the session id, exactly as in a single process:
+
+```rust
+app.post("/login", |ctx: Context| async move {
+    // ...check the password...
+    let session = ctx.session().await;
+    session.regenerate(); // new id after login: defeats session fixation
+    session.set("user_id", &42).await?;
+    ctx.json(json!({ "ok": true })).await
+});
+```
+
+If Redis is unreachable, loading a session fails soft: the error is logged and the request carries on as signed out, rather than every request failing.
+
+## 2. One rate limit for every instance
+
+`RateLimiter` takes a pluggable store. Give it `RedisRateLimitStore` and every instance draws from the same bucket:
+
+```rust
+use ultimo::middleware::builtin::RateLimiter;
+use ultimo::redis::RedisRateLimitStore;
+
+app.use_middleware(
+    RateLimiter::new(100, 60) // 100 requests per 60 s, per client IP
+        .store(RedisRateLimitStore::new(conn.clone()))
+        .build(),
+);
+```
+
+Under the hood each check is one Lua script that reads, refills and spends a token bucket atomically. Two details make it correct across instances:
+
+- **Atomic.** Two instances checking the same client at the same moment can't both spend the last token.
+- **Timed by Redis's clock.** The script uses Redis's `TIME`, not the app's clock, so instances whose clocks drift apart still agree on how full a bucket is.
+
+### When Redis is down
+
+You have to decide what a rate limiter should do when it can't ask Redis. By default `RedisRateLimitStore` **fails open**: the request is allowed and the error logged, so a Redis outage means "no rate limiting for a while" rather than "the whole API returns errors". For a login endpoint, where the limiter is a defense against password guessing, you may prefer to fail closed:
+
+```rust
+let strict = RedisRateLimitStore::new(conn.clone()).fail_closed(); // 429 when Redis can't be asked
+```
+
+### Several limiters, one Redis
+
+Buckets are keyed `{scope}:{client}`. The default scope comes from the limit itself (`100/60s`), so two limiters with different limits never collide. If two limiters share a limit but should count separately — say, two routes — give each a scope:
+
+```rust
+RateLimiter::new(5, 60).scope("login").store(RedisRateLimitStore::new(conn.clone()))
+```
+
+## 3. A response cache every instance shares
+
+`Cache` stores successful `GET` responses and serves repeats without running the handler. Back it with Redis and a page rendered by one instance is served by all of them — and, more importantly, invalidating it on one instance clears it everywhere:
+
+```rust
+use std::time::Duration;
+use ultimo::cache::Cache;
+use ultimo::redis::RedisCacheStore;
+
+let cache = Cache::new(Duration::from_secs(60))
+    .store(RedisCacheStore::new(conn.clone()));
+app.use_middleware(cache.middleware());
+
+let c = cache.clone();
+app.put("/products/:id", move |ctx: Context| {
+    let cache = c.clone();
+    async move {
+        // ...save the product...
+        cache.invalidate("/products").await?;
+        ctx.json(json!({ "ok": true })).await
+    }
+});
+```
+
+`invalidate("/products")` removes every cached variant of that path — each query string, each `vary` header value — on every instance at once. Unlike cache reads, invalidation returns an error if Redis can't be reached, so a failed clear doesn't go unnoticed.
+
+The cache is careful about personal data by default. Requests with a `Cookie` or `Authorization` header skip it entirely, so one user's dashboard is never served to another. Opt in deliberately: `.vary(["authorization"])` keeps a separate entry per user, and `.public()` shares one entry between everyone when the response truly doesn't depend on who asks. The [caching guide](https://docs.ultimo.dev/caching) covers the full rules and where to register the middleware.
+
+## All together
+
+```rust
+use std::time::Duration;
+use ultimo::cache::Cache;
+use ultimo::middleware::builtin::RateLimiter;
+use ultimo::prelude::*;
+use ultimo::redis::{connect, RedisCacheStore, RedisRateLimitStore, RedisSessionStore};
+use ultimo::session::{session, SessionConfig};
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
+    let conn = connect(&url).await?;
+
+    let mut app = Ultimo::new();
+    app.use_middleware(
+        RateLimiter::new(100, 60)
+            .store(RedisRateLimitStore::new(conn.clone()))
+            .build(),
+    );
+    app.use_middleware(session(
+        RedisSessionStore::new(conn.clone()),
+        SessionConfig::default(),
+    ));
+    let cache = Cache::new(Duration::from_secs(60)).store(RedisCacheStore::new(conn));
+    app.use_middleware(cache.middleware());
+
+    app.get("/products", |ctx: Context| async move {
+        ctx.json(json!([{ "id": 1, "name": "Widget" }])).await
+    });
+
+    app.listen_with_shutdown("0.0.0.0:3000", ultimo::shutdown_signal())
+        .await
+}
+```
+
+Run two copies on different ports behind any load balancer and they behave as one app.
+
+## Running Redis in production
+
+- **Keys are namespaced** — `ultimo:session:`, `ultimo:ratelimit:` and `ultimo:cache:` — and each store has `.prefix(...)` if several apps share one Redis.
+- **Everything has a TTL**, so nothing grows without bound. But think about eviction: if Redis runs out of memory with an eviction policy, it may drop sessions to make room for cache entries. For anything beyond a small app, give the cache its own Redis instance (or database) from sessions and rate limits.
+- **Version:** the rate-limit script needs Redis 5 or newer, or a compatible server such as [Valkey](https://valkey.io).
+- **TLS and clusters:** `ultimo::redis::client` re-exports the `redis` crate, so you can build the `ConnectionManager` yourself — for example with a `rediss://` URL after enabling one of its TLS features. See the [Redis guide](https://docs.ultimo.dev/redis).
+
+## Try it
+
+Two examples run against a local Redis:
+
+```bash
+git clone https://github.com/ultimo-rs/ultimo
+cd ultimo
+docker run -d --rm -p 6379:6379 redis:7-alpine
+
+# Two instances on :3000 and :3001: log in on one, you're logged in on both,
+# and a burst of requests across both hits one shared rate limit.
+REDIS_URL=redis://127.0.0.1:6379 cargo run -p redis-example
+
+# A slow endpoint behind the cache: ~1 s on a miss, ~1 ms on a hit.
+REDIS_URL=redis://127.0.0.1:6379 cargo run -p response-cache-example
+```
+
+More reading: [Session authentication with cookies and CSRF](/blog/session-auth-rust-cookies-csrf), [observability with Prometheus and OpenTelemetry](/blog/rust-api-observability-prometheus-opentelemetry), and [what's new in Ultimo 0.7 to 0.9](/blog/whats-new-in-ultimo-0-7-to-0-9).

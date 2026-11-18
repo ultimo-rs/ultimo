@@ -1,0 +1,258 @@
+---
+title: "Observability for Rust APIs: Prometheus Metrics and OpenTelemetry Tracing"
+description: "Add request metrics and distributed traces to a Rust web API with Ultimo: a /metrics endpoint for Prometheus, OpenTelemetry spans exported to Jaeger, the PromQL queries worth having, and how to tie it together with request ids."
+date: "2026-11-18"
+author: "Ultimo Team"
+tags: ["tutorial", "observability", "production", "rust"]
+---
+
+# Observability for Rust APIs: Prometheus Metrics and OpenTelemetry Tracing
+
+A Rust API is fast until it isn't, and when a route gets slow at 3 a.m. you want two things: **metrics** to tell you *which* route and *since when*, and **traces** to tell you *where the time went* inside one slow request. This guide adds both to an [Ultimo](https://github.com/ultimo-rs/ultimo) app:
+
+- Prometheus metrics on a `/metrics` endpoint — request rate, errors and latency per route.
+- OpenTelemetry traces exported over OTLP to Jaeger, continuing traces started by your frontend or gateway.
+- Request ids that link a log line, a trace and a user's bug report.
+
+Each piece is a Cargo feature you opt into, and each is a couple of lines of setup.
+
+## Metrics with Prometheus
+
+```toml
+[dependencies]
+ultimo = { version = "0.9", features = ["metrics"] }
+tokio = { version = "1", features = ["full"] }
+```
+
+```rust
+use ultimo::metrics::Metrics;
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let metrics = Metrics::new();
+    let mut app = Ultimo::new();
+
+    // Register first so the latency covers every other middleware too.
+    app.use_middleware(metrics.middleware());
+    app.get("/metrics", metrics.handler());
+
+    app.get("/users/:id", |ctx: Context| async move {
+        ctx.json(json!({ "id": ctx.req.param("id")? })).await
+    });
+
+    app.listen("0.0.0.0:3000").await
+}
+```
+
+`curl localhost:3000/metrics` now returns the [Prometheus text format](https://prometheus.io/docs/instrumenting/exposition_formats/):
+
+```
+http_requests_total{method="GET",route="/users/:id",status="200"} 42
+http_request_duration_seconds_bucket{method="GET",route="/users/:id",le="0.005"} 40
+...
+http_requests_in_flight 1
+```
+
+Three series, chosen because they answer the questions you'll actually ask:
+
+| Metric | Type | Answers |
+| --- | --- | --- |
+| `http_requests_total` | counter (`method`, `route`, `status`) | How much traffic? How many errors? |
+| `http_request_duration_seconds` | histogram (`method`, `route`) | How slow, at the median and the tail? |
+| `http_requests_in_flight` | gauge | Is work piling up? |
+
+### Why the route pattern matters
+
+Notice the label is `route="/users/:id"`, not `/users/42`. Labelling by the raw path is the classic way to take down a Prometheus server: every distinct ID creates a new time series, and a crawler walking `/users/1` to `/users/1000000` creates a million of them. Ultimo labels by the *registered pattern*, so the number of series is bounded by your route table no matter what traffic arrives.
+
+### Queries worth saving
+
+Point Prometheus at the endpoint:
+
+```yaml
+scrape_configs:
+  - job_name: my-api
+    static_configs:
+      - targets: ["my-api:3000"]
+```
+
+Then three queries cover most dashboards and alerts.
+
+Requests per second, per route:
+
+```
+sum by (route) (rate(http_requests_total[5m]))
+```
+
+Error ratio, per route — the basis of an error-rate alert:
+
+```
+sum by (route) (rate(http_requests_total{status=~"5.."}[5m]))
+  / sum by (route) (rate(http_requests_total[5m]))
+```
+
+95th-percentile latency, per route:
+
+```
+histogram_quantile(0.95,
+  sum by (le, route) (rate(http_request_duration_seconds_bucket[5m])))
+```
+
+The default histogram buckets are Prometheus's own (5 ms to 10 s). If your API answers in single-digit milliseconds, tighten them so the percentiles stay accurate:
+
+```rust
+let metrics = Metrics::with_buckets(&[0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.5]);
+```
+
+### Don't publish your metrics
+
+`/metrics` reveals route names and traffic volume. On a public API, serve it on a separate internal port instead:
+
+```rust
+let mut admin = Ultimo::new_without_defaults();
+admin.get("/metrics", metrics.handler());
+
+tokio::try_join!(app.listen("0.0.0.0:3000"), admin.listen("10.0.0.5:9100"))?;
+```
+
+`Metrics` is cheap to clone and every clone shares the same counters, so one app records and the other serves. Basic auth or an [IP allow-list](https://docs.ultimo.dev/security) work too.
+
+## Traces with OpenTelemetry
+
+Metrics tell you `/checkout` got slow. A trace shows that inside a slow checkout, 900 ms went to one database query. [OpenTelemetry](https://opentelemetry.io/) is the vendor-neutral standard for traces, and Ultimo's `otel` feature creates a server span for every request.
+
+```toml
+[dependencies]
+ultimo = { version = "0.9", features = ["otel"] }
+opentelemetry = "0.33"
+opentelemetry_sdk = "0.33"
+opentelemetry-otlp = "0.33"
+tokio = { version = "1", features = ["full"] }
+```
+
+Use the same `opentelemetry` version as Ultimo (0.33). OpenTelemetry keeps its global tracer per crate version, so a provider installed through a different version is invisible to Ultimo and every span silently does nothing.
+
+```rust
+use opentelemetry::global;
+use opentelemetry_sdk::propagation::TraceContextPropagator;
+use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry_sdk::Resource;
+use ultimo::otel::Tracing;
+use ultimo::prelude::*;
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    // Export spans over OTLP/HTTP (port 4318) in batches.
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_http()
+        .build()
+        .expect("OTLP exporter");
+    let provider = SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(Resource::builder().with_service_name("my-api").build())
+        .build();
+    global::set_tracer_provider(provider.clone());
+    // Continue traces from incoming `traceparent` headers.
+    global::set_text_map_propagator(TraceContextPropagator::new());
+
+    let mut app = Ultimo::new();
+    app.use_middleware(Tracing::new().middleware());
+
+    app.get("/users/:id", |ctx: Context| async move {
+        ctx.json(json!({ "id": ctx.req.param("id")? })).await
+    });
+
+    let result = app
+        .listen_with_shutdown("0.0.0.0:3000", ultimo::shutdown_signal())
+        .await;
+    // Flush buffered spans before the process exits.
+    let _ = provider.shutdown();
+    result
+}
+```
+
+Start Jaeger locally — it accepts OTLP and has a trace viewer:
+
+```bash
+docker run --rm -e COLLECTOR_OTLP_ENABLED=true \
+  -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one:latest
+```
+
+Make a few requests, open `http://localhost:16686`, pick `my-api`, and every request is there as a span named `GET /users/:id`, with the method, route, status and user agent as attributes. In production, set `OTEL_EXPORTER_OTLP_ENDPOINT` to your collector, Grafana Tempo or Honeycomb; the code doesn't change.
+
+### What the spans record
+
+Spans follow OpenTelemetry's [HTTP semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-spans/), so dashboards built for any other HTTP server work unchanged. A few choices worth knowing:
+
+- **5xx responses mark the span as an error; 4xx don't.** A `404` is the client's mistake, not a server failure, and shouldn't page anyone.
+- **The query string is never recorded.** It often carries tokens and personal data.
+- **Requests that time out still end their span**, tagged `error.type = "cancelled"`, so slow requests don't vanish from your traces.
+
+### Distributed traces
+
+With the `TraceContextPropagator` installed, a request carrying a W3C `traceparent` header continues the caller's trace instead of starting a new one. When your frontend, API gateway or another service propagates trace context, the whole request path appears as one trace.
+
+### Spans inside your handlers
+
+The server span is the *current* span while your handler runs, so anything you start becomes its child:
+
+```rust
+use opentelemetry::trace::{Span, Tracer};
+use opentelemetry::{global, KeyValue};
+
+app.get("/reports/:id", |ctx: Context| async move {
+    let id = ctx.req.param("id")?.to_string();
+
+    let mut span = global::tracer("my-api").start("load report");
+    span.set_attribute(KeyValue::new("report.id", id.clone()));
+    let report = load_report(&id).await?; // your own code
+    span.end();
+
+    ctx.json(report).await
+});
+```
+
+Now the trace shows how much of the request was spent loading the report and how much elsewhere.
+
+## Tie it together with request ids
+
+The `request_id()` middleware gives every request an id — the incoming `X-Request-Id` if a proxy set a valid one, otherwise a new UUID — returns it in the response header, and makes it available as `ctx.request_id().await`. With tracing enabled, the id is also recorded on the span as `ultimo.request_id`.
+
+```rust
+use ultimo::middleware::builtin::request_id;
+
+app.use_middleware(Tracing::new().middleware());
+app.use_middleware(request_id());
+```
+
+When a user reports "it failed", the `X-Request-Id` from their browser's network tab finds the matching trace and log lines directly.
+
+## The full setup
+
+Metrics, tracing, request ids and graceful shutdown together, in the order that gives the most complete picture:
+
+```rust
+app.use_middleware(metrics.middleware());          // 1. outermost: measures everything
+app.use_middleware(Tracing::new().middleware());   // 2. span covers the rest of the chain
+app.use_middleware(request_id());                  // 3. id lands on the span and in logs
+app.get("/metrics", metrics.handler());
+
+app.request_timeout(std::time::Duration::from_secs(30));
+app.listen_with_shutdown("0.0.0.0:3000", ultimo::shutdown_signal()).await
+```
+
+None of this needs an agent or a sidecar: one binary exposes `/metrics` and pushes spans over OTLP.
+
+## Try it
+
+Two runnable examples show the output live in your browser:
+
+```bash
+git clone https://github.com/ultimo-rs/ultimo
+cd ultimo
+cargo run -p metrics-example        # watch /metrics update as you click
+cargo run -p otel-tracing-example   # see spans, parents and trace ids
+```
+
+Further reading: the [Metrics](https://docs.ultimo.dev/metrics) and [Tracing](https://docs.ultimo.dev/otel) docs, [deployment guides](https://docs.ultimo.dev/deployment) with health checks and graceful shutdown, and [what's new in Ultimo 0.7 to 0.9](/blog/whats-new-in-ultimo-0-7-to-0-9).

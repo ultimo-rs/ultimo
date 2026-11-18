@@ -1,0 +1,221 @@
+---
+title: "Add \"Sign in with Google\" and GitHub Login to a Rust Web App"
+description: "A step-by-step guide to OAuth2 and OpenID Connect login in Rust with Ultimo: register the app, add two routes, read the signed-in user, link users to your own database, and get the security details right."
+date: "2026-11-18"
+author: "Ultimo Team"
+tags: ["tutorial", "authentication", "oauth2", "security"]
+---
+
+# Add "Sign in with Google" and GitHub Login to a Rust Web App
+
+"Sign in with Google" looks like one button, but behind it sits a protocol that is easy to get subtly wrong: a redirect dance, a one-time code, token verification, and half a dozen checks that each stop a specific attack. This guide adds Google and GitHub login to a Rust app with [Ultimo](https://github.com/ultimo-rs/ultimo)'s `oauth2` feature, which handles that protocol for you, and explains what it checks along the way.
+
+By the end you'll have:
+
+- `/auth/google/login` and `/auth/github/login` routes that sign the user in,
+- a `/me` endpoint that returns the signed-in user,
+- logout, and
+- a hook that links each login to a user record in your own database.
+
+## Logging in vs. protecting an API
+
+There are two different jobs that both get called "OAuth":
+
+1. **Logging in browser users** to your app — they click a button, approve on Google's page, and come back signed in. That's what this guide covers.
+2. **Protecting an API with bearer tokens** that an identity provider (Auth0, Clerk, Cognito) issues to your frontend or other services. For that, verify the token on each request with [`Jwt::oidc`](https://docs.ultimo.dev/jwt) instead.
+
+## How the login flow works
+
+Ultimo implements the [authorization-code flow](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1) with [PKCE](https://datatracker.ietf.org/doc/html/rfc7636):
+
+1. The user opens `/auth/google/login`. Ultimo generates a random `state`, a PKCE verifier and a `nonce`, stores them in the user's session, and redirects to Google.
+2. The user signs in and approves. Google redirects back to your callback with a one-time `code`.
+3. The callback checks `state` against the session, exchanges the code for tokens (proving with the PKCE verifier that it's the same client that started), verifies Google's signed ID token, starts a fresh session for the user, and redirects them on.
+
+Every one of those checks has a reason, which we'll come back to.
+
+## Step 1: Register your app with the provider
+
+**Google:** in the [Google Cloud console](https://console.cloud.google.com/apis/credentials), create an *OAuth client ID* of type *Web application*. Add an authorized redirect URI:
+
+```
+http://localhost:3000/auth/google/callback
+```
+
+**GitHub:** under *Settings → Developer settings → OAuth Apps*, create an app with the callback URL:
+
+```
+http://localhost:3000/auth/github/callback
+```
+
+Each gives you a client ID and a client secret. Keep the secrets out of your code:
+
+```bash
+export GOOGLE_CLIENT_ID=...
+export GOOGLE_CLIENT_SECRET=...
+export GITHUB_CLIENT_ID=...
+export GITHUB_CLIENT_SECRET=...
+```
+
+The redirect URI must match **exactly** what you send — scheme, host, port, path and trailing slash. A mismatch is the most common reason a first attempt fails.
+
+## Step 2: Add the dependency
+
+```toml
+[dependencies]
+ultimo = { version = "0.9", features = ["oauth2"] }
+tokio = { version = "1", features = ["full"] }
+```
+
+The `oauth2` feature turns on `session` and `oidc` for you.
+
+## Step 3: Two routes per provider
+
+```rust
+use ultimo::auth::oauth2::OAuth2;
+use ultimo::prelude::*;
+use ultimo::session::{session, MemoryStore, SessionConfig};
+
+const BASE: &str = "http://localhost:3000";
+
+#[tokio::main]
+async fn main() -> ultimo::Result<()> {
+    let env = |key: &str| std::env::var(key).expect(key);
+
+    // OpenID Connect providers are configured from their issuer URL:
+    // Ultimo fetches https://accounts.google.com/.well-known/openid-configuration.
+    let google = OAuth2::discover(
+        "https://accounts.google.com",
+        env("GOOGLE_CLIENT_ID"),
+        env("GOOGLE_CLIENT_SECRET"),
+        format!("{BASE}/auth/google/callback"),
+    )
+    .await?;
+
+    // GitHub isn't an OpenID Connect provider; the preset identifies the
+    // user through GitHub's API instead.
+    let github = OAuth2::github(
+        env("GITHUB_CLIENT_ID"),
+        env("GITHUB_CLIENT_SECRET"),
+        format!("{BASE}/auth/github/callback"),
+    );
+
+    let mut app = Ultimo::new();
+    // secure(false) only because we're on http://localhost; drop it in production.
+    app.use_middleware(session(MemoryStore::new(), SessionConfig::default().secure(false)));
+
+    app.get("/auth/google/login", google.login_handler());
+    app.get("/auth/google/callback", google.callback_handler());
+    app.get("/auth/github/login", github.login_handler());
+    app.get("/auth/github/callback", github.callback_handler());
+
+    app.get("/me", |ctx: Context| async move {
+        match OAuth2::current_user(&ctx).await? {
+            Some(user) => {
+                ctx.json(json!({
+                    "id": user.subject,
+                    "email": user.email,
+                    "name": user.name,
+                }))
+                .await
+            }
+            None => Err(UltimoError::Unauthorized("not signed in".into())),
+        }
+    });
+
+    app.post("/logout", |ctx: Context| async move {
+        ctx.session().await.destroy();
+        ctx.redirect("/").await
+    });
+
+    app.listen("127.0.0.1:3000").await
+}
+```
+
+Run it and open `http://localhost:3000/auth/google/login?return_to=/me`. After approving on Google's page you land on `/me` with your profile as JSON.
+
+`return_to` decides where the user goes after logging in. It only accepts paths on your own site — `https://evil.example` or `//evil.example` become `/` — so attackers can't use your login route to bounce people to a phishing page.
+
+## What you get back
+
+`OAuth2::current_user` returns an `OAuthUser`:
+
+```rust
+pub struct OAuthUser {
+    pub subject: String,        // stable user id at the provider
+    pub email: Option<String>,
+    pub name: Option<String>,
+    pub claims: serde_json::Value, // everything the provider sent
+}
+```
+
+For Google, `claims` is the verified ID token: `email_verified`, `picture`, `locale` and so on. For GitHub it's the `/user` API response. `subject` is the field to identify people by — more on that below.
+
+## Step 4: Link logins to your own users
+
+Real apps keep their own `users` table. `on_login` replaces the default "store the user in the session and redirect" step, so you can look up or create a record first:
+
+```rust
+let google = google.on_login(|ctx, login| async move {
+    // Only trust an email address the provider has verified.
+    let verified = login.user.claims["email_verified"].as_bool() == Some(true);
+    if !verified {
+        return Err(UltimoError::Forbidden("verify your Google email first".into()));
+    }
+
+    // upsert_user is your own database code: find or create the user.
+    let user_id = upsert_user("google", &login.user.subject, login.user.email.as_deref()).await?;
+    ctx.session().await.set("user_id", &user_id).await?;
+    ctx.redirect(&login.return_to).await
+});
+```
+
+Two rules keep account linking safe:
+
+- **Key users on the provider plus `subject`**, never on email. Emails change, and two providers can each claim the same address.
+- **Only link by email when the provider says it's verified.** Otherwise someone can register `you@company.com` at a provider that doesn't check, and log in as you.
+
+When `on_login` runs, the session id has already been replaced with a fresh one. Returning an error refuses the login — useful for "company accounts only" rules. The provider's access and refresh tokens are in `login.tokens` if you need to call the provider's API later; Ultimo doesn't store them unless you do.
+
+## What Ultimo checks for you
+
+Each check in the flow stops a specific attack:
+
+| Check | What it prevents |
+| --- | --- |
+| `state` must match the login this browser started, and is single-use | An attacker forcing their own login into your session (login CSRF) |
+| PKCE code verifier | A stolen authorization code being redeemed by someone else |
+| ID token signature, `iss`, `aud`, `exp` (OpenID Connect providers) | Forged or replayed tokens, or tokens issued to a different app |
+| `nonce` in the ID token (OpenID Connect providers) | Replaying an old ID token into a new login |
+| Session id rotated on login | Session fixation — an attacker planting a session id before you log in |
+| `return_to` limited to your own paths | Using your login route as an open redirect |
+
+Google's signing keys are fetched from its JWKS endpoint, cached, and refreshed when Google rotates them. GitHub has no ID token, so there the user is identified by calling GitHub's API with the access token.
+
+## Before you ship
+
+- **Serve over HTTPS** and remove `.secure(false)`. The session cookie is then marked `Secure`.
+- **Keep the session cookie `SameSite=Lax`** (the default). The return from Google is a cross-site navigation; a `Strict` cookie isn't sent on it, and every login fails the `state` check.
+- **Running several instances?** Store sessions in Redis with [`RedisSessionStore`](https://docs.ultimo.dev/redis), or the callback may land on an instance that never saw the login start.
+- **Register the production redirect URI** with each provider. You can keep the localhost one for development.
+
+## Other providers
+
+`OAuth2::discover` works with any OpenID Connect provider — Microsoft Entra ID, Okta, Auth0, Keycloak, AWS Cognito, GitLab — given its issuer URL. For plain OAuth2 providers like Discord, pass the endpoints yourself with `OAuth2::new`. The [OAuth2 guide](https://docs.ultimo.dev/oauth2) lists issuers and options.
+
+## Try it without creating any accounts
+
+The [`oauth2-login` example](https://github.com/ultimo-rs/ultimo/tree/main/examples/oauth2-login) runs the full flow against a tiny built-in mock provider when no credentials are set, so you can watch every redirect before registering anything:
+
+```bash
+git clone https://github.com/ultimo-rs/ultimo
+cd ultimo
+cargo run -p oauth2-login-example
+```
+
+Set `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`, or `OIDC_ISSUER`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET`, to point it at a real provider.
+
+## Related reading
+
+- [Session authentication in Rust: cookies, sessions and CSRF](/blog/session-auth-rust-cookies-csrf) — the session layer this builds on.
+- [What's new in Ultimo 0.7 to 0.9](/blog/whats-new-in-ultimo-0-7-to-0-9) — everything else that shipped alongside OAuth2.
