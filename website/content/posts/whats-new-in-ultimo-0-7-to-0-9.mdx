@@ -1,0 +1,184 @@
+---
+title: "What's New in Ultimo: Everything From 0.7 to 0.9"
+description: "Typed extractors, OIDC tokens, streaming and Server-Sent Events, graceful shutdown, Prometheus metrics, OpenTelemetry tracing, Redis, \"Sign in with Google\" and response caching — a tour of thirteen Ultimo releases, with upgrade notes."
+date: "2026-11-18T12:00:00Z"
+author: "Ultimo Team"
+tags: ["release", "rust", "web-framework"]
+---
+
+# What's New in Ultimo: Everything From 0.7 to 0.9
+
+Our last post went out on September 1. Since then we've shipped thirteen releases of [Ultimo](https://github.com/ultimo-rs/ultimo), from 0.7.0 to 0.9.10, and none of them got a write-up. This post catches up: what each release added, why it matters, and the three changes you need to know about when upgrading.
+
+The short version: Ultimo now covers most of what a production API needs without reaching for extra crates — typed request parsing, login with external providers, observability, horizontal scaling with Redis, and response caching — while every feature stays opt-in behind a Cargo feature.
+
+```toml
+[dependencies]
+ultimo = "0.9"
+```
+
+## Typed extractors (0.7)
+
+Handlers used to take a `Context` and pull everything out of it by hand. They can now take typed parameters that are parsed before your code runs:
+
+```rust
+use serde::Deserialize;
+use ultimo::extract::{Path, Query, Valid};
+use ultimo::prelude::*;
+
+#[derive(Deserialize)]
+struct Page {
+    page: u32,
+}
+
+#[derive(Deserialize, Validate)]
+struct NewUser {
+    #[validate(length(min = 3))]
+    name: String,
+}
+
+app.get("/items/:id", |Path(id): Path<u32>, Query(p): Query<Page>| async move {
+    ultimo::response::helpers::text(format!("item {id}, page {}", p.page))
+});
+
+app.post("/users", |Valid(user): Valid<NewUser>| async move {
+    ultimo::response::helpers::text(format!("created {}", user.name))
+});
+```
+
+`Valid` uses the [`validator`](https://docs.rs/validator) crate's rules, so add it next to Ultimo to derive them: `validator = { version = "0.18", features = ["derive"] }`.
+
+`Path`, `Query` and `Json` reject malformed input with `400`. `Valid` deserializes the body *and* runs its `validator` rules, answering `422 Unprocessable Entity` when they fail. Handlers that take `|ctx: Context|` keep working unchanged, and you can mix the two styles in one app.
+
+## Verifying tokens from Auth0, Clerk, Cognito and friends (0.8)
+
+The `jwt` middleware used to handle HS256 tokens you issued yourself. With the `oidc` feature it also verifies RS256/ES256 tokens issued by an identity provider, fetching and caching its signing keys (JWKS) and rotating them when the provider does:
+
+```rust
+use ultimo::auth::jwt::Jwt;
+
+app.use_middleware(
+    Jwt::oidc("https://your-tenant.auth0.com/")
+        .audience("your-api-identifier")
+        .build(),
+);
+```
+
+This is for APIs that receive bearer tokens. If you want browser users to *log in* with a provider, see OAuth2 below. Details are in the [JWT & OIDC guide](https://docs.ultimo.dev/jwt).
+
+## Streaming responses and Server-Sent Events (0.9)
+
+Responses no longer have to be fully buffered. `ctx.stream(...)` sends a body chunk by chunk, and `ctx.sse(...)` sends typed [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) that a browser can consume with a plain `EventSource`:
+
+```rust
+use ultimo::{sse_channel, SseEvent};
+
+app.sse("/feed", |ctx: Context| async move {
+    let (tx, rx) = sse_channel();
+    tokio::spawn(async move {
+        for n in 0..5 {
+            if tx.send(SseEvent::new(&json!({ "n": n })).unwrap()).is_err() {
+                break; // the client went away
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    });
+    ctx.sse(rx).await
+});
+```
+
+SSE is the simplest way to push live updates — progress bars, notifications, LLM token streams — when you don't need the two-way channel a WebSocket gives you. See [SSE](https://docs.ultimo.dev/sse) and [Streaming](https://docs.ultimo.dev/streaming).
+
+## Request timeouts and graceful shutdown (0.9.3)
+
+Two things every deployed service needs, now built in:
+
+```rust
+use std::time::Duration;
+
+app.request_timeout(Duration::from_secs(30));       // 408 if a handler takes longer
+app.shutdown_grace_period(Duration::from_secs(25)); // stay below your platform's kill timeout
+
+app.listen_with_shutdown("0.0.0.0:3000", ultimo::shutdown_signal()).await?;
+```
+
+On `SIGTERM` — what Docker, Kubernetes and Fly.io send before stopping a container — the server stops accepting connections, lets in-flight requests finish within the grace period, and closes WebSockets with a proper `1001 Going Away` frame. Rolling deploys stop dropping requests.
+
+## A middleware pack (0.9.4)
+
+Small pieces most apps end up writing themselves:
+
+- `request_id()` — accepts or generates an `X-Request-Id`, exposes it as `ctx.request_id()`, and tags log lines with it.
+- `etag()` and `cache_control(...)` — conditional `GET` with `304 Not Modified`, and default caching headers.
+- `server_timing()` — a `Server-Timing` header your browser's dev tools understand.
+- `BasicAuth` — HTTP Basic auth for admin pages and internal endpoints.
+- `trim_trailing_slash()` / `append_trailing_slash()` — one canonical URL per route.
+
+All in [`middleware::builtin`](https://docs.ultimo.dev/middleware).
+
+## Prometheus metrics (0.9.5) and OpenTelemetry tracing (0.9.6)
+
+With the `metrics` feature, two lines give you a request counter, a latency histogram and an in-flight gauge, served at `/metrics` for Prometheus to scrape:
+
+```rust
+use ultimo::metrics::Metrics;
+
+let metrics = Metrics::new();
+app.use_middleware(metrics.middleware());
+app.get("/metrics", metrics.handler());
+```
+
+Series are labelled with the *route pattern* (`/users/:id`), never the raw path, so a crawler hitting random IDs can't explode your metrics storage.
+
+With the `otel` feature, `Tracing::new().middleware()` creates an [OpenTelemetry](https://opentelemetry.io) server span for every request, continues incoming W3C `traceparent` headers, and works with any OTLP backend — Jaeger, Grafana Tempo, Honeycomb. We've written a [full walkthrough of both](/blog/rust-api-observability-prometheus-opentelemetry).
+
+## Redis: shared sessions and rate limits (0.9.7)
+
+Running two instances behind a load balancer breaks in-memory state: a user logs in on one instance and the next request lands on the other. The `redis` feature adds `RedisSessionStore` and `RedisRateLimitStore`, so every instance shares one view of who's logged in and how many requests a client has made. The rate limiter runs as an atomic Lua script timed by Redis's own clock, so instances with skewed clocks still agree. More in [Scaling a Rust API across instances](/blog/scaling-rust-api-redis-sessions-rate-limits-caching).
+
+## "Sign in with Google / GitHub / Okta" (0.9.8)
+
+The `oauth2` feature adds the whole browser login flow in two routes: the authorization-code flow with PKCE, `state` and `nonce` checks, ID-token verification for OpenID Connect providers, session-id rotation on login, and protection against open redirects. It works with any OpenID Connect provider through discovery, and has a preset for GitHub. Walkthrough: [Add "Sign in with Google" to a Rust API](/blog/oauth2-login-rust-sign-in-with-google-github).
+
+## Response caching (0.9.9)
+
+`Cache` stores successful `GET` responses and serves repeats without running the handler — in memory by default, or in Redis so every instance shares one cache. It is conservative by default: requests carrying a `Cookie` or `Authorization` header skip the cache unless you opt in, so one user's page is never served to another.
+
+```rust
+use std::time::Duration;
+use ultimo::cache::Cache;
+
+let cache = Cache::new(Duration::from_secs(60));
+app.use_middleware(cache.middleware());
+
+// when the data behind a page changes:
+cache.invalidate("/products").await?;
+```
+
+See [Response Caching](https://docs.ultimo.dev/caching).
+
+## A security fix (0.9.10)
+
+0.9.10 upgrades the `jsonwebtoken` dependency to version 12, which removes a version of `crypto-bigint` with non-constant-time arithmetic ([RUSTSEC-2026-0387](https://rustsec.org/advisories/RUSTSEC-2026-0387)). If you use the `jwt`, `oidc` or `oauth2` features, update:
+
+```bash
+cargo update -p ultimo
+```
+
+It also brings two behavior changes from upstream: tokens whose header lists an unknown `crit` extension are now rejected, and `Jwt::hs256("")` panics at startup — an empty HMAC secret would let anyone forge tokens.
+
+## Upgrading from 0.6
+
+Most of these releases are additive, but three changes can affect existing code:
+
+1. **Validation errors are `422`, not `400` (0.7).** `UltimoError::Validation` — what `validate()` returns — now maps to `422 Unprocessable Entity`. Malformed JSON is still `400`. If a client or test checks for `400` on invalid input, update it.
+2. **The response body type changed (0.9).** `Response` is now `hyper::Response<UltimoBody>` instead of `hyper::Response<Full<Bytes>>`, which is what makes streaming possible. Handlers that return `ctx.json(...)` and friends are unaffected; code that names `Full<Bytes>` on the response side needs to switch to `UltimoBody`. `res.into_body().collect()` still works.
+3. **`jwt`, `oidc` and `oauth2` users need Rust 1.88** for `jsonwebtoken` 12; the rest of Ultimo still builds on Rust 1.86. The `redis` feature also needs 1.88.
+
+The full list is in the [changelog](https://docs.ultimo.dev/changelog).
+
+## What's next
+
+On the [roadmap](https://docs.ultimo.dev/roadmap): Rust client generation (`ultimo generate --target rust`), WebSocket compression, OpenTelemetry metrics export, and the stabilization work toward 1.0 — a public-API audit and a SemVer freeze. If there's something you need before then, [open an issue](https://github.com/ultimo-rs/ultimo/issues) or start a [discussion](https://github.com/ultimo-rs/ultimo/discussions).
+
+New to Ultimo? [Build your first API in 10 minutes](/blog/build-your-first-api-with-ultimo).
