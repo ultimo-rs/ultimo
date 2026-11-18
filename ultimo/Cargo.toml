@@ -86,6 +86,8 @@ rsa = { version = "0.9", features = ["std"] }
 rand = "0.8"
 # In-memory span exporter + W3C propagator for the `otel` integration tests.
 opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace", "testing"] }
+# Lower RLIMIT_NOFILE (safely) to force EMFILE in the accept-loop test.
+rlimit = "0.10"
 
 [features]
 default = []

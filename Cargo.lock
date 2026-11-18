@@ -3180,6 +3180,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rlimit"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7043b63bd0cd1aaa628e476b80e6d4023a3b50eb32789f2728908107bd0c793a"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "rmcp"
 version = "3.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4468,6 +4477,7 @@ dependencies = [
  "rand 0.8.6",
  "redis",
  "reqwest",
+ "rlimit",
  "rsa 0.9.10",
  "serde",
  "serde_json",
