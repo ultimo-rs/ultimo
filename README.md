@@ -57,7 +57,7 @@ the framework is 100% safe Rust (`#![forbid(unsafe_code)]`).
 
 ```toml
 [dependencies]
-ultimo = "0.10"
+ultimo = "0.11"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 ```
@@ -135,7 +135,7 @@ Everything is opt-in (`default = []`):
 | `diesel-postgres` · `diesel-mysql` · `diesel-sqlite` | Diesel 2.4 integration per backend (Rust 1.88+)                   |
 
 ```toml
-ultimo = { version = "0.10", features = ["websocket", "jwt", "sqlx-postgres"] }
+ultimo = { version = "0.11", features = ["websocket", "jwt", "sqlx-postgres"] }
 ```
 
 ## CLI
