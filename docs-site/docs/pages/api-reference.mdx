@@ -1374,8 +1374,8 @@ All features are off by default (`default = []`).
 - `oidc` - Verify RS256/ES256 tokens against a provider's JWKS endpoint (`Jwt::jwks`, `Jwt::oidc`, `Jwt::jwks_from_set`) with fetch/cache/rotation ([JWT](/jwt))
 - `testing` - Testing utilities: `TestClient`, assertions, helpers ([Testing](/testing))
 - `test-helpers` - WebSocket test helpers (for integration tests)
-- `sqlx-postgres` / `sqlx-mysql` / `sqlx-sqlite` - SQLx integration per backend
-- `diesel-postgres` / `diesel-mysql` / `diesel-sqlite` - Diesel integration per backend
+- `sqlx-postgres` / `sqlx-mysql` / `sqlx-sqlite` - SQLx 0.9 integration per backend; needs Rust 1.94 ([SQLx](/sqlx))
+- `diesel-postgres` / `diesel-mysql` / `diesel-sqlite` - Diesel 2.4 integration per backend; needs Rust 1.88 ([Diesel](/diesel))
 
 ```toml
 ultimo = { version = "0.10", features = ["websocket", "session", "sqlx-postgres"] }

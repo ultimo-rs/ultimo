@@ -81,8 +81,8 @@ it with `#[cfg(feature = "...")]`. Features: `websocket`, `websocket-compression
 `jwt`), `oauth2` (OAuth2/OIDC login; implies `oidc` + `session`), `api-key`, `static-files`, `compression`, `metrics` (Prometheus), `otel` (OpenTelemetry tracing), `redis` (session, rate-limit + response-cache stores; needs Rust 1.88),
 `client-gen` (ts-rs type
 derivation), `test-helpers` (exposes `websocket::test_helpers` for integration
-tests), `database` (enabled transitively by `sqlx-postgres|mysql|sqlite`,
-`diesel-postgres|mysql|sqlite`).
+tests), `database` (enabled transitively by `sqlx-postgres|mysql|sqlite` (SQLx 0.9;
+needs Rust 1.94), `diesel-postgres|mysql|sqlite` (Diesel 2.4; needs Rust 1.88)).
 
 ## ⚠️ Test invocation gotchas (READ BEFORE TOUCHING TESTS)
 

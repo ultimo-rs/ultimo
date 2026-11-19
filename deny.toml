@@ -13,11 +13,6 @@ version = 2
 ignore = [
   "RUSTSEC-2024-0421", # idna
   "RUSTSEC-2023-0071", # rsa
-  # libsqlite3-sys < 0.39 (bundled C SQLite CVE). Pinned by sqlx: even sqlx
-  # 0.9.0 requires libsqlite3-sys < 0.38, and the workspace can only have one
-  # libsqlite3-sys (`links = "sqlite3"`). diesel-sqlite users can already get
-  # >= 0.39 with diesel 2.4. Tracked in #204.
-  "RUSTSEC-2026-0459", # libsqlite3-sys (C SQLite CVE)
   # Unmaintained (not vulnerabilities) transitive deps — low risk, no control.
   "RUSTSEC-2024-0370", # proc-macro-error
   "RUSTSEC-2024-0384", # instant (via notify)

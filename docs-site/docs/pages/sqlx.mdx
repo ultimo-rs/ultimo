@@ -19,7 +19,7 @@ Add dependencies to `Cargo.toml`:
 ```toml
 [dependencies]
 ultimo = { version = "0.10", features = ["sqlx-postgres"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres"] }
+sqlx = { version = "0.9", features = ["runtime-tokio", "postgres"] }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 ```
@@ -28,6 +28,13 @@ For other databases:
 
 - **MySQL**: `features = ["runtime-tokio", "mysql"]`
 - **SQLite**: `features = ["runtime-tokio", "sqlite"]`
+
+The `sqlx-*` features use **SQLx 0.9, which needs Rust 1.94**. The rest of Ultimo keeps its 1.86 MSRV.
+
+:::info
+**Upgrading from Ultimo 0.10:**
+Ultimo 0.11 moved from SQLx 0.8 to 0.9 to pick up a fixed bundled SQLite ([RUSTSEC-2026-0459](https://rustsec.org/advisories/RUSTSEC-2026-0459)). `SqlxPool` and `ctx.sqlx()` hand you SQLx types directly, so bump your own `sqlx` dependency to `"0.9"` in the same change. SQLx 0.9 renamed the combined runtime/TLS features: replace `runtime-tokio-rustls` with `runtime-tokio` plus `tls-rustls`. The [SQLx changelog](https://github.com/launchbadge/sqlx/blob/main/CHANGELOG.md) lists its other changes.
+:::
 
 ## Basic Setup
 

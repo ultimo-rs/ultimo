@@ -131,8 +131,8 @@ Everything is opt-in (`default = []`):
 | `oauth2`                                             | "Sign in with …" login: OAuth2 + PKCE, OIDC ID tokens, sessions   |
 | `testing`                                            | In-process `TestClient`, assertions, fixtures                     |
 | `test-helpers`                                       | WebSocket test helpers (for integration tests)                    |
-| `sqlx-postgres` · `sqlx-mysql` · `sqlx-sqlite`       | SQLx integration per backend                                      |
-| `diesel-postgres` · `diesel-mysql` · `diesel-sqlite` | Diesel integration per backend                                    |
+| `sqlx-postgres` · `sqlx-mysql` · `sqlx-sqlite`       | SQLx 0.9 integration per backend (Rust 1.94+)                     |
+| `diesel-postgres` · `diesel-mysql` · `diesel-sqlite` | Diesel 2.4 integration per backend (Rust 1.88+)                   |
 
 ```toml
 ultimo = { version = "0.10", features = ["websocket", "jwt", "sqlx-postgres"] }
