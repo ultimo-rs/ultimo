@@ -171,13 +171,12 @@ ultimo generate --path ./src --output ./frontend/src/api
 
 The generated client includes full TypeScript types matching your Rust structs, proper error handling, and method signatures. Your frontend developers get autocomplete, type checking, and zero manual API client maintenance.
 
-**With Axum**, you'd typically:
+**With Axum**, the generated client comes from a library you add. There are two common routes:
 
-1. Manually write OpenAPI specs (or use `utoipa` to derive them)
-2. Run a separate code generator like `openapi-typescript-codegen`
-3. Maintain synchronization between your Rust types and the generated client
+- **Through OpenAPI:** derive a spec with [`utoipa`](https://crates.io/crates/utoipa), then run a separate generator such as `openapi-typescript-codegen` on it, and re-run it whenever your Rust types change.
+- **Directly from Rust types:** [`reflectapi`](https://github.com/thepartly/reflectapi) has Axum support and generates TypeScript and Rust clients (Python is experimental) from your Rust code, with no OpenAPI step in between.
 
-Ultimo collapses this into a single, integrated workflow. For teams with a TypeScript frontend, this eliminates an entire category of bugs — API contract mismatches between frontend and backend.
+Ultimo builds this into the framework instead: the RPC registry that serves your endpoints also writes the client, so there's no extra crate or generator to wire up. For teams with a TypeScript frontend, this eliminates an entire category of bugs — API contract mismatches between frontend and backend.
 
 ## Authentication & Authorization
 
@@ -325,7 +324,7 @@ If stability and ecosystem breadth are your top priorities, Axum is the safer ch
 | Response compression      | ✅ (built-in)        | Via `tower-http`      |
 | WebSocket                 | ✅ (with pub/sub)    | ✅ (raw)              |
 | JSON-RPC                  | ✅ (first-class)     | ❌                    |
-| TypeScript client gen     | ✅ (automatic)       | ❌                    |
+| TypeScript client gen     | ✅ (automatic)       | Via `reflectapi`      |
 | OpenAPI generation        | ✅ (built-in)        | Via `utoipa`          |
 | Sessions                  | ✅ (built-in)        | Via `tower-sessions`  |
 | CSRF protection           | ✅ (built-in)        | Manual                |
