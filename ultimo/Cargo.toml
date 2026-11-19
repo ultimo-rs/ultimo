@@ -63,8 +63,8 @@ opentelemetry = { version = "0.33", default-features = false, features = ["trace
 redis = { version = "1", default-features = false, features = ["tokio-comp", "connection-manager", "script"], optional = true }
 
 # Database support (optional)
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls"], optional = true }
-diesel = { version = "2.3.10", optional = true }  # >=2.3.8: RUSTSEC fix for COPY command injection + unaligned access
+sqlx = { version = "0.9", features = ["runtime-tokio", "tls-rustls"], optional = true }
+diesel = { version = "2.4", optional = true }  # >=2.4: bundled SQLite via libsqlite3-sys >=0.39 (RUSTSEC-2026-0459)
 r2d2 = { version = "0.8", optional = true }
 
 [dev-dependencies]

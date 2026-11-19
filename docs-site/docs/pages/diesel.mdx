@@ -19,7 +19,7 @@ Add dependencies to `Cargo.toml`:
 ```toml
 [dependencies]
 ultimo = { version = "0.10", features = ["diesel-postgres"] }
-diesel = { version = "2", features = ["postgres", "r2d2"] }
+diesel = { version = "2.4", features = ["postgres", "r2d2"] }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 ```
@@ -28,6 +28,8 @@ For other databases:
 
 - **MySQL**: `features = ["mysql", "r2d2"]`
 - **SQLite**: `features = ["sqlite", "r2d2"]`
+
+The `diesel-*` features need **Diesel 2.4 and Rust 1.88**. Diesel 2.4 bundles a SQLite with the fix for [RUSTSEC-2026-0459](https://rustsec.org/advisories/RUSTSEC-2026-0459). The rest of Ultimo keeps its 1.86 MSRV.
 
 Install Diesel CLI:
 

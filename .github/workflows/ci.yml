@@ -219,6 +219,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libpq-dev default-libmysqlclient-dev pkg-config
+          # pkg-config reports libmysqlclient's library version (e.g. 24.x),
+          # which mysqlclient-sys rejects; give it the MySQL release instead.
+          echo "MYSQLCLIENT_VERSION=$(mysql_config --version)" >> "$GITHUB_ENV"
+          mysql_config --version
 
       - name: Build all features
         run: cargo build -p ultimo --all-features
@@ -300,6 +304,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libpq-dev default-libmysqlclient-dev pkg-config
+          # pkg-config reports libmysqlclient's library version (e.g. 24.x),
+          # which mysqlclient-sys rejects; give it the MySQL release instead.
+          echo "MYSQLCLIENT_VERSION=$(mysql_config --version)" >> "$GITHUB_ENV"
+          mysql_config --version
       - uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           package: ultimo
@@ -320,12 +328,11 @@ jobs:
           tool: cargo-audit
       - name: cargo audit (committed Cargo.lock)
         # Keep in sync with deny.toml's [advisories].ignore (reasons there):
-        # idna, rsa, libsqlite3-sys — no compatible fix yet.
+        # idna, rsa — no compatible fix yet.
         run: |
           cargo audit \
             --ignore RUSTSEC-2024-0421 \
-            --ignore RUSTSEC-2023-0071 \
-            --ignore RUSTSEC-2026-0459
+            --ignore RUSTSEC-2023-0071
 
   # ── Supply-chain checks (cargo-deny) ──────────────────────────────────
   # Advisories (RUSTSEC), banned/duplicate deps, and source pinning. License
