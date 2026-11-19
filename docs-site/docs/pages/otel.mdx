@@ -6,7 +6,7 @@ trace from a W3C `traceparent` header. Send the spans to Jaeger, Grafana Tempo,
 Honeycomb, Datadog or any OTLP collector. Requires the `otel` Cargo feature.
 
 ```toml
-ultimo = { version = "0.10", features = ["otel"] }
+ultimo = { version = "0.11", features = ["otel"] }
 ```
 
 Ultimo depends only on the [`opentelemetry`](https://docs.rs/opentelemetry)
@@ -17,7 +17,7 @@ globally; until it does, every span is a no-op and costs next to nothing.
 
 ```toml
 [dependencies]
-ultimo = { version = "0.10", features = ["otel"] }
+ultimo = { version = "0.11", features = ["otel"] }
 opentelemetry = "0.33"
 opentelemetry_sdk = "0.33"
 opentelemetry-otlp = "0.33"   # HTTP/protobuf exporter, port 4318
