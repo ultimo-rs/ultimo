@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.10.1...ultimo-v0.11.0) - 2026-11-19
+
+### Fixed
+
+- *(database)* [**breaking**] upgrade sqlx to 0.9 and diesel to 2.4, clearing RUSTSEC-2026-0459 ([#235](https://github.com/ultimo-rs/ultimo/pull/235))
+
 ## [0.10.1](https://github.com/ultimo-rs/ultimo/compare/ultimo-v0.10.0...ultimo-v0.10.1) - 2026-11-18
 
 ### Fixed
